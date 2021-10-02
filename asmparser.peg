@@ -2,10 +2,18 @@
 
 %value "Parsev"
 
-program <- line* !.
-line <- s:stmt eol { srcpos = $0s; onstmt(s); }
+line <- s:stmt eol { $$ = s; }
+      / eol { $$.kind = ASM_BLANK; }
+      / . { $$.kind = ASM_SYNTAX_ERROR; }
+      
 stmt <- i:instr { $$ = i; }
-instr <- "nop" { $$.instr = (Instr){.kind = ASM_NOP}; }
-       / "ret" { $$.instr = (Instr){.kind = ASM_RET}; }
-ws <- [ \t]*
-eol <- ws ("\n" / ! .)
+      / l:label {  $$ = l; } 
+label <- i:ident ':' { $$.label = (Label){.kind = ASM_LABEL, .value = i.ident}; }
+instr <- "nop" { $$.instr = (Instr){.kind = ASM_NOP }; }
+       / "ret" { $$.instr = (Instr){.kind = ASM_RET }; }
+       / "jmp" ws i:ident
+           { $$.instr = (Instr){.kind = ASM_JMP, .jmp.target = i.ident}; }
+ident <- <[_a-zA-Z][_a-zA-Z0-9]*> { $$.ident = xstrdup($1); } 
+
+ws <- [ \t]+
+eol <- ws? ("\n" / (! .))
