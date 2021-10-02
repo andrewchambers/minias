@@ -8,13 +8,19 @@ typedef struct {
 
 #define MAXSECTIONS 32
 static Section sections[MAXSECTIONS];
-static size_t nsections = 0;
+static size_t nsections = 1; // first is reserved.
 
+static Section *shstrtab = NULL;
 static Section *strtab = NULL;
 static Section *symtab = NULL;
-static Section *textsec = NULL;
+static Section *bss = NULL;
+static Section *text = NULL;
 
-void secappend(Section *s, uint8_t *bytes, size_t n) {
+static void secappend(Section *s, uint8_t *bytes, size_t n) {
+  if (s->capacity == 0) {
+    s->capacity = 32;
+    s->data = xmalloc(s->capacity);
+  }
   while (s->capacity < s->hdr.sh_size + n) {
     s->capacity = s->capacity * 2;
     s->data = xrealloc(s->data, s->capacity);
@@ -23,54 +29,63 @@ void secappend(Section *s, uint8_t *bytes, size_t n) {
   s->hdr.sh_size += n;
 }
 
-Elf64_Word elfstr(const char *s) {
+static Elf64_Word elfstr(Section *strsec, const char *s) {
   Elf64_Word i;
-  for (i = 0; i < strtab->hdr.sh_size; i++) {
-    if (i == 0 || (strtab->data[i - 1] == 0))
-      if (strcmp(s, (char *)&strtab->data[i]) == 0)
+  for (i = 0; i < strsec->hdr.sh_size; i++) {
+    if (i == 0 || (strsec->data[i - 1] == 0))
+      if (strcmp(s, (char *)&strsec->data[i]) == 0)
         return i;
   }
-  secappend(strtab, (uint8_t *)s, strlen(s) + 1);
+  secappend(strsec, (uint8_t *)s, strlen(s) + 1);
   return i;
 }
 
-Section *newsection(const char *name) {
+static Section *newsection() {
   Section *s;
   s = &sections[nsections++];
   if (nsections > MAXSECTIONS)
     die("too many sections");
-  s->hdr.sh_name = elfstr(name);
-  s->capacity = 32;
-  s->data = xmalloc(s->capacity);
   return s;
 }
 
-void initsections(void) {
-  /* Manually init string table first */
-  strtab = &sections[nsections++];
+static void initsections(void) {
+  shstrtab = newsection();
+  shstrtab->hdr.sh_name = elfstr(shstrtab, ".shstrtab");
+  shstrtab->hdr.sh_type = SHT_STRTAB;
+  shstrtab->hdr.sh_entsize = 1;
+
+  strtab = newsection();
+  strtab->hdr.sh_name = elfstr(shstrtab, ".strtab");
   strtab->hdr.sh_type = SHT_STRTAB;
-  strtab->capacity = 16;
-  strtab->data = xmalloc(strtab->capacity);
-  strtab->hdr.sh_name = elfstr(".strtab");
   strtab->hdr.sh_entsize = 1;
 
-  symtab = newsection(".symtab");
+  symtab = newsection();
+  symtab->hdr.sh_name = elfstr(shstrtab, ".symtab");
   symtab->hdr.sh_type = SHT_SYMTAB;
   symtab->hdr.sh_link = 1;
   symtab->hdr.sh_entsize = sizeof(Elf64_Sym);
 
-  textsec = newsection(".text");
-  textsec->hdr.sh_type = SHT_PROGBITS;
-  textsec->hdr.sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-  textsec->hdr.sh_entsize = 1;
+  bss = newsection();
+  bss->hdr.sh_name = elfstr(shstrtab, ".bss");
+  bss->hdr.sh_type = SHT_NOBITS;
+  bss->hdr.sh_flags = SHF_ALLOC | SHF_WRITE;
+  bss->hdr.sh_entsize = 1;
+  bss->hdr.sh_addralign = 16; // XXX right value?
+
+  text = newsection();
+  text->hdr.sh_name = elfstr(shstrtab, ".text");
+  text->hdr.sh_type = SHT_PROGBITS;
+  text->hdr.sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+  text->hdr.sh_entsize = 1;
+  text->hdr.sh_addralign = 4;
 }
 
-void out(uint8_t *buf, size_t n) {
+static void out(uint8_t *buf, size_t n) {
   if (write(STDOUT_FILENO, buf, n) != n)
     die("io error");
 }
 
-void outelf(void) {
+static void outelf(void) {
   size_t i;
   uint64_t offset = 0;
   Elf64_Ehdr ehdr = {0};
@@ -100,6 +115,8 @@ void outelf(void) {
     offset += sections[i].hdr.sh_size;
   }
   for (i = 0; i < nsections; i++) {
+    if (sections[i].hdr.sh_type == SHT_NOBITS)
+      continue;
     out(sections[i].data, sections[i].hdr.sh_size);
   }
 }
