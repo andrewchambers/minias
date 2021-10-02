@@ -40,13 +40,13 @@ Section *newsection(const char *name) {
   if (nsections > MAXSECTIONS)
     die("too many sections");
   s->hdr.sh_name = elfstr(name);
-  s->capacity = 16;
+  s->capacity = 32;
   s->data = xmalloc(s->capacity);
   return s;
 }
 
 void initsections(void) {
-  /* Manually init string table */
+  /* Manually init string table first */
   strtab = &sections[nsections++];
   strtab->hdr.sh_type = SHT_STRTAB;
   strtab->capacity = 16;
