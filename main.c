@@ -17,12 +17,8 @@ static Section *bss = NULL;
 static Section *text = NULL;
 
 static void secappend(Section *s, uint8_t *bytes, size_t n) {
-  if (s->capacity == 0) {
-    s->capacity = 32;
-    s->data = xmalloc(s->capacity);
-  }
   while (s->capacity < s->hdr.sh_size + n) {
-    s->capacity = s->capacity * 2;
+    s->capacity = s->capacity ? (s->capacity * 2) : 64;
     s->data = xrealloc(s->data, s->capacity);
   }
   memcpy(s->data + s->hdr.sh_size, bytes, n);
@@ -49,15 +45,19 @@ static Section *newsection() {
 }
 
 static void initsections(void) {
+  uint8_t zb = 0;
+
   shstrtab = newsection();
   shstrtab->hdr.sh_name = elfstr(shstrtab, ".shstrtab");
   shstrtab->hdr.sh_type = SHT_STRTAB;
   shstrtab->hdr.sh_entsize = 1;
+  secappend(shstrtab, &zb, 1);
 
   strtab = newsection();
   strtab->hdr.sh_name = elfstr(shstrtab, ".strtab");
   strtab->hdr.sh_type = SHT_STRTAB;
   strtab->hdr.sh_entsize = 1;
+  secappend(strtab, &zb, 1);
 
   symtab = newsection();
   symtab->hdr.sh_name = elfstr(shstrtab, ".symtab");
@@ -102,8 +102,8 @@ static void outelf(void) {
   ehdr.e_flags = 0;
   ehdr.e_version = 1;
   ehdr.e_ehsize = sizeof(Elf64_Ehdr);
-  ehdr.e_shentsize = sizeof(Elf64_Shdr);
   ehdr.e_shoff = sizeof(Elf64_Ehdr);
+  ehdr.e_shentsize = sizeof(Elf64_Shdr);
   ehdr.e_shnum = nsections;
   ehdr.e_shstrndx = 1;
   offset = sizeof(Elf64_Shdr) * nsections;
