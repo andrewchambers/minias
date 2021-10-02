@@ -25,14 +25,14 @@ static void secappend(Section *s, uint8_t *bytes, size_t n) {
   s->hdr.sh_size += n;
 }
 
-static Elf64_Word elfstr(Section *strsec, const char *s) {
+static Elf64_Word elfstr(Section *sec, const char *s) {
   Elf64_Word i;
-  for (i = 0; i < strsec->hdr.sh_size; i++) {
-    if (i == 0 || (strsec->data[i - 1] == 0))
-      if (strcmp(s, (char *)&strsec->data[i]) == 0)
+  for (i = 0; i < sec->hdr.sh_size; i++) {
+    if (i == 0 || (sec->data[i - 1] == 0))
+      if (strcmp(s, (char *)&sec->data[i]) == 0)
         return i;
   }
-  secappend(strsec, (uint8_t *)s, strlen(s) + 1);
+  secappend(sec, (uint8_t *)s, strlen(s) + 1);
   return i;
 }
 
@@ -48,21 +48,21 @@ static void initsections(void) {
   uint8_t zb = 0;
 
   shstrtab = newsection();
+  secappend(shstrtab, &zb, 1);
   shstrtab->hdr.sh_name = elfstr(shstrtab, ".shstrtab");
   shstrtab->hdr.sh_type = SHT_STRTAB;
   shstrtab->hdr.sh_entsize = 1;
-  secappend(shstrtab, &zb, 1);
 
   strtab = newsection();
+  secappend(strtab, &zb, 1);
   strtab->hdr.sh_name = elfstr(shstrtab, ".strtab");
   strtab->hdr.sh_type = SHT_STRTAB;
   strtab->hdr.sh_entsize = 1;
-  secappend(strtab, &zb, 1);
 
   symtab = newsection();
   symtab->hdr.sh_name = elfstr(shstrtab, ".symtab");
   symtab->hdr.sh_type = SHT_SYMTAB;
-  symtab->hdr.sh_link = 1;
+  symtab->hdr.sh_link = 2;
   symtab->hdr.sh_entsize = sizeof(Elf64_Sym);
 
   bss = newsection();
