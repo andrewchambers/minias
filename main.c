@@ -87,7 +87,7 @@ static void out(uint8_t *buf, size_t n) {
 
 static void outelf(void) {
   size_t i;
-  uint64_t offset = 0;
+  uint64_t offset;
   Elf64_Ehdr ehdr = {0};
 
   ehdr.e_ident[0] = 0x7f;
@@ -106,9 +106,10 @@ static void outelf(void) {
   ehdr.e_shentsize = sizeof(Elf64_Shdr);
   ehdr.e_shnum = nsections;
   ehdr.e_shstrndx = 1;
-  offset = sizeof(Elf64_Shdr) * nsections;
 
   out((uint8_t *)&ehdr, sizeof(ehdr));
+  offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Shdr) * nsections;
+
   for (i = 0; i < nsections; i++) {
     sections[i].hdr.sh_offset = offset;
     out((uint8_t *)&sections[i].hdr, sizeof(Elf64_Shdr));
