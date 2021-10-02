@@ -9,11 +9,6 @@ Goals:
 - Static linking.
 - A simple, tiny, fast implementation (in that order).
 
-Stretch goals:
-
-- Assemble what is needed to compile musl libc.
-- Dynamic linking.
-
 Non Goals:
 
 - Assemble every assembly instruction.
@@ -21,5 +16,6 @@ Non Goals:
 
 # Resources
 
+- [elf spec](https://refspecs.linuxfoundation.org/elf/elf.pdf)
 - [goas](https://github.com/DQNEO/goas)
 - [neatas](https://repo.or.cz/neatas.git)
