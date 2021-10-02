@@ -6,7 +6,7 @@ Goals:
 
 - Assemble the output of [cproc](https://github.com/michaelforney/cproc)/[qbe](https://c9x.me/compile/).
 - x86_64 elf output.
-- Static linking.
+- Static linking only.
 - A simple, tiny, fast implementation (in that order).
 
 Non Goals:
