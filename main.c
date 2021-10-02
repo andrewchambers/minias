@@ -1,15 +1,12 @@
-#include "minias.h"
+#include "dumbas.h"
 
-typedef struct {
-  Elf64_Shdr hdr;
-  size_t capacity;
-  uint8_t *data;
-} Section;
+int srcpos = 0;
 
 #define MAXSECTIONS 32
 static Section sections[MAXSECTIONS];
 static size_t nsections = 1; // first is reserved.
 
+static Section *cursection = NULL;
 static Section *shstrtab = NULL;
 static Section *strtab = NULL;
 static Section *symtab = NULL;
@@ -23,6 +20,10 @@ static void secappend(Section *s, uint8_t *bytes, size_t n) {
   }
   memcpy(s->data + s->hdr.sh_size, bytes, n);
   s->hdr.sh_size += n;
+}
+
+static void secbyte(Section *s, uint8_t b) {
+  secappend(s, &b, 1);
 }
 
 static Elf64_Word elfstr(Section *sec, const char *s) {
@@ -45,16 +46,14 @@ static Section *newsection() {
 }
 
 static void initsections(void) {
-  uint8_t zb = 0;
-
   shstrtab = newsection();
-  secappend(shstrtab, &zb, 1);
+  secbyte(shstrtab, 0);
   shstrtab->hdr.sh_name = elfstr(shstrtab, ".shstrtab");
   shstrtab->hdr.sh_type = SHT_STRTAB;
   shstrtab->hdr.sh_entsize = 1;
 
   strtab = newsection();
-  secappend(strtab, &zb, 1);
+  secbyte(strtab, 0);
   strtab->hdr.sh_name = elfstr(shstrtab, ".strtab");
   strtab->hdr.sh_type = SHT_STRTAB;
   strtab->hdr.sh_entsize = 1;
@@ -122,8 +121,31 @@ static void outelf(void) {
   }
 }
 
-int main() {
+void onstmt(Parsev p) {
+  switch (p.kind) {
+  case ASM_NOP:
+    secbyte(cursection, 0x90);
+    break;
+  case ASM_RET:
+    secbyte(cursection, 0xc3);
+    break;
+  default:
+    die("unexpected kind");
+  }
+}
+
+#include "asmparser.c" // XXX resolve dependency cycle.
+
+void parse(void) {
+  asmparser_context_t *ctx = asmparser_create(NULL);
+  while (asmparser_parse(ctx, NULL));
+  asmparser_destroy(ctx);
+}
+
+int main(void) {
   initsections();
+  cursection = text;
+  parse();
   outelf();
   return 0;
 }

@@ -1,13 +1,12 @@
-# minias
+# dumbas
 
-An assembler for x86_64, written for fun and learning.
+A dumb assembler for x86_64, written for fun and learning.
 
 Goals:
 
 - A simple, tiny, fast implementation (in that order).
 - Assemble the output of [cproc](https://github.com/michaelforney/cproc)/[qbe](https://c9x.me/compile/).
 - Relocatable elf output.
-- Static linking only.
 
 Non Goals:
 
