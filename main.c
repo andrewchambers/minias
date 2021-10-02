@@ -92,14 +92,6 @@ void outelf(void) {
   ehdr.e_shnum = nsections;
   ehdr.e_shstrndx = 1;
   offset = sizeof(Elf64_Shdr) * nsections;
-  /*
-  textsec->shdr.sh_offset = offset;
-  textsec->shdr.sh_size = 0;
-  offset += textsec->shdr.sh_size * textsec->shdr.sh_entsize;
-  symstrsec->shdr.sh_size = 0;
-  symstrsec->shdr.sh_offset = offset;
-  offset += symstrsec->shdr.sh_size * symstrsec->shdr.sh_entsize;
-  */
 
   out((uint8_t *)&ehdr, sizeof(ehdr));
   for (i = 0; i < nsections; i++) {
