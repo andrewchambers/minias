@@ -2,21 +2,38 @@
 
 AsmLine *allasm = NULL;
 
-// Label worst case offsets
-struct hashtable *labelwco = NULL;
+// Symbols in memory before
+// writing out the symtab section.
+struct hashtable *symbols = NULL;
 
 #define MAXSECTIONS 32
 static Section sections[MAXSECTIONS];
 static size_t nsections = 1; // first is reserved.
 
-static Section *cursection = NULL;
 static Section *shstrtab = NULL;
 static Section *strtab = NULL;
 static Section *symtab = NULL;
 static Section *bss = NULL;
 static Section *text = NULL;
 
-static void secbytes(Section *s, uint8_t *bytes, size_t n) {
+static Symbol *getsym(const char *label) {
+  Symbol **ps, *s;
+  struct hashtablekey htk;
+
+  htabkey(&htk, label, strlen(label));
+  ps = (Symbol **)htabput(symbols, &htk);
+  if (!*ps) {
+    *ps = zalloc(sizeof(Symbol));
+  }
+  s = *ps;
+  return s;
+}
+
+static const char *secname(Section *s) {
+  return (const char *)shstrtab->data + s->hdr.sh_name;
+}
+
+static void secaddbytes(Section *s, uint8_t *bytes, size_t n) {
   while (s->capacity < s->hdr.sh_size + n) {
     s->capacity = s->capacity ? (s->capacity * 2) : 64;
     s->data = xrealloc(s->data, s->capacity);
@@ -25,7 +42,7 @@ static void secbytes(Section *s, uint8_t *bytes, size_t n) {
   s->hdr.sh_size += n;
 }
 
-static void secbyte(Section *s, uint8_t b) { secbytes(s, &b, 1); }
+static void secaddbyte(Section *s, uint8_t b) { secaddbytes(s, &b, 1); }
 
 static Elf64_Word elfstr(Section *sec, const char *s) {
   Elf64_Word i;
@@ -34,27 +51,9 @@ static Elf64_Word elfstr(Section *sec, const char *s) {
       if (strcmp(s, (char *)&sec->data[i]) == 0)
         return i;
   }
-  secbytes(sec, (uint8_t *)s, strlen(s) + 1);
+  secaddbytes(sec, (uint8_t *)s, strlen(s) + 1);
   return i;
 }
-
-/*
-static Elf64_sym *getsym(const char *name) {
-  const char *symname;
-  Elf64_sym newsym, *sym;
-  Elf64_Word i, nsyms;
-
-  nsyms = symtab->hdr.sh_size / sizeof(Elf64_sym);
-  for (i = 0; i < nsyms; i++) {
-    sym = (Elf64_sym*)symtab->data + i;
-    symname = (char*)strtab->data + sym->name;
-    if (strcmp(symname, name) == 0)
-      return sym;
-  }
-
-  return NULL;
-}
-*/
 
 static Section *newsection() {
   Section *s;
@@ -66,13 +65,13 @@ static Section *newsection() {
 
 static void initsections(void) {
   shstrtab = newsection();
-  secbyte(shstrtab, 0);
+  secaddbyte(shstrtab, 0);
   shstrtab->hdr.sh_name = elfstr(shstrtab, ".shstrtab");
   shstrtab->hdr.sh_type = SHT_STRTAB;
   shstrtab->hdr.sh_entsize = 1;
 
   strtab = newsection();
-  secbyte(strtab, 0);
+  secaddbyte(strtab, 0);
   strtab->hdr.sh_name = elfstr(shstrtab, ".strtab");
   strtab->hdr.sh_type = SHT_STRTAB;
   strtab->hdr.sh_entsize = 1;
@@ -96,8 +95,6 @@ static void initsections(void) {
   text->hdr.sh_flags = SHF_EXECINSTR | SHF_ALLOC;
   text->hdr.sh_entsize = 1;
   text->hdr.sh_addralign = 4;
-
-  cursection = text;
 }
 
 static void out(uint8_t *buf, size_t n) {
@@ -163,10 +160,9 @@ void parse(void) {
     }
     if (v.kind == ASM_BLANK)
       continue;
-    l = xmalloc(sizeof(AsmLine));
+    l = zalloc(sizeof(AsmLine));
     l->v = v;
     l->lineno = lineno;
-    l->next = NULL;
     if (prevl)
       prevl->next = l;
     else
@@ -178,31 +174,43 @@ void parse(void) {
   asmparser_destroy(ctx);
 }
 
-/* Compute worst case offsets in the text section
-   once we have worst case offsets we can compute
-   worst case jump distances. */
-static void computewco() {
+/*
+   First pass deals with finding the symbol information
+   and computing the worst case offsets for each instruction
+   and symbol.
+*/
+static void prepass() {
+  Symbol *sym;
   Parsev *v;
   AsmLine *l;
+  Section *cursection;
+
   const char *label;
   struct hashtablekey htk;
-  int64_t offset = 0;
+
+  cursection = text;
 
   for (l = allasm; l; l = l->next) {
-    l->wco = offset;
     v = &l->v;
+    l->wco = cursection->wco;
     switch (v->kind) {
+    case ASM_DIR_GLOBL:
+      label = v->globl.name;
+      sym = getsym(label);
+      sym->global = 1;
+      break;
     case ASM_LABEL:
-      label = v->label.value;
-      htabkey(&htk, label, strlen(label));
-      *((int64_t *)htabput(labelwco, &htk)) = offset;
+      label = v->label.name;
+      sym = getsym(label);
+      sym->section = cursection;
+      sym->wco = cursection->wco;
       break;
     case ASM_NOP:
     case ASM_RET:
-      offset += 1;
+      cursection->wco += 1;
       break;
     case ASM_JMP:
-      offset += 5;
+      cursection->wco += 5;
       break;
     default:
       fatal("unexpected kind: %d", v->kind);
@@ -210,36 +218,46 @@ static void computewco() {
   }
 }
 
-static int64_t pessimisticdistance(AsmLine *line, const char *label) {
-  struct hashtablekey htk;
-  htabkey(&htk, label, strlen(label));
-  return (int64_t)htabget(labelwco, &htk) - line->wco;
+static int64_t pessimisticdistance(AsmLine *line, Symbol *s) {
+  if (!s->section)
+    fatal("bug: symbol has unknown section.");
+  return s->wco - line->wco;
 }
 
 static void assemble() {
+  Symbol *sym;
   Parsev *v;
   AsmLine *l;
+  Section *cursection;
+
+  cursection = text;
 
   for (l = allasm; l; l = l->next) {
     v = &l->v;
     switch (l->v.kind) {
+    case ASM_DIR_GLOBL:
     case ASM_LABEL:
       break;
     case ASM_NOP:
-      secbyte(cursection, 0x90);
+      secaddbyte(cursection, 0x90);
       break;
     case ASM_RET:
-      secbyte(cursection, 0xc3);
+      secaddbyte(cursection, 0xc3);
       break;
     case ASM_JMP: {
-      int64_t distance;
-      distance = pessimisticdistance(l, v->instr.jmp.target);
-      if (distance <= 128 && distance >= -127) {
-        uint8_t jbuf[2] = {0xeb, 0x00};
-        secbytes(cursection, jbuf, sizeof(jbuf));
+      sym = getsym(v->instr.jmp.target);
+      if (sym->section && (sym->section == cursection)) {
+        int64_t distance;
+        distance = sym->wco - cursection->wco;
+        if (distance <= 128 && distance >= -127) {
+          uint8_t jbuf[2] = {0xeb, 0x00};
+          secaddbytes(cursection, jbuf, sizeof(jbuf));
+        } else {
+          uint8_t jbuf[5] = {0xe9, 0x00, 0x00, 0x00, 0x00};
+          secaddbytes(cursection, jbuf, sizeof(jbuf));
+        }
       } else {
-        uint8_t jbuf[5] = {0xe9, 0x00, 0x00, 0x00, 0x00};
-        secbytes(cursection, jbuf, sizeof(jbuf));
+        fatal("TODO, jmp to undefined symbol");
       }
       break;
     }
@@ -250,10 +268,10 @@ static void assemble() {
 }
 
 int main(void) {
-  labelwco = mkhtab(256);
+  symbols = mkhtab(256);
   initsections();
   parse();
-  computewco();
+  prepass();
   assemble();
   outelf();
   return 0;

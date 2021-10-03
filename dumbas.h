@@ -12,13 +12,22 @@
 
 typedef struct {
   Elf64_Shdr hdr;
+  int64_t wco;
   size_t capacity;
   uint8_t *data;
 } Section;
 
+typedef struct {
+  int64_t wco;
+  int64_t offset;
+  int global : 1;
+  Section *section;
+} Symbol;
+
 enum AsmKind {
   ASM_SYNTAX_ERROR,
   ASM_BLANK,
+  ASM_DIR_GLOBL,
   ASM_LABEL,
   ASM_NOP,
   ASM_RET,
@@ -36,13 +45,19 @@ typedef struct {
 
 typedef struct {
   enum AsmKind kind;
-  const char *value;
+  const char *name;
 } Label;
+
+typedef struct {
+  enum AsmKind kind;
+  const char *name;
+} Globl;
 
 typedef union {
   enum AsmKind kind;
   Instr instr;
   Label label;
+  Globl globl;
   const char *ident;
 } Parsev;
 
@@ -63,6 +78,7 @@ void *xrealloc(void *, size_t);
 void *xreallocarray(void *, size_t, size_t);
 char *xmemdup(const char *, size_t);
 char *xstrdup(const char *s);
+void *zalloc(size_t n);
 
 struct hashtablekey {
   uint64_t hash;

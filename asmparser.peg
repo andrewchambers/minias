@@ -2,18 +2,27 @@
 
 %value "Parsev"
 
+
+
+
 line <- s:stmt eol { $$ = s; }
       / eol { $$.kind = ASM_BLANK; }
       / . { $$.kind = ASM_SYNTAX_ERROR; }
-      
-stmt <- i:instr { $$ = i; }
+
+stmt <- d:directive {$$ = d;}
+      / i:instr { $$ = i; }
       / l:label {  $$ = l; } 
-label <- i:ident ':' { $$.label = (Label){.kind = ASM_LABEL, .value = i.ident}; }
+
+directive <- ".glob" "o"? "l" ws i:ident
+                { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident }; }
+
 instr <- "nop" { $$.instr = (Instr){.kind = ASM_NOP }; }
        / "ret" { $$.instr = (Instr){.kind = ASM_RET }; }
        / "jmp" ws i:ident
            { $$.instr = (Instr){.kind = ASM_JMP, .jmp.target = i.ident}; }
-ident <- <[_a-zA-Z][_a-zA-Z0-9]*> { $$.ident = xstrdup($1); } 
+
+label <- i:ident ':' { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident}; }
 
 ws <- [ \t]+
 eol <- ws? ("\n" / (! .))
+ident <- <[_a-zA-Z][_a-zA-Z0-9]*> { $$.ident = xstrdup($1); } 
