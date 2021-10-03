@@ -219,6 +219,9 @@ static void prepass(void) {
     case ASM_DIR_TEXT:
       cursection = text;
       break;
+    case ASM_DIR_BALIGN:
+      cursection->wco += v->balign.align - 1;
+      break;
     case ASM_LABEL:
       label = v->label.name;
       sym = getsym(label);
@@ -227,21 +230,29 @@ static void prepass(void) {
       break;
     case ASM_DIR_BYTE:
     case ASM_NOP:
+    case ASM_LEAVE:
     case ASM_RET:
       cursection->wco += 1;
       break;
+   case ASM_XORL:
+    if (isr32kind(v->movq.src->kind) && isr32kind(v->movq.dst->kind)) {
+      cursection->wco += 2;
+    } else {
+      cursection->wco += 15; // XXX pessimistic.
+    }
+    break;
     case ASM_MOVQ:
       if (isr64kind(v->movq.src->kind) && isr64kind(v->movq.dst->kind)) {
-        cursection->wco += 2;
+        cursection->wco += 3;
       } else {
-        cursection->wco += 16; // XXX likely wrong.
+        cursection->wco += 15; // XXX pessimistic.
       }
       break;
     case ASM_PUSHQ:
       if (isr64kind(v->pushq.arg->kind)) {
         cursection->wco += 2;
       } else {
-        cursection->wco += 9; // XXX very pessimistic.
+        cursection->wco += 9; // XXX pessimistic.
       }
       break;
     case ASM_JMP:
@@ -296,6 +307,10 @@ static uint8_t kindr64bits(AsmKind k) {
   return (k - ASM_RAX) & 0xff;
 }
 
+static uint8_t kindr32bits(AsmKind k) {
+  return (k - ASM_EAX) & 0xff;
+}
+
 static uint8_t composemodrm(uint8_t mod, uint8_t regop,  uint8_t rm) {
   return (mod<<6) + (regop<<3) + rm;
 }
@@ -321,6 +336,17 @@ static void assemble() {
     case ASM_DIR_TEXT:
       cursection = text;
       break;
+    case ASM_DIR_BALIGN: {
+      int64_t i, rem, amnt;
+      amnt = 0;
+      rem = cursection->hdr.sh_size % v->balign.align;
+      if (rem)
+        amnt = v->balign.align - rem;
+      for (i = 0; i < amnt; i++) {
+        secaddbyte(cursection, 0x00);
+      }
+      break;
+    }
     case ASM_DIR_BYTE:
       secaddbyte(cursection, v->byte.b);
       break;
@@ -332,28 +358,29 @@ static void assemble() {
     case ASM_NOP:
       secaddbyte(cursection, 0x90);
       break;
+    case ASM_LEAVE:
+      secaddbyte(cursection, 0xc9);
+      break;
     case ASM_RET:
       secaddbyte(cursection, 0xc3);
       break;
-    case ASM_PUSHQ: {
-      Parsev *arg;
+     case ASM_XORL: {
+      Parsev *src, *dst;
 
-      arg = v->pushq.arg;
+      src = v->movq.src;
+      dst = v->movq.dst;
 
-      if (isr64kind(arg->kind)) {
-        uint8_t ibuf[2] = {0x50, kindr64bits(arg->kind)};
+      if (isr32kind(src->kind) && isr32kind(dst->kind)) {
+        uint8_t ibuf[2] = {
+          0x31,
+          composemodrm(MODREGI, kindr32bits(src->kind), kindr32bits(dst->kind)),
+        };
         secaddbytes(cursection, ibuf, sizeof(ibuf));
-      } else if (arg->kind == ASM_NUMBER) {
-        fatal("TODO");
-      } else if (arg->kind == ASM_IDENT) {
-        fatal("TODO");
       } else {
-        fatal("BUG: unexpected pushq arg");
+        fatal("TODO");
       }
-
       break;
     }
-
     case ASM_MOVQ: {
       Parsev *src, *dst;
 
@@ -372,7 +399,24 @@ static void assemble() {
       }
       break;
     }
+    case ASM_PUSHQ: {
+      Parsev *arg;
 
+      arg = v->pushq.arg;
+
+      if (isr64kind(arg->kind)) {
+        uint8_t ibuf[2] = {0x50, kindr64bits(arg->kind)};
+        secaddbytes(cursection, ibuf, sizeof(ibuf));
+      } else if (arg->kind == ASM_NUMBER) {
+        fatal("TODO");
+      } else if (arg->kind == ASM_IDENT) {
+        fatal("TODO");
+      } else {
+        fatal("BUG: unexpected pushq arg");
+      }
+
+      break;
+    }
     case ASM_JMP: {
       sym = getsym(v->jmp.target);
       if (sym->section && (sym->section == cursection)) {

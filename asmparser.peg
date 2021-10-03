@@ -15,6 +15,8 @@ directive <- ".glob" "o"? "l" ws i:ident
              { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident.name }; }
            / ".data" { $$.kind = ASM_DIR_DATA; }
            / ".text" { $$.kind = ASM_DIR_TEXT; }
+           / ".balign" ws n:number 
+             { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.number.value }; }
            / ".byte" ws n:number
              { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.number.value }; }
 
@@ -29,6 +31,8 @@ instr <- "nop"{ $$.kind = ASM_NOP; }
          { $$.pushq = (Pushq){.kind = ASM_PUSHQ, .arg = dupv(&v)}; }
        / "movq" ws s:r64 ws? "," ws? d:r64
          { $$.movq = (Movq){.kind = ASM_MOVQ, .src = dupv(&s), .dst = dupv(&d)}; }
+       / "xorl" ws s:r32 ws? "," ws? d:r32
+         { $$.xorl = (Xorl){.kind = ASM_XORL, .src = dupv(&s), .dst = dupv(&d)}; }
 
 label <- i:ident ':'
          { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident.name}; }
@@ -45,6 +49,14 @@ r64 <- "%rax" { $$.kind = ASM_RAX; }
      / "%rsi" { $$.kind = ASM_RSI; }
      / "%rdi" { $$.kind = ASM_RDI; }
 
+r32 <- "%eax" { $$.kind = ASM_EAX; }
+     / "%ecx" { $$.kind = ASM_ECX; }
+     / "%edx" { $$.kind = ASM_EDX; }
+     / "%ebx" { $$.kind = ASM_EBX; }
+     / "%esp" { $$.kind = ASM_ESP; }
+     / "%ebp" { $$.kind = ASM_EBP; }
+     / "%esi" { $$.kind = ASM_ESI; }
+     / "%edi" { $$.kind = ASM_EDI; }
 
 number <- <[0-9]+>
           { $$.number = (Number){ .kind = ASM_NUMBER, .value = strtoll($1, NULL, 10) }; } 

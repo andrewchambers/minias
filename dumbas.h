@@ -40,6 +40,7 @@ typedef enum {
   ASM_DIR_DATA,
   ASM_DIR_TEXT,
   ASM_DIR_BYTE,
+  ASM_DIR_BALIGN,
   // Instructions
   ASM_NOP,
   ASM_RET,
@@ -47,7 +48,16 @@ typedef enum {
   ASM_LEAVE,
   ASM_PUSHQ,
   ASM_MOVQ,
+  ASM_XORL,
   // Registers, order matters.
+  ASM_EAX,
+  ASM_ECX,
+  ASM_EDX,
+  ASM_EBX,
+  ASM_ESP,
+  ASM_EBP,
+  ASM_ESI,
+  ASM_EDI,
   ASM_RAX,
   ASM_RCX,
   ASM_RDX,
@@ -56,11 +66,14 @@ typedef enum {
   ASM_RBP,
   ASM_RSI,
   ASM_RDI,
-
 } AsmKind;
 
 static int isr64kind(AsmKind k) {
   return k >= ASM_RAX && k <= ASM_RDI;
+}
+
+static int isr32kind(AsmKind k) {
+  return k >= ASM_EAX && k <= ASM_EDI;
 }
 
 typedef union Parsev Parsev;
@@ -83,6 +96,12 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
+  Parsev *src;
+  Parsev *dst;
+} Xorl;
+
+typedef struct {
+  AsmKind kind;
   const char *name;
 } Label;
 
@@ -95,6 +114,11 @@ typedef struct {
   AsmKind kind;
   uint8_t b;
 } Byte;
+
+typedef struct {
+  AsmKind kind;
+  uint64_t align;
+} Balign;
 
 typedef struct {
   AsmKind kind;
@@ -111,13 +135,15 @@ typedef struct {
   int64_t value;
 } Number;
 
-union Parsev  {
+union Parsev {
   AsmKind kind;
   Label label;
   Globl globl;
+  Balign balign;
   Jmp jmp;
   Pushq pushq;
   Movq movq;
+  Xorl xorl;
   Byte byte;
   Ident ident;
   Number number;
