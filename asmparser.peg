@@ -2,9 +2,6 @@
 
 %value "Parsev"
 
-
-
-
 line <- s:stmt eol { $$ = s; }
       / eol { $$.kind = ASM_BLANK; }
       / . { $$.kind = ASM_SYNTAX_ERROR; }
@@ -15,14 +12,22 @@ stmt <- d:directive {$$ = d;}
 
 directive <- ".glob" "o"? "l" ws i:ident
                 { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident }; }
+           / ".data"
+             { $$.kind = ASM_DIR_DATA; }
+           / ".text"
+             { $$.kind = ASM_DIR_TEXT; }
+           / ".byte" ws n:number
+             { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.number }; }
 
 instr <- "nop" { $$.instr = (Instr){.kind = ASM_NOP }; }
        / "ret" { $$.instr = (Instr){.kind = ASM_RET }; }
        / "jmp" ws i:ident
            { $$.instr = (Instr){.kind = ASM_JMP, .jmp.target = i.ident}; }
 
-label <- i:ident ':' { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident}; }
+label <- i:ident ':'
+         { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident}; }
 
 ws <- [ \t]+
 eol <- ws? ("\n" / (! .))
+number <- <[0-9]+> { $$.number = strtoll($1, NULL, 10); }
 ident <- <[_a-zA-Z][_a-zA-Z0-9]*> { $$.ident = xstrdup($1); } 

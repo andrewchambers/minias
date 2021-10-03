@@ -15,6 +15,7 @@ static Section *strtab = NULL;
 static Section *symtab = NULL;
 static Section *bss = NULL;
 static Section *text = NULL;
+static Section *data = NULL;
 
 static Symbol *getsym(const char *name) {
   Symbol **ps, *s;
@@ -95,6 +96,13 @@ static void initsections(void) {
   bss->hdr.sh_flags = SHF_ALLOC | SHF_WRITE;
   bss->hdr.sh_entsize = 1;
   bss->hdr.sh_addralign = 16; // XXX right value?
+
+  data = newsection();
+  data->hdr.sh_name = elfstr(shstrtab, ".data");
+  data->hdr.sh_type = SHT_PROGBITS;
+  data->hdr.sh_flags = SHF_ALLOC | SHF_WRITE;
+  data->hdr.sh_entsize = 1;
+  data->hdr.sh_addralign = 8; // XXX right value?
 
   text = newsection();
   text->hdr.sh_name = elfstr(shstrtab, ".text");
@@ -205,12 +213,19 @@ static void prepass(void) {
       sym = getsym(label);
       sym->global = 1;
       break;
+    case ASM_DIR_DATA:
+      cursection = data;
+      break;
+    case ASM_DIR_TEXT:
+      cursection = text;
+      break;
     case ASM_LABEL:
       label = v->label.name;
       sym = getsym(label);
       sym->section = cursection;
       sym->wco = cursection->wco;
       break;
+    case ASM_DIR_BYTE:
     case ASM_NOP:
     case ASM_RET:
       cursection->wco += 1;
@@ -219,7 +234,7 @@ static void prepass(void) {
       cursection->wco += 5;
       break;
     default:
-      fatal("unexpected kind: %d", v->kind);
+      fatal("prepass: unexpected kind: %d", v->kind);
     }
   }
 }
@@ -274,6 +289,15 @@ static void assemble() {
     switch (l->v.kind) {
     case ASM_DIR_GLOBL:
       break;
+    case ASM_DIR_DATA:
+      cursection = data;
+      break;
+    case ASM_DIR_TEXT:
+      cursection = text;
+      break;
+    case ASM_DIR_BYTE:
+      secaddbyte(cursection, v->byte.b);
+      break;
     case ASM_LABEL:
       label = v->label.name;
       sym = getsym(label);
@@ -303,7 +327,7 @@ static void assemble() {
       break;
     }
     default:
-      fatal("unexpected kind: %d", l->v.kind);
+      fatal("assemble: unexpected kind: %d", l->v.kind);
     }
   }
 }

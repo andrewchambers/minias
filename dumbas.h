@@ -32,6 +32,9 @@ enum AsmKind {
   ASM_SYNTAX_ERROR,
   ASM_BLANK,
   ASM_DIR_GLOBL,
+  ASM_DIR_DATA,
+  ASM_DIR_TEXT,
+  ASM_DIR_BYTE,
   ASM_LABEL,
   ASM_NOP,
   ASM_RET,
@@ -57,12 +60,19 @@ typedef struct {
   const char *name;
 } Globl;
 
+typedef struct {
+  enum AsmKind kind;
+  uint8_t b;
+} Byte;
+
 typedef union {
   enum AsmKind kind;
   Instr instr;
   Label label;
   Globl globl;
+  Byte byte;
   const char *ident;
+  int64_t number;
 } Parsev;
 
 typedef struct AsmLine AsmLine;
