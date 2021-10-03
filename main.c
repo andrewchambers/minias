@@ -230,6 +230,20 @@ static void prepass(void) {
     case ASM_RET:
       cursection->wco += 1;
       break;
+    case ASM_MOVQ:
+      if (isr64kind(v->movq.src->kind) && isr64kind(v->movq.dst->kind)) {
+        cursection->wco += 2;
+      } else {
+        cursection->wco += 16; // XXX likely wrong.
+      }
+      break;
+    case ASM_PUSHQ:
+      if (isr64kind(v->pushq.arg->kind)) {
+        cursection->wco += 2;
+      } else {
+        cursection->wco += 9; // XXX very pessimistic.
+      }
+      break;
     case ASM_JMP:
       cursection->wco += 5;
       break;
@@ -275,6 +289,18 @@ static void fillsymtab(void) {
   }
 }
 
+#define MODREGI 0x3
+#define REX_W 0x48
+
+static uint8_t kindr64bits(AsmKind k) {
+  return (k - ASM_RAX) & 0xff;
+}
+
+static uint8_t composemodrm(uint8_t mod, uint8_t regop,  uint8_t rm) {
+  return (mod<<6) + (regop<<3) + rm;
+}
+
+
 static void assemble() {
   Symbol *sym;
   Parsev *v;
@@ -309,17 +335,55 @@ static void assemble() {
     case ASM_RET:
       secaddbyte(cursection, 0xc3);
       break;
+    case ASM_PUSHQ: {
+      Parsev *arg;
+
+      arg = v->pushq.arg;
+
+      if (isr64kind(arg->kind)) {
+        uint8_t ibuf[2] = {0x50, kindr64bits(arg->kind)};
+        secaddbytes(cursection, ibuf, sizeof(ibuf));
+      } else if (arg->kind == ASM_NUMBER) {
+        fatal("TODO");
+      } else if (arg->kind == ASM_IDENT) {
+        fatal("TODO");
+      } else {
+        fatal("BUG: unexpected pushq arg");
+      }
+
+      break;
+    }
+
+    case ASM_MOVQ: {
+      Parsev *src, *dst;
+
+      src = v->movq.src;
+      dst = v->movq.dst;
+
+      if (isr64kind(src->kind) && isr64kind(dst->kind)) {
+        uint8_t ibuf[3] = {
+          REX_W,
+          0x89,
+          composemodrm(MODREGI, kindr64bits(src->kind), kindr64bits(dst->kind)),
+        };
+        secaddbytes(cursection, ibuf, sizeof(ibuf));
+      } else {
+        fatal("TODO");
+      }
+      break;
+    }
+
     case ASM_JMP: {
-      sym = getsym(v->instr.jmp.target);
+      sym = getsym(v->jmp.target);
       if (sym->section && (sym->section == cursection)) {
         int64_t distance;
         distance = sym->wco - cursection->wco;
         if (distance <= 128 && distance >= -127) {
-          uint8_t jbuf[2] = {0xeb, 0x00};
-          secaddbytes(cursection, jbuf, sizeof(jbuf));
+          uint8_t ibuf[2] = {0xeb, 0x00};
+          secaddbytes(cursection, ibuf, sizeof(ibuf));
         } else {
-          uint8_t jbuf[5] = {0xe9, 0x00, 0x00, 0x00, 0x00};
-          secaddbytes(cursection, jbuf, sizeof(jbuf));
+          uint8_t ibuf[5] = {0xe9, 0x00, 0x00, 0x00, 0x00};
+          secaddbytes(cursection, ibuf, sizeof(ibuf));
         }
       } else {
         fatal("TODO, jmp to undefined symbol");

@@ -28,52 +28,100 @@ typedef struct {
   Section *section;
 } Symbol;
 
-enum AsmKind {
+typedef enum {
+  // Misc
   ASM_SYNTAX_ERROR,
   ASM_BLANK,
+  ASM_LABEL,
+  ASM_IDENT,
+  ASM_NUMBER,
+  // Directives
   ASM_DIR_GLOBL,
   ASM_DIR_DATA,
   ASM_DIR_TEXT,
   ASM_DIR_BYTE,
-  ASM_LABEL,
+  // Instructions
   ASM_NOP,
   ASM_RET,
-  ASM_JMP
-};
+  ASM_JMP,
+  ASM_LEAVE,
+  ASM_PUSHQ,
+  ASM_MOVQ,
+  // Registers, order matters.
+  ASM_RAX,
+  ASM_RCX,
+  ASM_RDX,
+  ASM_RBX,
+  ASM_RSP,
+  ASM_RBP,
+  ASM_RSI,
+  ASM_RDI,
+
+} AsmKind;
+
+static int isr64kind(AsmKind k) {
+  return k >= ASM_RAX && k <= ASM_RDI;
+}
+
+typedef union Parsev Parsev;
 
 typedef struct {
-  enum AsmKind kind;
-  union {
-    struct {
-      const char *target;
-    } jmp;
-  };
-} Instr;
+  AsmKind kind;
+  const char *target;
+} Jmp;
 
 typedef struct {
-  enum AsmKind kind;
+  AsmKind kind;
+  Parsev *arg;
+} Pushq;
+
+typedef struct {
+  AsmKind kind;
+  Parsev *src;
+  Parsev *dst;
+} Movq;
+
+typedef struct {
+  AsmKind kind;
   const char *name;
 } Label;
 
 typedef struct {
-  enum AsmKind kind;
+  AsmKind kind;
   const char *name;
 } Globl;
 
 typedef struct {
-  enum AsmKind kind;
+  AsmKind kind;
   uint8_t b;
 } Byte;
 
-typedef union {
-  enum AsmKind kind;
-  Instr instr;
+typedef struct {
+  AsmKind kind;
+  int64_t imm;
+} Imm;
+
+typedef struct {
+  AsmKind kind;
+  const char *name;
+} Ident;
+
+typedef struct {
+  AsmKind kind;
+  int64_t value;
+} Number;
+
+union Parsev  {
+  AsmKind kind;
   Label label;
   Globl globl;
+  Jmp jmp;
+  Pushq pushq;
+  Movq movq;
   Byte byte;
-  const char *ident;
-  int64_t number;
-} Parsev;
+  Ident ident;
+  Number number;
+};
 
 typedef struct AsmLine AsmLine;
 struct AsmLine {

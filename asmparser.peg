@@ -2,6 +2,7 @@
 
 %value "Parsev"
 
+
 line <- s:stmt eol { $$ = s; }
       / eol { $$.kind = ASM_BLANK; }
       / . { $$.kind = ASM_SYNTAX_ERROR; }
@@ -11,23 +12,54 @@ stmt <- d:directive {$$ = d;}
       / l:label {  $$ = l; } 
 
 directive <- ".glob" "o"? "l" ws i:ident
-                { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident }; }
-           / ".data"
-             { $$.kind = ASM_DIR_DATA; }
-           / ".text"
-             { $$.kind = ASM_DIR_TEXT; }
+             { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident.name }; }
+           / ".data" { $$.kind = ASM_DIR_DATA; }
+           / ".text" { $$.kind = ASM_DIR_TEXT; }
            / ".byte" ws n:number
-             { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.number }; }
+             { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.number.value }; }
 
-instr <- "nop" { $$.instr = (Instr){.kind = ASM_NOP }; }
-       / "ret" { $$.instr = (Instr){.kind = ASM_RET }; }
+instr <- "nop"{ $$.kind = ASM_NOP; }
+       / "leave" { $$.kind = ASM_LEAVE; }
+       / "ret" { $$.kind = ASM_RET; }
        / "jmp" ws i:ident
-           { $$.instr = (Instr){.kind = ASM_JMP, .jmp.target = i.ident}; }
+          { $$.jmp = (Jmp){.kind = ASM_JMP, .target = i.ident.name}; }
+       / "pushq" ws v:r64
+         { $$.pushq = (Pushq){.kind = ASM_PUSHQ, .arg = dupv(&v)}; }
+       / "pushq" ws v:imm
+         { $$.pushq = (Pushq){.kind = ASM_PUSHQ, .arg = dupv(&v)}; }
+       / "movq" ws s:r64 ws? "," ws? d:r64
+         { $$.movq = (Movq){.kind = ASM_MOVQ, .src = dupv(&s), .dst = dupv(&d)}; }
 
 label <- i:ident ':'
-         { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident}; }
+         { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident.name}; }
+
+imm <- '$' n:number { $$ = n; }
+     / '$' i:ident { $$ = i; }
+
+r64 <- "%rax" { $$.kind = ASM_RAX; }
+     / "%rcx" { $$.kind = ASM_RCX; }
+     / "%rdx" { $$.kind = ASM_RDX; }
+     / "%rbx" { $$.kind = ASM_RBX; }
+     / "%rsp" { $$.kind = ASM_RSP; }
+     / "%rbp" { $$.kind = ASM_RBP; }
+     / "%rsi" { $$.kind = ASM_RSI; }
+     / "%rdi" { $$.kind = ASM_RDI; }
+
+
+number <- <[0-9]+>
+          { $$.number = (Number){ .kind = ASM_NUMBER, .value = strtoll($1, NULL, 10) }; } 
+
+ident <- <[_a-zA-Z][_a-zA-Z0-9]*>
+         { $$.ident = (Ident){ .kind = ASM_IDENT, .name = xstrdup($1) }; } 
 
 ws <- [ \t]+
+
 eol <- ws? ("\n" / (! .))
-number <- <[0-9]+> { $$.number = strtoll($1, NULL, 10); }
-ident <- <[_a-zA-Z][_a-zA-Z0-9]*> { $$.ident = xstrdup($1); } 
+
+%source {
+  Parsev *dupv(Parsev *p) { 
+    Parsev *r = xmalloc(sizeof(Parsev));
+    *r = *p;
+    return r;
+  }
+}
