@@ -12,14 +12,18 @@
 
 typedef struct {
   Elf64_Shdr hdr;
+  int16_t idx;
   int64_t wco;
+  int64_t offset;
   size_t capacity;
   uint8_t *data;
 } Section;
 
 typedef struct {
+  const char *name;
   int64_t wco;
   int64_t offset;
+  int64_t size;
   int global : 1;
   Section *section;
 } Symbol;
@@ -79,6 +83,13 @@ void *xreallocarray(void *, size_t, size_t);
 char *xmemdup(const char *, size_t);
 char *xstrdup(const char *s);
 void *zalloc(size_t n);
+
+
+struct hashtable {
+  size_t len, cap;
+  struct hashtablekey *keys;
+  void **vals;
+};
 
 struct hashtablekey {
   uint64_t hash;

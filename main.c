@@ -16,14 +16,15 @@ static Section *symtab = NULL;
 static Section *bss = NULL;
 static Section *text = NULL;
 
-static Symbol *getsym(const char *label) {
+static Symbol *getsym(const char *name) {
   Symbol **ps, *s;
   struct hashtablekey htk;
 
-  htabkey(&htk, label, strlen(label));
+  htabkey(&htk, name, strlen(name));
   ps = (Symbol **)htabput(symbols, &htk);
   if (!*ps) {
     *ps = zalloc(sizeof(Symbol));
+    (*ps)->name = name;
   }
   s = *ps;
   return s;
@@ -57,13 +58,17 @@ static Elf64_Word elfstr(Section *sec, const char *s) {
 
 static Section *newsection() {
   Section *s;
-  s = &sections[nsections++];
-  if (nsections > MAXSECTIONS)
+  if (nsections >= MAXSECTIONS)
     fatal("too many sections");
+  s = &sections[nsections];
+  s->idx = nsections;
+  nsections += 1;
   return s;
 }
 
 static void initsections(void) {
+  Elf64_Sym elfsym;
+
   shstrtab = newsection();
   secaddbyte(shstrtab, 0);
   shstrtab->hdr.sh_name = elfstr(shstrtab, ".shstrtab");
@@ -81,6 +86,8 @@ static void initsections(void) {
   symtab->hdr.sh_type = SHT_SYMTAB;
   symtab->hdr.sh_link = 2;
   symtab->hdr.sh_entsize = sizeof(Elf64_Sym);
+  memset(&elfsym, 0, sizeof(elfsym));
+  secaddbytes(symtab, (uint8_t *)&elfsym, sizeof(Elf64_Sym));
 
   bss = newsection();
   bss->hdr.sh_name = elfstr(shstrtab, ".bss");
@@ -179,12 +186,11 @@ void parse(void) {
    and computing the worst case offsets for each instruction
    and symbol.
 */
-static void prepass() {
+static void prepass(void) {
   Symbol *sym;
   Parsev *v;
   AsmLine *l;
   Section *cursection;
-
   const char *label;
   struct hashtablekey htk;
 
@@ -218,10 +224,35 @@ static void prepass() {
   }
 }
 
-static int64_t pessimisticdistance(AsmLine *line, Symbol *s) {
-  if (!s->section)
-    fatal("bug: symbol has unknown section.");
-  return s->wco - line->wco;
+static void addtosymtab(Symbol *sym) {
+  Elf64_Sym elfsym;
+
+  memset(&elfsym, 0, sizeof(elfsym));
+  elfsym.st_name = elfstr(strtab, sym->name);
+  elfsym.st_size = sym->size;
+  elfsym.st_value = sym->offset;
+  elfsym.st_shndx = sym->section->idx;
+  secaddbytes(symtab, (uint8_t *)&elfsym, sizeof(Elf64_Sym));
+}
+
+static void fillsymtab(void) {
+  Symbol *sym;
+  size_t i;
+
+  // Local symbols
+  for (i = 0; i < symbols->cap; i++) {
+    sym = symbols->vals[i];
+    if (!sym || sym->global || !sym->section)
+      continue;
+    addtosymtab(sym);
+  }
+  // Global symbols
+  for (i = 0; i < symbols->cap; i++) {
+    sym = symbols->vals[i];
+    if (!sym || !sym->global || !sym->section)
+      continue;
+    addtosymtab(sym);
+  }
 }
 
 static void assemble() {
@@ -229,6 +260,7 @@ static void assemble() {
   Parsev *v;
   AsmLine *l;
   Section *cursection;
+  const char *label;
 
   cursection = text;
 
@@ -236,7 +268,11 @@ static void assemble() {
     v = &l->v;
     switch (l->v.kind) {
     case ASM_DIR_GLOBL:
+      break;
     case ASM_LABEL:
+      label = v->label.name;
+      sym = getsym(label);
+      sym->offset = cursection->hdr.sh_size;
       break;
     case ASM_NOP:
       secaddbyte(cursection, 0x90);
@@ -273,6 +309,7 @@ int main(void) {
   parse();
   prepass();
   assemble();
+  fillsymtab();
   outelf();
   return 0;
 }
