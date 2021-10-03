@@ -226,11 +226,16 @@ static void prepass(void) {
 
 static void addtosymtab(Symbol *sym) {
   Elf64_Sym elfsym;
+  int stype;
+  int sbind;
+  stype = (sym->section->hdr.sh_flags & SHF_EXECINSTR) ? STT_FUNC : STT_OBJECT;
+  sbind = sym->global ? STB_GLOBAL : STB_LOCAL;
 
   memset(&elfsym, 0, sizeof(elfsym));
   elfsym.st_name = elfstr(strtab, sym->name);
   elfsym.st_size = sym->size;
   elfsym.st_value = sym->offset;
+  elfsym.st_info = ELF32_ST_BIND(sbind) | ELF32_ST_TYPE(stype);
   elfsym.st_shndx = sym->section->idx;
   secaddbytes(symtab, (uint8_t *)&elfsym, sizeof(Elf64_Sym));
 }
