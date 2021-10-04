@@ -21,10 +21,9 @@ typedef struct {
 
 typedef struct {
   const char *name;
-  int64_t wco;
   int64_t offset;
   int64_t size;
-  int global : 1;
+  int global;
   Section *section;
 } Symbol;
 
@@ -33,8 +32,10 @@ typedef enum {
   ASM_SYNTAX_ERROR,
   ASM_BLANK,
   ASM_LABEL,
+  ASM_IMM,
   ASM_IDENT,
   ASM_NUMBER,
+  ASM_MEMARG,
   // Directives
   ASM_DIR_GLOBL,
   ASM_DIR_DATA,
@@ -46,9 +47,7 @@ typedef enum {
   ASM_RET,
   ASM_JMP,
   ASM_LEAVE,
-  ASM_PUSHQ,
-  ASM_MOVQ,
-  ASM_XORL,
+  ASM_ADD,
   // Registers, order matters.
   ASM_EAX,
   ASM_ECX,
@@ -68,37 +67,7 @@ typedef enum {
   ASM_RDI,
 } AsmKind;
 
-static int isr64kind(AsmKind k) {
-  return k >= ASM_RAX && k <= ASM_RDI;
-}
-
-static int isr32kind(AsmKind k) {
-  return k >= ASM_EAX && k <= ASM_EDI;
-}
-
 typedef union Parsev Parsev;
-
-typedef struct {
-  AsmKind kind;
-  const char *target;
-} Jmp;
-
-typedef struct {
-  AsmKind kind;
-  Parsev *arg;
-} Pushq;
-
-typedef struct {
-  AsmKind kind;
-  Parsev *src;
-  Parsev *dst;
-} Movq;
-
-typedef struct {
-  AsmKind kind;
-  Parsev *src;
-  Parsev *dst;
-} Xorl;
 
 typedef struct {
   AsmKind kind;
@@ -122,8 +91,16 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
-  int64_t imm;
+  const char *l; /* label */
+  int64_t c;     /* constant */
 } Imm;
+
+typedef struct {
+  AsmKind kind;
+  AsmKind reg;
+  const char *l; /* label */
+  int64_t c;     /* constant */
+} Memarg;
 
 typedef struct {
   AsmKind kind;
@@ -132,19 +109,31 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
-  int64_t value;
+  int64_t v;
 } Number;
+
+typedef struct {
+  AsmKind kind;
+  const char *target;
+} Jmp;
+
+typedef struct {
+  AsmKind kind;
+  char type;
+  Parsev *src;
+  Parsev *dst;
+} Add;
 
 union Parsev {
   AsmKind kind;
   Label label;
   Globl globl;
   Balign balign;
+  Memarg memarg;
+  Add add;
   Jmp jmp;
-  Pushq pushq;
-  Movq movq;
-  Xorl xorl;
   Byte byte;
+  Imm imm;
   Ident ident;
   Number number;
 };
@@ -152,7 +141,6 @@ union Parsev {
 typedef struct AsmLine AsmLine;
 struct AsmLine {
   int64_t lineno;
-  int64_t wco; // Worst case offset
   Parsev v;
   AsmLine *next;
 };
@@ -167,7 +155,6 @@ void *xreallocarray(void *, size_t, size_t);
 char *xmemdup(const char *, size_t);
 char *xstrdup(const char *s);
 void *zalloc(size_t n);
-
 
 struct hashtable {
   size_t len, cap;

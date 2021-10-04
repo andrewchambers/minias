@@ -1,15 +1,16 @@
 #include "dumbas.h"
 
-AsmLine *allasm = NULL;
+static AsmLine *allasm = NULL;
 
 // Symbols in memory before
 // writing out the symtab section.
-struct hashtable *symbols = NULL;
+static struct hashtable *symbols = NULL;
 
 #define MAXSECTIONS 32
 static Section sections[MAXSECTIONS];
 static size_t nsections = 1; // first is reserved.
 
+static Section *cursection;
 static Section *shstrtab = NULL;
 static Section *strtab = NULL;
 static Section *symtab = NULL;
@@ -112,47 +113,11 @@ static void initsections(void) {
   text->hdr.sh_addralign = 4;
 }
 
-static void out(uint8_t *buf, size_t n) {
-  if (write(STDOUT_FILENO, buf, n) != n)
-    fatal("io error");
-}
-
-static void outelf(void) {
-  size_t i;
-  uint64_t offset;
-  Elf64_Ehdr ehdr = {0};
-
-  ehdr.e_ident[0] = 0x7f;
-  ehdr.e_ident[1] = 'E';
-  ehdr.e_ident[2] = 'L';
-  ehdr.e_ident[3] = 'F';
-  ehdr.e_ident[4] = ELFCLASS64;
-  ehdr.e_ident[5] = ELFDATA2LSB;
-  ehdr.e_ident[6] = 1;
-  ehdr.e_type = ET_REL;
-  ehdr.e_machine = EM_X86_64;
-  ehdr.e_flags = 0;
-  ehdr.e_version = 1;
-  ehdr.e_ehsize = sizeof(Elf64_Ehdr);
-  ehdr.e_shoff = sizeof(Elf64_Ehdr);
-  ehdr.e_shentsize = sizeof(Elf64_Shdr);
-  ehdr.e_shnum = nsections;
-  ehdr.e_shstrndx = 1;
-
-  out((uint8_t *)&ehdr, sizeof(ehdr));
-  offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Shdr) * nsections;
-
-  for (i = 0; i < nsections; i++) {
-    sections[i].hdr.sh_offset = offset;
-    out((uint8_t *)&sections[i].hdr, sizeof(Elf64_Shdr));
-    offset += sections[i].hdr.sh_size;
-  }
-  for (i = 0; i < nsections; i++) {
-    if (sections[i].hdr.sh_type == SHT_NOBITS)
-      continue;
-    out(sections[i].data, sections[i].hdr.sh_size);
-  }
-}
+static const char *dbg_str[] = {"Evaluating rule", "Matched rule",
+                                "Abandoning rule"};
+#define PCC_DEBUG(event, rule, level, pos, buffer, length)                     \
+  fprintf(stderr, "%*s%s %s @%zu [%.*s]\n", (int)((level)*2), "",              \
+          dbg_str[event], rule, pos, (int)(length), buffer)
 
 #include "asmparser.c" // XXX resolve dependency cycle.
 
@@ -189,25 +154,56 @@ void parse(void) {
   asmparser_destroy(ctx);
 }
 
-/*
-   First pass deals with finding the symbol information
-   and computing the worst case offsets for each instruction
-   and symbol.
-*/
-static void prepass(void) {
+/* Shorthand helpers to write section bytes. */
+
+static void sb(uint8_t b) { secaddbyte(cursection, b); }
+
+static void sb2(uint8_t b1, uint8_t b2) {
+  uint8_t buf[2] = {b1, b2};
+  secaddbytes(cursection, buf, sizeof(buf));
+}
+
+static void sb3(uint8_t b1, uint8_t b2, uint8_t b3) {
+  uint8_t buf[3] = {b1, b2, b3};
+  secaddbytes(cursection, buf, sizeof(buf));
+}
+
+static void sb4(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4) {
+  uint8_t buf[4] = {b1, b2, b3, b4};
+  secaddbytes(cursection, buf, sizeof(buf));
+}
+
+static void sw(uint32_t w) {
+  uint8_t buf[4] = {w & 0xff, (w & 0xff00) >> 8, (w & 0xff0000) >> 16,
+                    (w & 0xff0000) >> 24};
+  secaddbytes(cursection, buf, sizeof(buf));
+}
+
+/* Compose a ModR/M byte.  */
+static uint8_t modrm(uint8_t mod, uint8_t regop, uint8_t rm) {
+  return (mod << 6) + (regop << 3) + rm;
+}
+
+/* Convert an ASM_KIND to register bits */
+static uint8_t r64bits(AsmKind k) { return (k - ASM_RAX) & 0xff; }
+
+static uint8_t r32bits(AsmKind k) { return (k - ASM_EAX) & 0xff; }
+
+#define REX(W, R, X, B)                                                        \
+  ((1 << 6) | ((W) << 3) | ((R) << 2) | ((X) << 1) | ((B) << 0))
+#define REX_W REX(1, 0, 0, 0)
+
+static void assemble() {
   Symbol *sym;
   Parsev *v;
   AsmLine *l;
-  Section *cursection;
   const char *label;
-  struct hashtablekey htk;
 
   cursection = text;
 
   for (l = allasm; l; l = l->next) {
     v = &l->v;
-    l->wco = cursection->wco;
-    switch (v->kind) {
+    switch (l->v.kind) {
     case ASM_DIR_GLOBL:
       label = v->globl.name;
       sym = getsym(label);
@@ -219,47 +215,86 @@ static void prepass(void) {
     case ASM_DIR_TEXT:
       cursection = text;
       break;
-    case ASM_DIR_BALIGN:
-      cursection->wco += v->balign.align - 1;
+    case ASM_DIR_BALIGN: {
+      int64_t i, rem, amnt;
+      amnt = 0;
+      rem = cursection->hdr.sh_size % v->balign.align;
+      if (rem)
+        amnt = v->balign.align - rem;
+      for (i = 0; i < amnt; i++) {
+        sb(0x00);
+      }
+      break;
+    }
+    case ASM_DIR_BYTE:
+      sb(v->byte.b);
       break;
     case ASM_LABEL:
       label = v->label.name;
       sym = getsym(label);
-      sym->section = cursection;
-      sym->wco = cursection->wco;
+      sym->offset = cursection->hdr.sh_size;
       break;
-    case ASM_DIR_BYTE:
     case ASM_NOP:
+      sb(0x90);
+      break;
     case ASM_LEAVE:
+      sb(0xc9);
+      break;
     case ASM_RET:
-      cursection->wco += 1;
+      sb(0xc3);
       break;
-   case ASM_XORL:
-    if (isr32kind(v->movq.src->kind) && isr32kind(v->movq.dst->kind)) {
-      cursection->wco += 2;
-    } else {
-      cursection->wco += 15; // XXX pessimistic.
+    case ASM_ADD: {
+      Add *add = &v->add;
+
+      switch (add->type) {
+      case 'q':
+        switch (add->src->kind) {
+        case ASM_IMM:
+          fatal("TODO");
+          break;
+        case ASM_MEMARG:
+          fatal("TODO");
+          break;
+        default:
+          switch (add->src->kind) {
+          case ASM_IMM:
+            fatal("TODO");
+            break;
+          case ASM_MEMARG:
+            fatal("TODO");
+            break;
+          default:
+            sb3(REX_W, 0x03,
+                modrm(0x03, r64bits(add->dst->kind), r64bits(add->src->kind)));
+            break;
+          }
+          break;
+        }
+        break;
+      default:
+        fatal("unknown type");
+      }
+      break;
     }
-    break;
-    case ASM_MOVQ:
-      if (isr64kind(v->movq.src->kind) && isr64kind(v->movq.dst->kind)) {
-        cursection->wco += 3;
+    case ASM_JMP: {
+      int64_t distance;
+
+      sym = getsym(v->jmp.target);
+      if (sym->section && (sym->section == cursection)) {
+        distance = sym->offset - cursection->hdr.sh_size;
       } else {
-        cursection->wco += 15; // XXX pessimistic.
+        distance = 0x7fffffff; // XXX
+      }
+      if (distance <= 128 && distance >= -127) {
+        sb2(0xeb, (uint8_t)distance);
+      } else {
+        sb(0xe9);
+        sw((uint32_t)distance);
       }
       break;
-    case ASM_PUSHQ:
-      if (isr64kind(v->pushq.arg->kind)) {
-        cursection->wco += 2;
-      } else {
-        cursection->wco += 9; // XXX pessimistic.
-      }
-      break;
-    case ASM_JMP:
-      cursection->wco += 5;
-      break;
+    }
     default:
-      fatal("prepass: unexpected kind: %d", v->kind);
+      fatal("assemble: unexpected kind: %d", l->v.kind);
     }
   }
 }
@@ -300,153 +335,61 @@ static void fillsymtab(void) {
   }
 }
 
-#define MODREGI 0x3
-#define REX_W 0x48
+FILE *outf = NULL;
 
-static uint8_t kindr64bits(AsmKind k) {
-  return (k - ASM_RAX) & 0xff;
+static void out(uint8_t *buf, size_t n) {
+  fwrite(buf, 1, n, outf);
+  if (ferror(outf))
+    fatal("fwrite:");
 }
 
-static uint8_t kindr32bits(AsmKind k) {
-  return (k - ASM_EAX) & 0xff;
-}
+static void outelf(void) {
+  size_t i;
+  uint64_t offset;
+  Elf64_Ehdr ehdr = {0};
 
-static uint8_t composemodrm(uint8_t mod, uint8_t regop,  uint8_t rm) {
-  return (mod<<6) + (regop<<3) + rm;
-}
+  ehdr.e_ident[0] = 0x7f;
+  ehdr.e_ident[1] = 'E';
+  ehdr.e_ident[2] = 'L';
+  ehdr.e_ident[3] = 'F';
+  ehdr.e_ident[4] = ELFCLASS64;
+  ehdr.e_ident[5] = ELFDATA2LSB;
+  ehdr.e_ident[6] = 1;
+  ehdr.e_type = ET_REL;
+  ehdr.e_machine = EM_X86_64;
+  ehdr.e_flags = 0;
+  ehdr.e_version = 1;
+  ehdr.e_ehsize = sizeof(Elf64_Ehdr);
+  ehdr.e_shoff = sizeof(Elf64_Ehdr);
+  ehdr.e_shentsize = sizeof(Elf64_Shdr);
+  ehdr.e_shnum = nsections;
+  ehdr.e_shstrndx = 1;
 
+  out((uint8_t *)&ehdr, sizeof(ehdr));
+  offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Shdr) * nsections;
 
-static void assemble() {
-  Symbol *sym;
-  Parsev *v;
-  AsmLine *l;
-  Section *cursection;
-  const char *label;
-
-  cursection = text;
-
-  for (l = allasm; l; l = l->next) {
-    v = &l->v;
-    switch (l->v.kind) {
-    case ASM_DIR_GLOBL:
-      break;
-    case ASM_DIR_DATA:
-      cursection = data;
-      break;
-    case ASM_DIR_TEXT:
-      cursection = text;
-      break;
-    case ASM_DIR_BALIGN: {
-      int64_t i, rem, amnt;
-      amnt = 0;
-      rem = cursection->hdr.sh_size % v->balign.align;
-      if (rem)
-        amnt = v->balign.align - rem;
-      for (i = 0; i < amnt; i++) {
-        secaddbyte(cursection, 0x00);
-      }
-      break;
-    }
-    case ASM_DIR_BYTE:
-      secaddbyte(cursection, v->byte.b);
-      break;
-    case ASM_LABEL:
-      label = v->label.name;
-      sym = getsym(label);
-      sym->offset = cursection->hdr.sh_size;
-      break;
-    case ASM_NOP:
-      secaddbyte(cursection, 0x90);
-      break;
-    case ASM_LEAVE:
-      secaddbyte(cursection, 0xc9);
-      break;
-    case ASM_RET:
-      secaddbyte(cursection, 0xc3);
-      break;
-     case ASM_XORL: {
-      Parsev *src, *dst;
-
-      src = v->movq.src;
-      dst = v->movq.dst;
-
-      if (isr32kind(src->kind) && isr32kind(dst->kind)) {
-        uint8_t ibuf[2] = {
-          0x31,
-          composemodrm(MODREGI, kindr32bits(src->kind), kindr32bits(dst->kind)),
-        };
-        secaddbytes(cursection, ibuf, sizeof(ibuf));
-      } else {
-        fatal("TODO");
-      }
-      break;
-    }
-    case ASM_MOVQ: {
-      Parsev *src, *dst;
-
-      src = v->movq.src;
-      dst = v->movq.dst;
-
-      if (isr64kind(src->kind) && isr64kind(dst->kind)) {
-        uint8_t ibuf[3] = {
-          REX_W,
-          0x89,
-          composemodrm(MODREGI, kindr64bits(src->kind), kindr64bits(dst->kind)),
-        };
-        secaddbytes(cursection, ibuf, sizeof(ibuf));
-      } else {
-        fatal("TODO");
-      }
-      break;
-    }
-    case ASM_PUSHQ: {
-      Parsev *arg;
-
-      arg = v->pushq.arg;
-
-      if (isr64kind(arg->kind)) {
-        uint8_t ibuf[2] = {0x50, kindr64bits(arg->kind)};
-        secaddbytes(cursection, ibuf, sizeof(ibuf));
-      } else if (arg->kind == ASM_NUMBER) {
-        fatal("TODO");
-      } else if (arg->kind == ASM_IDENT) {
-        fatal("TODO");
-      } else {
-        fatal("BUG: unexpected pushq arg");
-      }
-
-      break;
-    }
-    case ASM_JMP: {
-      sym = getsym(v->jmp.target);
-      if (sym->section && (sym->section == cursection)) {
-        int64_t distance;
-        distance = sym->wco - cursection->wco;
-        if (distance <= 128 && distance >= -127) {
-          uint8_t ibuf[2] = {0xeb, 0x00};
-          secaddbytes(cursection, ibuf, sizeof(ibuf));
-        } else {
-          uint8_t ibuf[5] = {0xe9, 0x00, 0x00, 0x00, 0x00};
-          secaddbytes(cursection, ibuf, sizeof(ibuf));
-        }
-      } else {
-        fatal("TODO, jmp to undefined symbol");
-      }
-      break;
-    }
-    default:
-      fatal("assemble: unexpected kind: %d", l->v.kind);
-    }
+  for (i = 0; i < nsections; i++) {
+    sections[i].hdr.sh_offset = offset;
+    out((uint8_t *)&sections[i].hdr, sizeof(Elf64_Shdr));
+    offset += sections[i].hdr.sh_size;
+  }
+  for (i = 0; i < nsections; i++) {
+    if (sections[i].hdr.sh_type == SHT_NOBITS)
+      continue;
+    out(sections[i].data, sections[i].hdr.sh_size);
   }
 }
 
 int main(void) {
   symbols = mkhtab(256);
+  outf = stdout;
+
   initsections();
   parse();
-  prepass();
   assemble();
   fillsymtab();
   outelf();
+  if (fflush(outf) != 0)
+    fatal("fflush:");
   return 0;
 }
