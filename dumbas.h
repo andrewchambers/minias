@@ -65,6 +65,14 @@ typedef enum {
   ASM_RBP,
   ASM_RSI,
   ASM_RDI,
+  ASM_R8,
+  ASM_R9,
+  ASM_R10,
+  ASM_R11,
+  ASM_R12,
+  ASM_R13,
+  ASM_R14,
+  ASM_R15,
 } AsmKind;
 
 typedef union Parsev Parsev;

@@ -37,7 +37,7 @@ add <- "add" 'q'? ws s:m ws? ',' ws? d:r64
      { $$.add = mkadd('q', s, d); }
      / "add" 'q'? ws s:r64 ws? ',' ws? d:m
      { $$.add = mkadd('q', s, d); }
-    / "add" 'q'? ws s:r64 ws? ',' ws? d:r64
+     / "add" 'q'? ws s:r64 ws? ',' ws? d:r64
      { $$.add = mkadd('q', s, d); }
      / "addq" ws s:imm ws? ',' ws? d:m
      { $$.add = mkadd('q', s, d); }
@@ -57,6 +57,14 @@ r64 <- "%rax" { $$.kind = ASM_RAX; }
      / "%rbp" { $$.kind = ASM_RBP; }
      / "%rsi" { $$.kind = ASM_RSI; }
      / "%rdi" { $$.kind = ASM_RDI; }
+     / "%r8"  { $$.kind = ASM_R8; }
+     / "%r9"  { $$.kind = ASM_R9; }
+     / "%r10" { $$.kind = ASM_R10; }
+     / "%r11" { $$.kind = ASM_R11; }
+     / "%r12" { $$.kind = ASM_R12; }
+     / "%r13" { $$.kind = ASM_R13; }
+     / "%r14" { $$.kind = ASM_R14; }
+     / "%r15" { $$.kind = ASM_R15; }
 
 imm <- '$' i:ident
        { $$.imm = (Imm){.kind = ASM_IMM, .l = i.ident.name, .c = 0 };  }
@@ -74,7 +82,7 @@ ws <- [ \t]+
 eol <- ws? ("\n" / (! .))
 
 %source {
- 
+
 static Parsev *dupv(Parsev *p) { 
   Parsev *r = xmalloc(sizeof(Parsev));
   *r = *p;
