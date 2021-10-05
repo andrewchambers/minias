@@ -309,25 +309,37 @@ static void assemble() {
         }
       }
 
-      if (isregkind(op->src->kind) && isregkind(op->dst->kind)) {
+      if (isregkind(op->dst->kind)) {
+        rm = rbits(op->dst->kind);
+      }
 
-        if (op->kind == ASM_ADD)
-          opcode = 0x03;
-        else if (op->kind == ASM_SUB)
-          opcode = 0x2b;
-        else {
+      if (isregkind(op->src->kind)) {
+
+        if (op->kind == ASM_ADD) {
+          opcode = 0x01;
+        } else if (op->kind == ASM_AND) {
+          opcode = 0x21;
+        } else if (op->kind == ASM_SUB) {
+          opcode = 0x29;
+        } else if (op->kind == ASM_XOR) {
+          opcode = 0x31;
+        } else {
           fatal("unreachable");
         }
 
-        reg = rbits(op->dst->kind);
-        rm = rbits(op->src->kind);
-
+        reg = rbits(op->src->kind);
       } else if (op->src->kind == ASM_IMM) {
 
         if (op->kind == ASM_ADD) {
           opcode = 0x81;
           reg = 0x00;
+        } else if (op->kind == ASM_AND) {
+          opcode = 0x81;
+          reg = 0x05;
         } else if (op->kind == ASM_SUB) {
+          opcode = 0x81;
+          reg = 0x05;
+        } else if (op->kind == ASM_XOR) {
           opcode = 0x81;
           reg = 0x05;
         } else {
@@ -340,23 +352,8 @@ static void assemble() {
           rm = rbits(op->dst->kind);
         }
 
-      } else if (isregkind(op->src->kind)) {
-        assert(memarg);
-
-        if (op->kind == ASM_ADD) {
-          opcode = 0x01;
-        } else if (op->kind == ASM_SUB) {
-          opcode = 0x29;
-        } else {
-          fatal("unreachable");
-        }
-
-        reg = rbits(op->src->kind);
-
       } else if (op->src->kind == ASM_MEMARG) {
         fatal("todo");
-      } else {
-        fatal("unreachable");
       }
 
       rex = REX(op->type == 'q', reg & (1 << 4), 0, rm & (1 << 4));
@@ -372,6 +369,8 @@ static void assemble() {
       }
 
       switch (dispsz) {
+      case 0:
+        break;
       case 1:
         sb((uint8_t)disp);
         break;
@@ -383,6 +382,8 @@ static void assemble() {
       }
 
       switch (immsz) {
+      case 0:
+        break;
       case 1:
         sb((uint8_t)imm);
         break;
