@@ -48,7 +48,11 @@ typedef enum {
   ASM_JMP,
   ASM_LEAVE,
   ASM_ADD,
+  ASM_AND,
+  ASM_SUB,
+  ASM_XOR,
   // Registers, order matters.
+  ASM_REG_BEGIN,
   ASM_EAX,
   ASM_ECX,
   ASM_EDX,
@@ -73,6 +77,7 @@ typedef enum {
   ASM_R13,
   ASM_R14,
   ASM_R15,
+  ASM_REG_END,
 } AsmKind;
 
 typedef union Parsev Parsev;
@@ -130,7 +135,10 @@ typedef struct {
   char type;
   Parsev *src;
   Parsev *dst;
-} Add;
+} ModRMBinop;
+
+typedef ModRMBinop Add;
+typedef ModRMBinop Sub;
 
 union Parsev {
   AsmKind kind;
@@ -138,7 +146,9 @@ union Parsev {
   Globl globl;
   Balign balign;
   Memarg memarg;
+  ModRMBinop modrmbinop;
   Add add;
+  Sub sub;
   Jmp jmp;
   Byte byte;
   Imm imm;

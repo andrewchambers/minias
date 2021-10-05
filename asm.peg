@@ -23,23 +23,30 @@ instr = "nop"{ $$.kind = ASM_NOP; }
        | "leave" { $$.kind = ASM_LEAVE; }
        | "ret" { $$.kind = ASM_RET; }
        | i:jmp { $$ = i; }
-       | i:add { $$ = i; }
+       | i:mod-rm-binop { $$ = i; }
 
 jmp = "jmp" ws i:ident
        { $$.jmp = (Jmp){.kind = ASM_JMP, .target = i.ident.name}; }
 
-add = "addq" ws s:r-m64 ws? ',' ws? d:r64
-      { $$.add = (Add){ .kind = ASM_ADD, .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
-    | "addq" ws s:r64 ws? ',' ws? d:r-m64
-      { $$.add = (Add){ .kind = ASM_ADD, .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
-    | "addq" ws s:imm ws? ',' ws? d:r-m64
-      { $$.add = (Add){ .kind = ASM_ADD, .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
-    | "addl" ws s:r-m32 ws? ',' ws? d:r32
-      { $$.add = (Add){ .kind = ASM_ADD, .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
-    | "addl" ws s:r32 ws? ',' ws? d:r-m32
-      { $$.add = (Add){ .kind = ASM_ADD, .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
-    | "addl" ws s:imm ws? ',' ws? d:r-m32
-      { $$.add = (Add){ .kind = ASM_ADD, .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
+mod-rm-binop = "add" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_ADD; }
+             | "and" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_AND;}
+             | "sub" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_SUB;}
+             | "xor" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_XOR;}
+
+
+mod-rm-binop-args = 
+     "q" ws s:r-m64 ws? ',' ws? d:r64
+      { $$.modrmbinop = (ModRMBinop){ .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
+    | "q" ws s:r64 ws? ',' ws? d:r-m64
+      { $$.modrmbinop = (ModRMBinop){ .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
+    | "q" ws s:imm ws? ',' ws? d:r-m64
+      { $$.modrmbinop = (ModRMBinop){ .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
+    | "l" ws s:r-m32 ws? ',' ws? d:r32
+      { $$.modrmbinop = (ModRMBinop){ .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
+    | "l" ws s:r32 ws? ',' ws? d:r-m32
+      { $$.modrmbinop = (ModRMBinop){ .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
+    | "l" ws s:imm ws? ',' ws? d:r-m32
+      { $$.modrmbinop = (ModRMBinop){ .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
 
 r-m64 = r:r64 { $$ = r; }
       | m:m { $$ = m; }
