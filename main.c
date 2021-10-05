@@ -276,7 +276,7 @@ static void assemble() {
             } else {
               fatal("TODO mem arg with disp");
             }
-          } else {
+          } else { // imm, r64
             uint8_t rbits = r64bits(add->dst->kind);
             uint8_t rex = REX(1,0,0,rbits&(1<<4));
             sb3(rex, 0x81, modrm(0x03, 0x00, rbits));
@@ -291,10 +291,13 @@ static void assemble() {
           case ASM_MEMARG:
             fatal("TODO");
             break;
-          default:
-            sb3(REX_W, 0x03,
-                modrm(0x03, r64bits(add->dst->kind), r64bits(add->src->kind)));
+          default: { // r64, r64 
+            uint8_t srcbits = r64bits(add->src->kind);
+            uint8_t dstbits = r64bits(add->dst->kind);
+            uint8_t rex = REX(1,dstbits&(1<<4),0,srcbits&(1<<4));
+            sb3(rex, 0x03, modrm(0x03, dstbits, srcbits));
             break;
+          }
           }
           break;
         }
