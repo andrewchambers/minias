@@ -30,6 +30,7 @@ jmp = "jmp" ws i:ident
 
 mod-rm-binop = "add" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_ADD; }
              | "and" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_AND;}
+             | "or"  a:mod-rm-binop-args { $$ = a; $$.kind = ASM_OR;}
              | "sub" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_SUB;}
              | "xor" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_XOR;}
 

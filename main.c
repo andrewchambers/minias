@@ -259,6 +259,7 @@ static void assemble() {
       break;
     case ASM_ADD:
     case ASM_AND:
+    case ASM_OR:
     case ASM_SUB:
     case ASM_XOR: {
 
