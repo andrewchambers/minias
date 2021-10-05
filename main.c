@@ -1,4 +1,4 @@
-#include "dumbas.h"
+#include "minias.h"
 
 static AsmLine *allasm = NULL;
 
@@ -113,45 +113,43 @@ static void initsections(void) {
   text->hdr.sh_addralign = 4;
 }
 
-static const char *dbg_str[] = {"Evaluating rule", "Matched rule",
-                                "Abandoning rule"};
-#define PCC_DEBUG(event, rule, level, pos, buffer, length)                     \
-  fprintf(stderr, "%*s%s %s @%zu [%.*s]\n", (int)((level)*2), "",              \
-          dbg_str[event], rule, pos, (int)(length), buffer)
+static Parsev *dupv(Parsev *p) { 
+  Parsev *r = xmalloc(sizeof(Parsev));
+  *r = *p;
+  return r;
+}
 
-#include "asmparser.c" // XXX resolve dependency cycle.
+#define YYSTYPE Parsev
+#define YY_CTX_LOCAL
+#define YY_CTX_MEMBERS Parsev v;
+#include "asm.peg.inc"
 
 void parse(void) {
-  int more;
   uint64_t lineno;
-  Parsev v;
   AsmLine *l, *prevl;
-  asmparser_context_t *ctx;
+  yycontext ctx;
 
-  ctx = asmparser_create(NULL);
+  memset(&ctx, 0, sizeof(yycontext));
   prevl = NULL;
   lineno = 0;
 
-  do {
-    more = asmparser_parse(ctx, &v);
+  while (yyparse(&ctx)) {
     lineno += 1;
-    if (v.kind == ASM_SYNTAX_ERROR) {
+    if (ctx.v.kind == ASM_SYNTAX_ERROR) {
       fprintf(stderr, "<stdin>:%lu: syntax error\n", lineno);
       exit(1);
     }
-    if (v.kind == ASM_BLANK)
+    if (ctx.v.kind == ASM_BLANK)
       continue;
     l = zalloc(sizeof(AsmLine));
-    l->v = v;
+    l->v = ctx.v;
     l->lineno = lineno;
     if (prevl)
       prevl->next = l;
     else
       allasm = l;
     prevl = l;
-  } while (more);
-
-  asmparser_destroy(ctx);
+  }
 }
 
 /* Shorthand helpers to write section bytes. */

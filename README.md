@@ -1,6 +1,6 @@
-# dumbas
+# minias
 
-A dumb assembler for x86_64, written for fun and learning.
+A mini assembler for x86_64, written for fun and learning.
 
 Goals:
 
@@ -13,6 +13,19 @@ Non Goals:
 - Assemble every assembly instruction.
 - Assemble other architectures.
 - Work as a library.
+
+# Building
+
+```
+redo minias
+```
+
+or 
+
+```
+leg asm.peg > asm.peg.inc
+cc -O2 *.c -o minias
+```
 
 # Resources
 
