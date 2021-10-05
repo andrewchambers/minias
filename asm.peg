@@ -34,8 +34,17 @@ add = "addq" ws s:r-m64 ws? ',' ws? d:r64
       { $$.add = (Add){ .kind = ASM_ADD, .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
     | "addq" ws s:imm ws? ',' ws? d:r-m64
       { $$.add = (Add){ .kind = ASM_ADD, .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
+    | "addl" ws s:r-m32 ws? ',' ws? d:r32
+      { $$.add = (Add){ .kind = ASM_ADD, .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
+    | "addl" ws s:r32 ws? ',' ws? d:r-m32
+      { $$.add = (Add){ .kind = ASM_ADD, .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
+    | "addl" ws s:imm ws? ',' ws? d:r-m32
+      { $$.add = (Add){ .kind = ASM_ADD, .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
 
 r-m64 = r:r64 { $$ = r; }
+      | m:m { $$ = m; }
+
+r-m32 = r:r32 { $$ = r; }
       | m:m { $$ = m; }
 
 m = '(' ws? r:r64 ws? ')'
@@ -61,6 +70,15 @@ r64 = "%rax" { $$.kind = ASM_RAX }
     | "%r13" { $$.kind = ASM_R13 }
     | "%r14" { $$.kind = ASM_R14 }
     | "%r15" { $$.kind = ASM_R15 }
+
+r32 = "%eax" { $$.kind = ASM_EAX }
+    | "%ecx" { $$.kind = ASM_ECX }
+    | "%edx" { $$.kind = ASM_EDX }
+    | "%ebx" { $$.kind = ASM_EBX }
+    | "%esp" { $$.kind = ASM_ESP }
+    | "%ebp" { $$.kind = ASM_EBP }
+    | "%esi" { $$.kind = ASM_ESI }
+    | "%edi" { $$.kind = ASM_EDI }
 
 
 imm = '$' i:ident

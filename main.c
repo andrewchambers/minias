@@ -113,7 +113,7 @@ static void initsections(void) {
   text->hdr.sh_addralign = 4;
 }
 
-static Parsev *dupv(Parsev *p) { 
+static Parsev *dupv(Parsev *p) {
   Parsev *r = xmalloc(sizeof(Parsev));
   *r = *p;
   return r;
@@ -179,20 +179,18 @@ static void sw(uint32_t w) {
 
 /* Compose a ModR/M byte.  */
 static uint8_t modrm(uint8_t mod, uint8_t regop, uint8_t rm) {
-  return ((mod&3) << 6) | ((regop&7) << 3) | (rm&7);
+  return ((mod & 3) << 6) | ((regop & 7) << 3) | (rm & 7);
 }
 
 /* Is one of the r$n style registers. */
-static uint8_t isextr64(AsmKind k) {
-  return k >= ASM_R8 && k <= ASM_R15;
-}
+static uint8_t isextr64(AsmKind k) { return k >= ASM_R8 && k <= ASM_R15; }
 
 /* Convert an ASM_KIND to register bits */
 static uint8_t r64bits(AsmKind k) {
   if (isextr64(k)) {
-    return (1<<4) | ((k - ASM_R8) & 0xff);
+    return (1 << 4) | ((k - ASM_R8) & 0xff);
   } else {
-    return (k - ASM_RAX) & 0xff;  
+    return (k - ASM_RAX) & 0xff;
   }
 }
 
@@ -254,19 +252,63 @@ static void assemble() {
       break;
     case ASM_ADD: {
       Add *add = &v->add;
-
       switch (add->type) {
+      case 'l':
+        switch (add->src->kind) {
+        case ASM_IMM:
+          if (add->dst->kind == ASM_MEMARG) {
+            uint8_t rbits = r64bits(add->dst->memarg.reg);
+            if (rbits & (1 << 4)) {
+              // 64 bit register, need rex.
+              sb(REX(0, 0, 0, rbits & (1 << 4)));
+            }
+            if ((rbits & 7) == 4) {
+              fatal("%d: cannot address destination", l->lineno);
+            }
+            if (add->dst->memarg.c == 0 && add->dst->memarg.l == NULL) {
+              if ((rbits & 7) == 5) { /* BP style registers need displacement */
+                sb3(0x81, modrm(0x01, 0x00, rbits), 0x00);
+              } else {
+                sb2(0x81, modrm(0x00, 0x00, rbits));
+              }
+            } else {
+              fatal("TODO mem arg with disp");
+            }
+          } else { // imm, r32
+            sb2(0x81, modrm(0x03, 0x00, r32bits(add->dst->kind)));
+          }
+          sw(0);
+          break;
+          break;
+        case ASM_MEMARG:
+          fatal("TODO");
+          break;
+        default:
+          switch (add->src->kind) {
+          case ASM_MEMARG:
+            fatal("TODO");
+            break;
+          default: { // r32, r32
+            uint8_t srcbits = r32bits(add->src->kind);
+            uint8_t dstbits = r32bits(add->dst->kind);
+            sb2(0x03, modrm(0x03, dstbits, srcbits));
+            break;
+          }
+          }
+          break;
+        }
+        break;
       case 'q':
         switch (add->src->kind) {
         case ASM_IMM:
           if (add->dst->kind == ASM_MEMARG) {
             uint8_t rbits = r64bits(add->dst->memarg.reg);
-            uint8_t rex = REX(1,0,0,rbits&(1<<4));
-            if ((rbits&7) == 4) {
-              fatal("%d: cannot address destination register", l->lineno);
+            uint8_t rex = REX(1, 0, 0, rbits & (1 << 4));
+            if ((rbits & 7) == 4) {
+              fatal("%d: cannot address destination", l->lineno);
             }
             if (add->dst->memarg.c == 0 && add->dst->memarg.l == NULL) {
-              if ((rbits&7) == 5) { /* BP style registers need displacement */
+              if ((rbits & 7) == 5) { /* BP style registers need displacement */
                 sb4(rex, 0x81, modrm(0x01, 0x00, rbits), 0x00);
               } else {
                 sb3(rex, 0x81, modrm(0x00, 0x00, rbits));
@@ -276,7 +318,7 @@ static void assemble() {
             }
           } else { // imm, r64
             uint8_t rbits = r64bits(add->dst->kind);
-            uint8_t rex = REX(1,0,0,rbits&(1<<4));
+            uint8_t rex = REX(1, 0, 0, rbits & (1 << 4));
             sb3(rex, 0x81, modrm(0x03, 0x00, rbits));
           }
           sw(0);
@@ -289,10 +331,10 @@ static void assemble() {
           case ASM_MEMARG:
             fatal("TODO");
             break;
-          default: { // r64, r64 
+          default: { // r64, r64
             uint8_t srcbits = r64bits(add->src->kind);
             uint8_t dstbits = r64bits(add->dst->kind);
-            uint8_t rex = REX(1,dstbits&(1<<4),0,srcbits&(1<<4));
+            uint8_t rex = REX(1, dstbits & (1 << 4), 0, srcbits & (1 << 4));
             sb3(rex, 0x03, modrm(0x03, dstbits, srcbits));
             break;
           }

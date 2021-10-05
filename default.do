@@ -6,7 +6,7 @@ case "$1" in
     test "$1" = "main.o" && redo-ifchange asm.peg.inc
     redo-ifchange "${1%.o}.c" minias.h
     set -x
-    ${CC:- cc} ${CFLAGS:- -O -Og} -c -o "$3" "${1%.o}.c"
+    ${CC:- cc} ${CFLAGS:- -g -Og} -c -o "$3" "${1%.o}.c"
   ;;
   asm.peg.inc)
     redo-ifchange asm.peg
@@ -16,9 +16,11 @@ case "$1" in
   minias)
     obj="main.o util.o "
     redo-ifchange $obj
+    set -x
     ${CC:- cc} ${LDFLAGS:-} -o "$3" $obj
   ;;
   fmt)
+    set -x
     clang-format -i main.c util.c >&2
   ;;
   *)
