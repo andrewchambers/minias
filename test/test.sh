@@ -25,6 +25,7 @@ t () {
 	echo -n "."
 }
 
+t "leaq (%rax), %rax"
 
 t "addq (%rax), %rax"
 t "andq (%rax), %rax"

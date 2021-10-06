@@ -259,6 +259,7 @@ static void assemble() {
       break;
     case ASM_ADD:
     case ASM_AND:
+    case ASM_LEA:
     case ASM_OR:
     case ASM_SUB:
     case ASM_XOR: {
@@ -345,6 +346,8 @@ static void assemble() {
           opcode = 0x03;
         } else if (op->kind == ASM_AND) {
           opcode = 0x23;
+        } else if (op->kind == ASM_LEA) {
+          opcode = 0x8d;
         } else if (op->kind == ASM_SUB) {
           opcode = 0x2b;
         } else if (op->kind == ASM_XOR) {
