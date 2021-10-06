@@ -1,5 +1,6 @@
 #include "minias.h"
 
+static FILE *outf = NULL;
 static AsmLine *allasm = NULL;
 
 // Symbols in memory before
@@ -257,10 +258,10 @@ static void assemble() {
     case ASM_RET:
       sb(0xc3);
       break;
-
     case ASM_ADD:
     case ASM_AND:
     case ASM_LEA:
+    case ASM_MOV:
     case ASM_OR:
     case ASM_SUB:
     case ASM_XOR: {
@@ -320,6 +321,8 @@ static void assemble() {
           opcode = 0x01;
         } else if (op->kind == ASM_AND) {
           opcode = 0x21;
+        } else if (op->kind == ASM_MOV) {
+          opcode = 0x89;
         } else if (op->kind == ASM_OR) {
           opcode = 0x09;
         } else if (op->kind == ASM_SUB) {
@@ -331,17 +334,6 @@ static void assemble() {
         }
 
         reg = rbits(op->src->kind);
-      } else if (op->src->kind == ASM_IMM) {
-
-        opcode = 0x81;
-        reg = 0x00;
-
-        if (memarg) {
-          rm = rbits(memarg->reg);
-        } else {
-          rm = rbits(op->dst->kind);
-        }
-
       } else if (op->src->kind == ASM_MEMARG) {
 
         if (op->kind == ASM_ADD) {
@@ -350,6 +342,8 @@ static void assemble() {
           opcode = 0x23;
         } else if (op->kind == ASM_LEA) {
           opcode = 0x8d;
+        } else if (op->kind == ASM_MOV) {
+          opcode = 0x8b;
         } else if (op->kind == ASM_OR) {
           opcode = 0x0b;
         } else if (op->kind == ASM_SUB) {
@@ -359,8 +353,17 @@ static void assemble() {
         } else {
           fatal("unreachable");
         }
-        /* dst is reg */
         reg = rbits(op->dst->kind);
+      } else if (op->src->kind == ASM_IMM) {
+
+        opcode = 0x81;
+        reg = 0x00;
+        if (memarg) {
+          rm = rbits(memarg->reg);
+        } else {
+          rm = rbits(op->dst->kind);
+        }
+
       }
 
       rex = REX(op->type == 'q', reg & (1 << 4), 0, rm & (1 << 4));
@@ -461,8 +464,6 @@ static void fillsymtab(void) {
     addtosymtab(sym);
   }
 }
-
-FILE *outf = NULL;
 
 static void out(uint8_t *buf, size_t n) {
   fwrite(buf, 1, n, outf);

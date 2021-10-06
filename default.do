@@ -24,7 +24,7 @@ case "$1" in
     clang-format -i main.c util.c >&2
   ;;
   *)
-    echo "don't know how to build $1" 2>&1
+    echo "don't know how to do $1" 2>&1
     exit 1
   ;;
 esac

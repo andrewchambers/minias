@@ -25,6 +25,13 @@ t () {
 	echo -n "."
 }
 
+# TODO Tidy and be more systematic, we could just loop
+t "movq %rax, %rax"
+t "movq (%rax), %rax"
+t "movq %rax, (%rax)"
+t "movl %eax, %eax"
+t "movl (%rax), %eax"
+t "movl %eax, (%rax)"
 t "leaq (%rax), %rax"
 t "leal (%rax), %eax"
 t "addq (%rax), %rax"

@@ -50,6 +50,7 @@ typedef enum {
   ASM_ADD,
   ASM_AND,
   ASM_LEA,
+  ASM_MOV,
   ASM_OR,
   ASM_SUB,
   ASM_XOR,
@@ -142,6 +143,7 @@ typedef struct {
 typedef ModRMBinop Add;
 typedef ModRMBinop And;
 typedef ModRMBinop Lea;
+typedef ModRMBinop Mov;
 typedef ModRMBinop Or;
 typedef ModRMBinop Sub;
 typedef ModRMBinop Xor;
@@ -156,6 +158,7 @@ union Parsev {
   Add add;
   And and;
   Lea lea;
+  Mov mov;
   Or or;
   Xor xor;
   Sub sub;
