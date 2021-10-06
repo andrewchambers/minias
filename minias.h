@@ -51,11 +51,49 @@ typedef enum {
   ASM_AND,
   ASM_LEA,
   ASM_MOV,
+  ASM_MOVSX,
+  ASM_MOVZX,
   ASM_OR,
   ASM_SUB,
+  ASM_XCHG,
   ASM_XOR,
   // Registers, order matters.
   ASM_REG_BEGIN,
+ 
+  ASM_AL,
+  ASM_CL,
+  ASM_DL,
+  ASM_BL,
+  ASM_SPL,
+  ASM_BPL,
+  ASM_SIL,
+  ASM_DIL,
+  ASM_R8B,
+  ASM_R9B,
+  ASM_R10B,
+  ASM_R11B,
+  ASM_R12B,
+  ASM_R13B,
+  ASM_R14B,
+  ASM_R15B,
+
+  ASM_AX,
+  ASM_CX,
+  ASM_DX,
+  ASM_BX,
+  ASM_SP,
+  ASM_BP,
+  ASM_SI,
+  ASM_DI,
+  ASM_R8W,
+  ASM_R9W,
+  ASM_R10W,
+  ASM_R11W,
+  ASM_R12W,
+  ASM_R13W,
+  ASM_R14W,
+  ASM_R15W,
+
   ASM_EAX,
   ASM_ECX,
   ASM_EDX,
@@ -64,6 +102,15 @@ typedef enum {
   ASM_EBP,
   ASM_ESI,
   ASM_EDI,
+  ASM_R8D,
+  ASM_R9D,
+  ASM_R10D,
+  ASM_R11D,
+  ASM_R12D,
+  ASM_R13D,
+  ASM_R14D,
+  ASM_R15D,
+
   ASM_RAX,
   ASM_RCX,
   ASM_RDX,
@@ -80,6 +127,7 @@ typedef enum {
   ASM_R13,
   ASM_R14,
   ASM_R15,
+
   ASM_REG_END,
 } AsmKind;
 
@@ -144,6 +192,7 @@ typedef ModRMBinop Add;
 typedef ModRMBinop And;
 typedef ModRMBinop Lea;
 typedef ModRMBinop Mov;
+typedef ModRMBinop Movzx;
 typedef ModRMBinop Or;
 typedef ModRMBinop Sub;
 typedef ModRMBinop Xor;
@@ -159,6 +208,7 @@ union Parsev {
   And and;
   Lea lea;
   Mov mov;
+  Movzx movzx;
   Or or;
   Xor xor;
   Sub sub;
@@ -176,9 +226,13 @@ struct AsmLine {
   AsmLine *next;
 };
 
+extern size_t curlineno;
+
 /* util.c */
 
+void lfatal(const char *fmt, ...);
 void fatal(const char *fmt, ...);
+void unreachable(void);
 
 void *xmalloc(size_t);
 void *xrealloc(void *, size_t);

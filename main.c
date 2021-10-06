@@ -19,6 +19,8 @@ static Section *bss = NULL;
 static Section *text = NULL;
 static Section *data = NULL;
 
+size_t curlineno = 0;
+
 static Symbol *getsym(const char *name) {
   Symbol **ps, *s;
   struct hashtablekey htk;
@@ -126,25 +128,23 @@ static Parsev *dupv(Parsev *p) {
 #include "asm.peg.inc"
 
 void parse(void) {
-  uint64_t lineno;
   AsmLine *l, *prevl;
   yycontext ctx;
 
   memset(&ctx, 0, sizeof(yycontext));
   prevl = NULL;
-  lineno = 0;
+  curlineno = 0;
 
   while (yyparse(&ctx)) {
-    lineno += 1;
+    curlineno += 1;
     if (ctx.v.kind == ASM_SYNTAX_ERROR) {
-      fprintf(stderr, "<stdin>:%lu: syntax error\n", lineno);
-      exit(1);
+      lfatal("syntax error\n");
     }
     if (ctx.v.kind == ASM_BLANK)
       continue;
     l = zalloc(sizeof(AsmLine));
     l->v = ctx.v;
-    l->lineno = lineno;
+    l->lineno = curlineno;
     if (prevl)
       prevl->next = l;
     else
@@ -180,29 +180,40 @@ static void sw(uint32_t w) {
 
 static int isregkind(AsmKind k) { return k > ASM_REG_BEGIN && k < ASM_REG_END; }
 
-/* Is one of the r$n style registers. */
-static int isextr64(AsmKind k) { return k >= ASM_R8 && k <= ASM_R15; }
-
-static uint8_t r64bits(AsmKind k) {
-  if (isextr64(k)) {
-    return (1 << 4) | ((k - ASM_R8) & 0xff);
-  } else {
-    return (k - ASM_RAX) & 0xff;
-  }
+/* Convert an AsmKind to register bits in reg/rm style.  */
+static uint8_t modrmregbits(AsmKind k) {
+  return (k - (ASM_REG_BEGIN+1)) % 16;
 }
 
-static uint8_t r32bits(AsmKind k) { return (k - ASM_EAX) & 0xff; }
+static uint8_t modrmregopcode(AsmKind k, char t) {
+    uint8_t opcode;
+    if (k == ASM_ADD) {
+      opcode = 0x00;
+    } else if (k == ASM_AND) {
+      opcode = 0x20;
+    } else if (k == ASM_MOV) {
+      opcode = 0x88;
+    } else if (k == ASM_OR) {
+      opcode = 0x08;
+    } else if (k == ASM_SUB) {
+      opcode = 0x28;
+    } else if (k == ASM_XCHG) {
+      opcode = 0x86;
+    } else if (k == ASM_XOR) {
+      opcode = 0x30;
+    } else {
+      unreachable();
+    }
+    if (t != 'b')
+      opcode += 1;
+    return opcode;
+}
 
-/* Convert an ASM_KIND to register bits */
-static uint8_t rbits(AsmKind k) {
-  if (k >= ASM_RAX && k <= ASM_R15) {
-    return r64bits(k);
-  } else if (k >= ASM_EAX && k <= ASM_EDI) {
-    return r32bits(k);
-  } else {
-    fatal("BUG: kind not a register");
-  }
-  return 0;
+
+static uint8_t modrmmemopcode(AsmKind k, char t) {
+  if (k == ASM_LEA)
+    return 0x8d;
+  return modrmregopcode(k, t) + 2;
 }
 
 #define REX(W, R, X, B)                                                        \
@@ -217,6 +228,7 @@ static void assemble() {
   cursection = text;
 
   for (l = allasm; l; l = l->next) {
+    curlineno = l->lineno;
     v = &l->v;
     switch (l->v.kind) {
     case ASM_DIR_GLOBL:
@@ -258,13 +270,19 @@ static void assemble() {
     case ASM_RET:
       sb(0xc3);
       break;
+    case ASM_MOVZX:
+    case ASM_MOVSX: {
+      fatal("TODO");
+    }
     case ASM_ADD:
     case ASM_AND:
     case ASM_LEA:
     case ASM_MOV:
     case ASM_OR:
     case ASM_SUB:
+    case ASM_XCHG:
     case ASM_XOR: {
+      
       ModRMBinop *op;
       Memarg *memarg;
       uint8_t opcode;
@@ -290,11 +308,11 @@ static void assemble() {
       }
 
       if (memarg) {
-        rm = rbits(memarg->reg);
+        rm = modrmregbits(memarg->reg);
 
         /* We cannot address ESP/RSP/... */
         if ((rm & 7) == 4)
-          fatal("addressing mode unrepresentable");
+          lfatal("addressing mode unrepresentable");
 
         if (memarg->c == 0 && memarg->l == NULL) {
           if ((rm & 7) == 5) { // BP style registers need displacement
@@ -307,66 +325,35 @@ static void assemble() {
             mod = 0x00;
           }
         } else {
-          fatal("unreachable");
+          unreachable();
         }
       }
 
       if (isregkind(op->dst->kind)) {
-        rm = rbits(op->dst->kind);
+        rm = modrmregbits(op->dst->kind);
       }
 
       if (isregkind(op->src->kind)) {
-
-        if (op->kind == ASM_ADD) {
-          opcode = 0x01;
-        } else if (op->kind == ASM_AND) {
-          opcode = 0x21;
-        } else if (op->kind == ASM_MOV) {
-          opcode = 0x89;
-        } else if (op->kind == ASM_OR) {
-          opcode = 0x09;
-        } else if (op->kind == ASM_SUB) {
-          opcode = 0x29;
-        } else if (op->kind == ASM_XOR) {
-          opcode = 0x31;
-        } else {
-          fatal("unreachable");
-        }
-
-        reg = rbits(op->src->kind);
+        opcode = modrmregopcode(op->kind, op->type);
+        reg = modrmregbits(op->src->kind);
       } else if (op->src->kind == ASM_MEMARG) {
-
-        if (op->kind == ASM_ADD) {
-          opcode = 0x03;
-        } else if (op->kind == ASM_AND) {
-          opcode = 0x23;
-        } else if (op->kind == ASM_LEA) {
-          opcode = 0x8d;
-        } else if (op->kind == ASM_MOV) {
-          opcode = 0x8b;
-        } else if (op->kind == ASM_OR) {
-          opcode = 0x0b;
-        } else if (op->kind == ASM_SUB) {
-          opcode = 0x2b;
-        } else if (op->kind == ASM_XOR) {
-          opcode = 0x33;
-        } else {
-          fatal("unreachable");
-        }
-        reg = rbits(op->dst->kind);
+        opcode = modrmmemopcode(op->kind, op->type);
+        reg = modrmregbits(op->dst->kind);
       } else if (op->src->kind == ASM_IMM) {
-
         opcode = 0x81;
         reg = 0x00;
         if (memarg) {
-          rm = rbits(memarg->reg);
+          rm = modrmregbits(memarg->reg);
         } else {
-          rm = rbits(op->dst->kind);
+          rm = modrmregbits(op->dst->kind);
         }
-
       }
 
-      rex = REX(op->type == 'q', reg & (1 << 4), 0, rm & (1 << 4));
+      if (op->type == 'w') {
+        sb(0x66);
+      }
+
+      rex = REX(op->type == 'q', reg & (1 << 3), 0, rm & (1 << 3));
 
       if (rex != REX(0, 0, 0, 0)) {
         sb(rex);
@@ -388,7 +375,7 @@ static void assemble() {
         sw((uint32_t)disp);
         break;
       default:
-        fatal("unreachable");
+        unreachable();
       }
 
       switch (immsz) {
@@ -401,7 +388,7 @@ static void assemble() {
         sw((uint32_t)imm);
         break;
       default:
-        fatal("unreachable");
+        unreachable();
       }
 
       break;
@@ -424,7 +411,7 @@ static void assemble() {
       break;
     }
     default:
-      fatal("assemble: unexpected kind: %d", l->v.kind);
+      lfatal("assemble: unexpected kind: %d", l->v.kind);
     }
   }
 }

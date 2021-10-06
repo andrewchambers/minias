@@ -26,12 +26,56 @@ t () {
 }
 
 # TODO Tidy and be more systematic, we could just loop
+
+t "xchg %rax, %rax"
+t "xchg %eax, %eax"
+t "xchg %ax, %ax"
+t "xchg %al, %al"
+t "xchg %rax, (%rax)"
+t "xchg %eax, (%rax)"
+t "xchg %ax, (%rax)"
+t "xchg %al, (%rax)"
+t "xchg (%rax), %rax"
+t "xchg (%rax), %eax"
+t "xchg (%rax), %ax"
+t "xchg (%rax), %al"
+
+exit 0
+
+t "addb %al, %al"
+t "addb (%rax), %al"
+t "addb %al, (%rax)"
+
+t "subb %al, %al"
+t "subb (%rax), %al"
+t "subb %al, (%rax)"
+
+t "xorb %al, %al"
+t "xorb (%rax), %al"
+t "xorb %al, (%rax)"
+
+t "orb %al, %al"
+t "orb (%rax), %al"
+t "orb %al, (%rax)"
+
+t "andb %al, %al"
+t "andb (%rax), %al"
+t "andb %al, (%rax)"
+
+t "movb %al, %al"
+t "movb (%rax), %al"
+t "movb %al, (%rax)"
+
+t "movw %ax, %r9w"
+t "movw %ax, %ax"
+t "addw %ax, %ax"
 t "movq %rax, %rax"
 t "movq (%rax), %rax"
 t "movq %rax, (%rax)"
 t "movl %eax, %eax"
 t "movl (%rax), %eax"
 t "movl %eax, (%rax)"
+t "leaw (%rax), %ax"
 t "leaq (%rax), %rax"
 t "leal (%rax), %eax"
 t "addq (%rax), %rax"

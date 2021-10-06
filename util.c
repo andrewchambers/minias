@@ -10,13 +10,25 @@ static void vwarn(const char *fmt, va_list ap) {
   }
 }
 
-void fatal(const char *fmt, ...) {
+void lfatal(const char *fmt, ...) {
   va_list ap;
-
+  fprintf(stderr, "%ld: ", curlineno);
   va_start(ap, fmt);
   vwarn(fmt, ap);
   va_end(ap);
   exit(1);
+}
+
+void fatal(const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vwarn(fmt, ap);
+  va_end(ap);
+  exit(1);
+}
+
+void unreachable(void) {
+  lfatal("BUG: unexpected internal condition");
 }
 
 void *xmalloc(size_t n) {
