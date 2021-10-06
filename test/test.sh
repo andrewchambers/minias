@@ -26,12 +26,12 @@ t () {
 }
 
 t "leaq (%rax), %rax"
-
+t "leal (%rax), %eax"
 t "addq (%rax), %rax"
 t "andq (%rax), %rax"
+t "orq  (%rax), %rax"
 t "subq (%rax), %rax"
 t "xorq (%rax), %rax"
-
 t "nop"
 t "ret"
 t "leave"
@@ -46,19 +46,12 @@ t "addq %rax, (%rbx)"
 t "addl %eax, (%rax)"
 t "addl %eax, (%r9)"
 t "addl %ebx, (%r9)"
-
+t "orq %rax, %rax"
+t "orq %rax, (%rax)"
+t "orl %eax, %eax"
 t "xorq %rax, %rax"
 t "xorq %rax, (%rax)"
 t "xorl %eax, %eax"
-
 t "andq %rax, %rax"
 t "andq %rax, (%rax)"
 t "andl %eax, %eax"
-
-
-
-#t "addq %rbp, (%rax)"
-
-
-#t "addq %rax, %rbx"
-#t "addl %eax, %ebx"

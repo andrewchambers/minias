@@ -257,13 +257,13 @@ static void assemble() {
     case ASM_RET:
       sb(0xc3);
       break;
+
     case ASM_ADD:
     case ASM_AND:
     case ASM_LEA:
     case ASM_OR:
     case ASM_SUB:
     case ASM_XOR: {
-
       ModRMBinop *op;
       Memarg *memarg;
       uint8_t opcode;
@@ -320,6 +320,8 @@ static void assemble() {
           opcode = 0x01;
         } else if (op->kind == ASM_AND) {
           opcode = 0x21;
+        } else if (op->kind == ASM_OR) {
+          opcode = 0x09;
         } else if (op->kind == ASM_SUB) {
           opcode = 0x29;
         } else if (op->kind == ASM_XOR) {
@@ -348,6 +350,8 @@ static void assemble() {
           opcode = 0x23;
         } else if (op->kind == ASM_LEA) {
           opcode = 0x8d;
+        } else if (op->kind == ASM_OR) {
+          opcode = 0x0b;
         } else if (op->kind == ASM_SUB) {
           opcode = 0x2b;
         } else if (op->kind == ASM_XOR) {

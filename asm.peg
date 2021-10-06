@@ -1,106 +1,136 @@
 
-line  = s:stmt (eol | !. ) { yy->v = s; }
-      | eol { yy->v.kind = ASM_BLANK; }
-      | . { yy->v.kind = ASM_SYNTAX_ERROR; }
+line  = 
+    s:stmt (eol | !. ) { yy->v = s; }
+  | eol { yy->v.kind = ASM_BLANK; }
+  | . { yy->v.kind = ASM_SYNTAX_ERROR; }
 
-stmt = d:directive {$$ = d;}
-      | i:instr { $$ = i; }
-      | l:label {  $$ = l; } 
+stmt =
+   d:directive {$$ = d;}
+ | i:instr { $$ = i; }
+ | l:label {  $$ = l; } 
 
-directive = ".glob" "o"? "l" ws i:ident
-             { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident.name }; }
-           | ".data" { $$.kind = ASM_DIR_DATA; }
-           | ".text" { $$.kind = ASM_DIR_TEXT; }
-           | ".balign" ws n:number 
-             { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.number.v }; }
-           | ".byte" ws n:number
-             { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.number.v }; }
+directive = 
+   ".glob" "o"? "l" ws i:ident
+   { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident.name }; }
+ | ".data" 
+   { $$.kind = ASM_DIR_DATA; }
+ | ".text"
+   { $$.kind = ASM_DIR_TEXT; }
+ | ".balign" ws n:number 
+    { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.number.v }; }
+ | ".byte" ws n:number
+    { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.number.v }; }
 
-label = i:ident ':'
-         { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident.name}; }
+label = 
+  i:ident ':'
+  { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident.name}; }
 
-instr = "nop"{ $$.kind = ASM_NOP; }
-       | "leave" { $$.kind = ASM_LEAVE; }
-       | "ret" { $$.kind = ASM_RET; }
-       | i:jmp { $$ = i; }
-       | i:mod-rm-binop { $$ = i; }
+instr = 
+    "nop" { $$.kind = ASM_NOP; }
+  | "leave" { $$.kind = ASM_LEAVE; }
+  | "ret" { $$.kind = ASM_RET; }
+  | i:jmp { $$ = i; }
+  | i:lea { $$ = i; }
+  | i:mod-rm-binop { $$ = i; }
 
 jmp = "jmp" ws i:ident
        { $$.jmp = (Jmp){.kind = ASM_JMP, .target = i.ident.name}; }
 
-mod-rm-binop = "add" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_ADD; }
-             | "and" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_AND;}
-             | "lea" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_LEA;}
-             | "or"  a:mod-rm-binop-args { $$ = a; $$.kind = ASM_OR;}
-             | "sub" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_SUB;}
-             | "xor" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_XOR;}
+lea =
+  "lea" 
+    (
+      "q"? ws s:m ws? ',' ws? d:r64
+      { $$.lea.type = 'q';  }
+    | "l"? ws s:m ws? ',' ws? d:r32
+      { $$.lea.type = 'l';  }
+    ) { $$.lea.kind = ASM_LEA;
+        $$.lea.src = dupv(&s);
+        $$.lea.dst = dupv(&d); }
 
-
+mod-rm-binop = 
+    "add" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_ADD; }
+  | "and" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_AND;}
+  | "or"  a:mod-rm-binop-args { $$ = a; $$.kind = ASM_OR;}
+  | "sub" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_SUB;}
+  | "xor" a:mod-rm-binop-args { $$ = a; $$.kind = ASM_XOR;}
 
 mod-rm-binop-args = 
-     "q" ws s:r-m64 ws? ',' ws? d:r64
-      { $$.modrmbinop = (ModRMBinop){ .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
+  (
+      "q" ws s:r-m64 ws? ',' ws? d:r64
     | "q" ws s:r64 ws? ',' ws? d:r-m64
-      { $$.modrmbinop = (ModRMBinop){ .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
     | "q" ws s:imm ws? ',' ws? d:r-m64
-      { $$.modrmbinop = (ModRMBinop){ .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
-    | "l" ws s:r-m32 ws? ',' ws? d:r32
-      { $$.modrmbinop = (ModRMBinop){ .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
-    | "l" ws s:r32 ws? ',' ws? d:r-m32
-      { $$.modrmbinop = (ModRMBinop){ .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
-    | "l" ws s:imm ws? ',' ws? d:r-m32
-      { $$.modrmbinop = (ModRMBinop){ .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
+    | ws s:r64 ws? ',' ws? d:r64
+    | ws s:m ws? ',' ws? d:r64
+    | ws s:imm ws? ',' ws? d:r64
+  ) { $$.modrmbinop = (ModRMBinop){ .type = 'q', .src = dupv(&s), .dst = dupv(&d) } }
+  | (
+       "l" ws s:r-m32 ws? ',' ws? d:r32
+     | "l" ws s:r32 ws? ',' ws? d:r-m32
+     | "l" ws s:imm ws? ',' ws? d:r-m32
+     | ws s:r32 ws? ',' ws? d:r32
+     | ws s:m ws? ',' ws? d:r32
+     | ws s:imm ws? ',' ws? d:r32
+  )
+  { $$.modrmbinop = (ModRMBinop){ .type = 'l', .src = dupv(&s), .dst = dupv(&d) } }
 
-r-m64 = r:r64 { $$ = r; }
-      | m:m { $$ = m; }
+r-m64 = 
+    r:r64 { $$ = r; }
+  | m:m { $$ = m; }
 
-r-m32 = r:r32 { $$ = r; }
-      | m:m { $$ = m; }
+r-m32 =
+   r:r32 { $$ = r; }
+ | m:m { $$ = m; }
 
-m = '(' ws? r:r64 ws? ')'
+m = 
+  '(' ws? r:r64 ws? ')'
   {  $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = NULL, .reg = r.kind  }  }
   | <'-'?[0-9]+> ws? '(' ws? r:r64 ws? ')'
   { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = strtoll(yytext, NULL, 10), .l = NULL, .reg = r.kind  }  }
   | i:ident  ws? '(' ws? r:r64 ws? ')'
   { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = i.ident.name, .reg = r.kind  }  }
 
-r64 = "%rax" { $$.kind = ASM_RAX }
-    | "%rcx" { $$.kind = ASM_RCX }
-    | "%rdx" { $$.kind = ASM_RDX }
-    | "%rbx" { $$.kind = ASM_RBX }
-    | "%rsp" { $$.kind = ASM_RSP }
-    | "%rbp" { $$.kind = ASM_RBP }
-    | "%rsi" { $$.kind = ASM_RSI }
-    | "%rdi" { $$.kind = ASM_RDI }
-    | "%r8"  { $$.kind = ASM_R8 }
-    | "%r9"  { $$.kind = ASM_R9 }
-    | "%r10" { $$.kind = ASM_R10 }
-    | "%r11" { $$.kind = ASM_R11 }
-    | "%r12" { $$.kind = ASM_R12 }
-    | "%r13" { $$.kind = ASM_R13 }
-    | "%r14" { $$.kind = ASM_R14 }
-    | "%r15" { $$.kind = ASM_R15 }
+r64 = 
+  "%rax" { $$.kind = ASM_RAX }
+  | "%rcx" { $$.kind = ASM_RCX }
+  | "%rdx" { $$.kind = ASM_RDX }
+  | "%rbx" { $$.kind = ASM_RBX }
+  | "%rsp" { $$.kind = ASM_RSP }
+  | "%rbp" { $$.kind = ASM_RBP }
+  | "%rsi" { $$.kind = ASM_RSI }
+  | "%rdi" { $$.kind = ASM_RDI }
+  | "%r8"  { $$.kind = ASM_R8 }
+  | "%r9"  { $$.kind = ASM_R9 }
+  | "%r10" { $$.kind = ASM_R10 }
+  | "%r11" { $$.kind = ASM_R11 }
+  | "%r12" { $$.kind = ASM_R12 }
+  | "%r13" { $$.kind = ASM_R13 }
+  | "%r14" { $$.kind = ASM_R14 }
+  | "%r15" { $$.kind = ASM_R15 }
 
-r32 = "%eax" { $$.kind = ASM_EAX }
-    | "%ecx" { $$.kind = ASM_ECX }
-    | "%edx" { $$.kind = ASM_EDX }
-    | "%ebx" { $$.kind = ASM_EBX }
-    | "%esp" { $$.kind = ASM_ESP }
-    | "%ebp" { $$.kind = ASM_EBP }
-    | "%esi" { $$.kind = ASM_ESI }
-    | "%edi" { $$.kind = ASM_EDI }
+r32 = 
+  "%eax" { $$.kind = ASM_EAX }
+  | "%ecx" { $$.kind = ASM_ECX }
+  | "%edx" { $$.kind = ASM_EDX }
+  | "%ebx" { $$.kind = ASM_EBX }
+  | "%esp" { $$.kind = ASM_ESP }
+  | "%ebp" { $$.kind = ASM_EBP }
+  | "%esi" { $$.kind = ASM_ESI }
+  | "%edi" { $$.kind = ASM_EDI }
 
 
-imm = '$' i:ident
-       { $$.imm = (Imm){.kind = ASM_IMM, .l = i.ident.name, .c = 0 };  }
-     | '$' <'-'?[0-9]+>
-       { $$.imm = (Imm){.kind = ASM_IMM, .l = NULL, .c = strtoll(yytext, NULL, 10) }; }
+imm = 
+'$' i:ident
+ { $$.imm = (Imm){.kind = ASM_IMM, .l = i.ident.name, .c = 0 };  }
+ | '$' <'-'?[0-9]+>
+ { $$.imm = (Imm){.kind = ASM_IMM, .l = NULL, .c = strtoll(yytext, NULL, 10) }; }
 
-ident = <[_a-zA-Z][_a-zA-Z0-9]*>
-         { $$.ident = (Ident){ .kind = ASM_IDENT, .name = xstrdup(yytext) }; } 
+ident = 
+  <[_a-zA-Z][_a-zA-Z0-9]*>
+  { $$.ident = (Ident){ .kind = ASM_IDENT, .name = xstrdup(yytext) }; } 
 
-number = <'-'?[0-9]+>
-          { $$.number = (Number){ .kind = ASM_NUMBER, .v = strtoll(yytext, NULL, 10) }; }
+number =
+  <'-'?[0-9]+>
+  { $$.number = (Number){ .kind = ASM_NUMBER, .v = strtoll(yytext, NULL, 10) }; }
 
 ws = [ \t]+
 
