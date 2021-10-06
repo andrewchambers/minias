@@ -25,6 +25,12 @@ t () {
 	echo -n "."
 }
 
+
+t "addq (%rax), %rax"
+t "andq (%rax), %rax"
+t "subq (%rax), %rax"
+t "xorq (%rax), %rax"
+
 t "nop"
 t "ret"
 t "leave"

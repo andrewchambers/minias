@@ -267,8 +267,8 @@ static void assemble() {
       Memarg *memarg;
       uint8_t opcode;
       uint8_t rex, mod, reg, rm, sib;
-      int64_t disp;
       int wantsib;
+      int64_t disp;
       int dispsz;
       int64_t imm;
       int immsz;
@@ -330,21 +330,8 @@ static void assemble() {
         reg = rbits(op->src->kind);
       } else if (op->src->kind == ASM_IMM) {
 
-        if (op->kind == ASM_ADD) {
-          opcode = 0x81;
-          reg = 0x00;
-        } else if (op->kind == ASM_AND) {
-          opcode = 0x81;
-          reg = 0x05;
-        } else if (op->kind == ASM_SUB) {
-          opcode = 0x81;
-          reg = 0x05;
-        } else if (op->kind == ASM_XOR) {
-          opcode = 0x81;
-          reg = 0x05;
-        } else {
-          fatal("unreachable");
-        }
+        opcode = 0x81;
+        reg = 0x00;
 
         if (memarg) {
           rm = rbits(memarg->reg);
@@ -353,7 +340,20 @@ static void assemble() {
         }
 
       } else if (op->src->kind == ASM_MEMARG) {
-        fatal("todo");
+
+        if (op->kind == ASM_ADD) {
+          opcode = 0x03;
+        } else if (op->kind == ASM_AND) {
+          opcode = 0x23;
+        } else if (op->kind == ASM_SUB) {
+          opcode = 0x2b;
+        } else if (op->kind == ASM_XOR) {
+          opcode = 0x33;
+        } else {
+          fatal("unreachable");
+        }
+        /* dst is reg */
+        reg = rbits(op->dst->kind);
       }
 
       rex = REX(op->type == 'q', reg & (1 << 4), 0, rm & (1 << 4));
