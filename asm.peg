@@ -1,6 +1,6 @@
 
 line  = 
-    s:stmt (eol | !. ) { yy->v = s; }
+    ws? s:stmt (eol | !. ) { yy->v = s; }
   | eol { yy->v.kind = ASM_BLANK; }
   | . { yy->v.kind = ASM_SYNTAX_ERROR; }
 
