@@ -183,19 +183,22 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
-  char type;
+  uint8_t variant;
   Parsev *src;
   Parsev *dst;
-} ModRMBinop;
+} Instr;
 
-typedef ModRMBinop Add;
-typedef ModRMBinop And;
-typedef ModRMBinop Lea;
-typedef ModRMBinop Mov;
-typedef ModRMBinop Movzx;
-typedef ModRMBinop Or;
-typedef ModRMBinop Sub;
-typedef ModRMBinop Xor;
+/*
+typedef Instr Add;
+typedef Instr And;
+typedef Instr Lea;
+typedef Instr Mov;
+typedef Instr Movzx;
+typedef Instr Or;
+typedef Instr Sub;
+typedef Instr Xor;
+*/
+typedef Instr Xchg;
 
 union Parsev {
   AsmKind kind;
@@ -203,15 +206,20 @@ union Parsev {
   Globl globl;
   Balign balign;
   Memarg memarg;
-  ModRMBinop modrmbinop;
+  Instr instr;
+  /*
   Add add;
   And and;
   Lea lea;
   Mov mov;
   Movzx movzx;
   Or or;
+  */
+  Xchg xchg;
+  /*
   Xor xor;
   Sub sub;
+  */
   Jmp jmp;
   Byte byte;
   Imm imm;
