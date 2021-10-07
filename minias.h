@@ -24,8 +24,16 @@ typedef struct {
   int64_t offset;
   int64_t size;
   int global;
+  int defined;
   Section *section;
 } Symbol;
+
+typedef struct {
+  Section *section;
+  Symbol *sym;
+  int kind;
+  uint64_t offset;
+} Relocation;
 
 typedef enum {
   // Misc

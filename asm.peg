@@ -29,26 +29,32 @@ label =
   { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident.name}; }
 
 instr = 
-    "nop" { $$.kind = ASM_NOP; }
+    "nop"   { $$.kind = ASM_NOP; }
   | "leave" { $$.kind = ASM_LEAVE; }
-  | "ret" { $$.kind = ASM_RET; }
-  | i:xchg { $$ = i; }
-  | i:add  { $$ = i; }
-  | i:and  { $$ = i; }
-  | i:lea  { $$ = i; }
-  | i:mov  { $$ = i; }
-  | i:or   { $$ = i; }
-  | i:sub  { $$ = i; }
-  | i:xor  { $$ = i; }
+  | "ret"   { $$.kind = ASM_RET; }
+  | i:jmp   { $$ = i; }
+  | i:xchg  { $$ = i; }
+  | i:add   { $$ = i; }
+  | i:and   { $$ = i; }
+  | i:lea   { $$ = i; }
+  | i:mov   { $$ = i; }
+  | i:or    { $$ = i; }
+  | i:sub   { $$ = i; }
+  | i:xor   { $$ = i; }
+
+
+jmp = 
+  "jmp" ws t:ident 
+  { $$.jmp = (Jmp){ .kind = ASM_JMP, .target=t.ident.name } ; }
 
 lea = 
-  'lea' (
+  "lea" (
       'w'? ws s:m ws? ',' ws? d:r16 { $$ = INSTR(0, s, d); }
     | 'l'? ws s:m ws? ',' ws? d:r32 { $$ = INSTR(1, s, d); }
     | 'q'? ws s:m ws? ',' ws? d:r64 { $$ = INSTR(2, s, d); }
   ) { $$.instr.kind = ASM_LEA; }
 
-#XXX Some other these rules can probably be collapsed.
+#XXX Some of these rules can probably be collapsed (or expanded for simplicity?).
 
 mov = "mov" (
     'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = INSTR(0, s, d); }

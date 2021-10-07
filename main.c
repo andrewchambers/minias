@@ -7,6 +7,11 @@ static AsmLine *allasm = NULL;
 // writing out the symtab section.
 static struct hashtable *symbols = NULL;
 
+// Linked list of relocations
+static Relocation *relocs = NULL;
+static size_t nrelocs = 0;
+static size_t reloccap = 0;
+
 #define MAXSECTIONS 32
 static Section sections[MAXSECTIONS];
 static size_t nsections = 1; // first is reserved.
@@ -114,6 +119,14 @@ static void initsections(void) {
   text->hdr.sh_flags = SHF_EXECINSTR | SHF_ALLOC;
   text->hdr.sh_entsize = 1;
   text->hdr.sh_addralign = 4;
+}
+
+Relocation *newreloc() {
+  if (nrelocs == reloccap) {
+    reloccap = nrelocs ? nrelocs * 2 : 64;
+    relocs = xreallocarray(relocs, reloccap, sizeof(Relocation));
+  }
+  return &relocs[nrelocs++];
 }
 
 static Parsev *dupv(Parsev *p) {
@@ -235,6 +248,18 @@ static void assembleplusr(uint8_t opcode, AsmKind reg) {
 }
 
 static void assembleimm(Imm *imm) {
+  Relocation *reloc;
+  Symbol *sym;
+
+  if (imm->l != NULL) {
+    reloc = newreloc();
+    sym = getsym(imm->l);
+    reloc->kind = 0; // XXX
+    reloc->section = cursection;
+    reloc->sym = sym;
+    reloc->offset = cursection->hdr.sh_size;
+  }
+
   switch (imm->nbytes) {
   case 1:
     sb((uint8_t)imm->c);
@@ -336,7 +361,7 @@ static void assemblerrm(Instr *instr, uint8_t opcode) {
     if ((rm & 7) == 4)
       lfatal("addressing mode unrepresentable");
     if (memarg->c == 0 && memarg->l == NULL) {
-      if ((rm & 7) == 5) { // BP style registers need sib
+      if ((rm & 7) == 5) { /* BP style registers need sib */
         mod = 0x01;
         wantsib = 1;
         sib = 0;
@@ -416,7 +441,6 @@ static void assemble(void) {
   Symbol *sym;
   Parsev *v;
   AsmLine *l;
-  const char *label;
 
   cursection = text;
 
@@ -425,8 +449,7 @@ static void assemble(void) {
     v = &l->v;
     switch (l->v.kind) {
     case ASM_DIR_GLOBL:
-      label = v->globl.name;
-      sym = getsym(label);
+      sym = getsym(v->globl.name);
       sym->global = 1;
       break;
     case ASM_DIR_DATA:
@@ -450,9 +473,10 @@ static void assemble(void) {
       sb(v->byte.b);
       break;
     case ASM_LABEL:
-      label = v->label.name;
-      sym = getsym(label);
+      sym = getsym(v->label.name);
+      sym->section = cursection;
       sym->offset = cursection->hdr.sh_size;
+      sym->defined = 1;
       break;
     case ASM_NOP:
       sb(0x90);
@@ -520,20 +544,17 @@ static void assemble(void) {
       break;
     }
     case ASM_JMP: {
-      int64_t distance;
+      Symbol *sym;
+      Relocation *reloc;
 
+      sb(0xe9);
       sym = getsym(v->jmp.target);
-      if (sym->section && (sym->section == cursection)) {
-        distance = sym->offset - cursection->hdr.sh_size;
-      } else {
-        distance = 0x7fffffff; // XXX
-      }
-      if (distance <= 128 && distance >= -127) {
-        sb2(0xeb, (uint8_t)distance);
-      } else {
-        sb(0xe9);
-        sw((uint32_t)distance);
-      }
+      reloc = newreloc();
+      reloc->kind = 0; // XXX
+      reloc->section = cursection;
+      reloc->sym = sym;
+      reloc->offset = cursection->hdr.sh_size;
+      sw(0x00000000);
       break;
     }
     default:
@@ -564,17 +585,54 @@ static void fillsymtab(void) {
 
   // Local symbols
   for (i = 0; i < symbols->cap; i++) {
+    if (!symbols->keys[i].str)
+      continue;
     sym = symbols->vals[i];
-    if (!sym || sym->global || !sym->section)
+    if (sym->global || !sym->section)
       continue;
     addtosymtab(sym);
   }
   // Global symbols
   for (i = 0; i < symbols->cap; i++) {
+    if (!symbols->keys[i].str)
+      continue;
     sym = symbols->vals[i];
-    if (!sym || !sym->global || !sym->section)
+    if (!sym->global || !sym->section)
       continue;
     addtosymtab(sym);
+  }
+}
+
+static void handlerelocs(void) {
+  Symbol *sym;
+  Relocation *reloc;
+  size_t i;
+
+  for (i = 0; i < nrelocs; i++) {
+    reloc = &relocs[i];
+    sym = reloc->sym;
+    if (sym->section == reloc->section) {
+      switch (reloc->kind) {
+      case 0: {
+        uint8_t *rdata;
+        int32_t addend, value;
+        rdata = &reloc->section->data[reloc->offset];
+        addend = (int32_t)rdata[0] | (int32_t)(rdata[1] << 8) |
+                 (int32_t)(rdata[2] << 16) | (int32_t)(rdata[3] << 24);
+        // XXX overflow?
+        value = sym->offset - (int32_t)reloc->offset + addend;
+        fprintf(stderr, "%lu %ld %d %d\n", reloc->offset, sym->offset, addend,
+                value);
+        rdata[0] = (value & 0xff);
+        rdata[1] = (value & 0xff00) >> 8;
+        rdata[2] = (value & 0xff000) >> 16;
+        rdata[3] = (value & 0xff00000) >> 24;
+        break;
+      }
+      default:
+        unreachable();
+      }
+    }
   }
 }
 
@@ -624,11 +682,11 @@ static void outelf(void) {
 int main(void) {
   symbols = mkhtab(256);
   outf = stdout;
-
   initsections();
   parse();
   assemble();
-  // fillsymtab();
+  fillsymtab();
+  handlerelocs();
   outelf();
   if (fflush(outf) != 0)
     fatal("fflush:");
