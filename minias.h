@@ -155,6 +155,7 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
+  uint8_t nbytes;
   const char *l; /* label */
   int64_t c;     /* constant */
 } Imm;
