@@ -190,7 +190,7 @@ static void sl(uint32_t l) {
       l & 0xff,
       (l & 0xff00) >> 8,
       (l & 0xff0000) >> 16,
-      (l & 0xff0000) >> 24,
+      (l & 0xff000000) >> 24,
   };
   secaddbytes(cursection, buf, sizeof(buf));
 }
@@ -224,7 +224,7 @@ static uint8_t modregrm(uint8_t mod, uint8_t reg, uint8_t rm) {
 }
 
 /* Assemble op +rw | op + rd. */
-static void assembleplusr(Instr *i, uint8_t opcode, AsmKind reg) {
+static void assembleplusr(uint8_t opcode, AsmKind reg) {
   uint8_t bits = regbits(reg);
   uint8_t rex = rexbyte(isreg64(reg), 0, 0, bits & (1 << 3));
   if (isreg16(reg))
@@ -347,6 +347,46 @@ static void assemblebasicop(Instr *instr, uint8_t opcode) {
   }
 }
 
+static void assemblexchg(Instr *xchg) {
+  static uint8_t variant2op[14] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x86,
+                                   0x86, 0x87, 0x87, 0x87, 0x87, 0x87, 0x87};
+  uint8_t opcode = variant2op[xchg->variant];
+  if (xchg->variant <= 5) {
+    assembleplusr(opcode,
+                  (xchg->variant % 2) ? xchg->src->kind : xchg->dst->kind);
+  } else {
+    assemblerrm(xchg, opcode);
+  }
+}
+
+static void assemblemov(Instr *mov) {
+  uint8_t opcode, rex, mod, rm;
+
+  static uint8_t variant2op[20] = {
+      0xb0, 0xb8, 0xb8, 0xc7, 0xc6, 0xc7, 0xc7, 0xc7, 0x8a, 0x8b,
+      0x8b, 0x8b, 0x88, 0x89, 0x89, 0x89, 0x88, 0x89, 0x89, 0x89,
+  };
+
+  opcode = variant2op[mov->variant];
+  if (mov->variant >= 8) {
+    assemblerrm(mov, opcode);
+  } else if (mov->variant >= 3) {
+    // c7 /0 i[bwd] encoding.
+    // dest in rm.
+    rm = regbits(mov->dst->kind);
+    rex = rexbyte(isreg64(mov->dst->kind), 0, 0, rm & (1 << 3));
+    if (isreg16(mov->dst->kind))
+      sb(0x66);
+    if (rex != rexbyte(0, 0, 0, 0))
+      sb(rex);
+    sb2(opcode, modregrm(3, 0, rm));
+    assembleimm(&mov->src->imm);
+  } else {
+    assembleplusr(opcode, mov->dst->kind);
+    assembleimm(&mov->src->imm);
+  }
+}
+
 static void assemble() {
   Symbol *sym;
   Parsev *v;
@@ -401,6 +441,10 @@ static void assemble() {
     case ASM_LEA:
       assemblerrm(&v->instr, 0x8d);
       break;
+    case ASM_MOV: {
+      assemblemov(&v->instr);
+      break;
+    }
     case ASM_ADD: {
       static uint8_t variant2op[24] = {
           0x04, 0x05, 0x05, 0x05, 0x00, 0x00, 0x00, 0x00,
@@ -447,17 +491,7 @@ static void assemble() {
       break;
     }
     case ASM_XCHG: {
-      Instr *xchg = &v->instr;
-      static uint8_t variant2op[14] = {0x90, 0x90, 0x90, 0x90, 0x90,
-                                       0x90, 0x86, 0x86, 0x87, 0x87,
-                                       0x87, 0x87, 0x87, 0x87};
-      uint8_t opcode = variant2op[xchg->variant];
-      if (xchg->variant <= 5) {
-        assembleplusr(xchg, opcode,
-                      (xchg->variant % 2) ? xchg->src->kind : xchg->dst->kind);
-      } else {
-        assemblerrm(xchg, opcode);
-      }
+      assemblexchg(&v->instr);
       break;
     }
     case ASM_JMP: {

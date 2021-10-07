@@ -30,14 +30,12 @@ t () {
   echo -n "."
 }
 
-
-
-for op in add and or sub xor
+for op in mov add and or sub xor
 do
-  t "${op}b \$1, %al"
-  #t "${op}w \$1, %ax" # clang disagrees
-  #t "${op}l \$1, %eax" # clang disagrees
-  #t "${op}q \$1, %rax" # clang disagrees
+  t "${op}b \$127, %al"
+  t "${op}w \$32767, %ax" # clang disagrees
+  t "${op}l \$2147483647, %eax" # clang disagrees
+  t "${op}q \$2147483647, %rax" # clang disagrees
   t "${op}b (%rax), %al"
   t "${op}w (%rax), %ax"
   t "${op}l (%rax), %eax"
