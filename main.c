@@ -186,8 +186,12 @@ static void sw(uint16_t w) {
 }
 
 static void sl(uint32_t l) {
-  uint8_t buf[4] = {l & 0xff, (l & 0xff00) >> 8, (l & 0xff0000) >> 16,
-                    (l & 0xff0000) >> 24};
+  uint8_t buf[4] = {
+      l & 0xff,
+      (l & 0xff00) >> 8,
+      (l & 0xff0000) >> 16,
+      (l & 0xff0000) >> 24,
+  };
   secaddbytes(cursection, buf, sizeof(buf));
 }
 
@@ -268,7 +272,7 @@ static void assemblerrm(Instr *i, uint8_t opcode) {
     if ((rm & 7) == 4)
       lfatal("addressing mode unrepresentable");
     if (memarg->c == 0 && memarg->l == NULL) {
-      if ((rm & 7) == 5) { // BP style registers need displacement
+      if ((rm & 7) == 5) { // BP style registers need sib
         mod = 0x01;
         wantsib = 1;
         sib = 0;
@@ -312,35 +316,35 @@ static void assemblerrm(Instr *i, uint8_t opcode) {
 
 static void assembleimm(Imm *imm) {
   switch (imm->nbytes) {
-    case 1:
-      sb((uint8_t)imm->c);
-      break;
-    case 2:
-      sw((uint16_t)imm->c);
-      break;
-    case 4:
-      sl((uint32_t)imm->c);
-      break;
-    case 8:
-      sl((uint32_t)((imm->c&0xffffffff00000000) >> 32));
-      sl((uint32_t)((imm->c&0xffffffff)));
-      break;
-    default:
-      unreachable();
-    }
+  case 1:
+    sb((uint8_t)imm->c);
+    break;
+  case 2:
+    sw((uint16_t)imm->c);
+    break;
+  case 4:
+    sl((uint32_t)imm->c);
+    break;
+  case 8:
+    fatal("TODO 8 byte imm");
+    break;
+  default:
+    unreachable();
+  }
 }
 
 /* Assemble a 'basic op' which is just a repeated op pattern we have named. */
 static void assemblebasicop(Instr *instr, uint8_t opcode) {
-  //if (instr->variant < 4) {
-  //  
-  //  if (instr->dst->kind == ASM_RAX)
-  //    sb(rexbyte(1, 0, 0, 0));
-  //  sb(opcode);
-  //  assembleimm(&instr->src->imm);
-  //} else {
+  if (instr->variant < 4) {
+    if (isreg16(instr->dst->kind))
+      sb(0x66);
+    if (instr->dst->kind == ASM_RAX)
+      sb(rexbyte(1, 0, 0, 0));
+    sb(opcode);
+    assembleimm(&instr->src->imm);
+  } else {
     assemblerrm(instr, opcode);
-  //}
+  }
 }
 
 static void assemble() {
@@ -401,7 +405,7 @@ static void assemble() {
       */
     case ASM_ADD: {
       static uint8_t variant2op[24] = {
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x04, 0x05, 0x05, 0x05, 0x00, 0x00, 0x00, 0x00,
           0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x03, 0x03,
           0x00, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01,
       };
@@ -410,7 +414,7 @@ static void assemble() {
     }
     case ASM_AND: {
       static uint8_t variant2op[24] = {
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x24, 0x25, 0x25, 0x25, 0x00, 0x00, 0x00, 0x00,
           0x00, 0x00, 0x00, 0x00, 0x22, 0x23, 0x23, 0x23,
           0x20, 0x21, 0x21, 0x21, 0x20, 0x21, 0x21, 0x21,
       };
@@ -419,7 +423,7 @@ static void assemble() {
     }
     case ASM_OR: {
       static uint8_t variant2op[24] = {
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x0c, 0x0d, 0x0d, 0x0d, 0x00, 0x00, 0x00, 0x00,
           0x00, 0x00, 0x00, 0x00, 0x0a, 0x0b, 0x0b, 0x0b,
           0x08, 0x09, 0x09, 0x09, 0x08, 0x09, 0x09, 0x09,
       };
@@ -428,7 +432,7 @@ static void assemble() {
     }
     case ASM_SUB: {
       static uint8_t variant2op[24] = {
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x2c, 0x2d, 0x2d, 0x2d, 0x00, 0x00, 0x00, 0x00,
           0x00, 0x00, 0x00, 0x00, 0x2a, 0x2b, 0x2b, 0x2b,
           0x28, 0x29, 0x29, 0x29, 0x28, 0x29, 0x29, 0x29,
       };
@@ -437,7 +441,7 @@ static void assemble() {
     }
     case ASM_XOR: {
       static uint8_t variant2op[24] = {
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x34, 0x35, 0x35, 0x35, 0x00, 0x00, 0x00, 0x00,
           0x00, 0x00, 0x00, 0x00, 0x32, 0x33, 0x33, 0x33,
           0x30, 0x31, 0x31, 0x31, 0x30, 0x31, 0x31, 0x31,
       };
