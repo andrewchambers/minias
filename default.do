@@ -19,6 +19,13 @@ case "$1" in
     set -x
     ${CC:- cc} ${LDFLAGS:-} -o "$3" $obj
   ;;
+  all)
+    redo-ifchange minias
+  ;;
+  check)
+    redo-ifchange minias
+    sh ./test/test.sh >&2
+  ;;
   fmt)
     set -x
     clang-format -i main.c util.c >&2

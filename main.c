@@ -274,7 +274,7 @@ static void assemblerrm(Instr *i, uint8_t opcode) {
         mod = 0x00;
       }
     } else {
-      lfatal("TODO");
+      lfatal("TODO X");
     }
   }
 
@@ -287,7 +287,7 @@ static void assemblerrm(Instr *i, uint8_t opcode) {
 
   // fprintf(stderr, "%d %02x %02x", regarg - ASM_REG_BEGIN, regbits(regarg),
   // mod);
-  sb2(isreg8(regarg) ? opcode : opcode + 1, modregrm(mod, reg, rm));
+  sb2(opcode, modregrm(mod, reg, rm));
 
   if (wantsib)
     sb(sib);
@@ -361,42 +361,68 @@ static void assemble() {
     case ASM_RET:
       sb(0xc3);
       break;
-    /*
-    case ASM_MOVZX:
-    case ASM_MOVSX:
-    case ASM_LEA:
-    */
-    case ASM_ADD:
-    case ASM_AND:
-    case ASM_MOV:
-    case ASM_OR:
-    case ASM_XOR:
+      /*
+      case ASM_MOVZX:
+      case ASM_MOVSX:
+      case ASM_LEA:
+      */
+    case ASM_ADD: {
+      static uint8_t variant2op[24] = {
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x03, 0x03,
+          0x00, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01,
+      };
+      assemblerrm(&v->instr, variant2op[v->instr.variant]);
+      break;
+    }
+    case ASM_AND: {
+      static uint8_t variant2op[24] = {
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x22, 0x23, 0x23, 0x23,
+          0x20, 0x21, 0x21, 0x21, 0x20, 0x21, 0x21, 0x21,
+      };
+      assemblerrm(&v->instr, variant2op[v->instr.variant]);
+      break;
+    }
+    case ASM_OR: {
+      static uint8_t variant2op[24] = {
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x0a, 0x0b, 0x0b, 0x0b,
+          0x08, 0x09, 0x09, 0x09, 0x08, 0x09, 0x09, 0x09,
+      };
+      assemblerrm(&v->instr, variant2op[v->instr.variant]);
+      break;
+    }
     case ASM_SUB: {
-      Instr *instr = &v->instr;
-      if (instr->variant <= 12) {
-        lfatal("todo");
-      } else {
-        switch (v->kind) {
-        // clang-format off
-          case ASM_ADD: assemblerrm(instr, 0x00); break;
-          case ASM_AND: assemblerrm(instr, 0x00); break;
-          case ASM_MOV: assemblerrm(instr, 0x00); break;
-          case ASM_OR:  assemblerrm(instr, 0x00); break;
-          case ASM_XOR: assemblerrm(instr, 0x00); break;
-          case ASM_SUB: assemblerrm(instr, 0x00); break;
-          default: unreachable();
-          // clang-format on
-        }
-      }
+      static uint8_t variant2op[24] = {
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x2a, 0x2b, 0x2b, 0x2b,
+          0x28, 0x29, 0x29, 0x29, 0x28, 0x29, 0x29, 0x29,
+      };
+      assemblerrm(&v->instr, variant2op[v->instr.variant]);
+      break;
+    }
+    case ASM_XOR: {
+      static uint8_t variant2op[24] = {
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x32, 0x33, 0x33, 0x33,
+          0x30, 0x31, 0x31, 0x31, 0x30, 0x31, 0x31, 0x31,
+      };
+      assemblerrm(&v->instr, variant2op[v->instr.variant]);
       break;
     }
     case ASM_XCHG: {
       Instr *xchg = &v->instr;
-      if (xchg->variant <= 5)
-        assembleplusr(xchg, 0x90,
+      static uint8_t variant2op[14] = {0x90, 0x90, 0x90, 0x90, 0x90,
+                                       0x90, 0x86, 0x86, 0x87, 0x87,
+                                       0x87, 0x87, 0x87, 0x87};
+      uint8_t opcode = variant2op[xchg->variant];
+      if (xchg->variant <= 5) {
+        assembleplusr(xchg, opcode,
                       (xchg->variant % 2) ? xchg->src->kind : xchg->dst->kind);
-      else
-        assemblerrm(xchg, 0x86);
+      } else {
+        assemblerrm(xchg, opcode);
+      }
       break;
     }
     case ASM_JMP: {
