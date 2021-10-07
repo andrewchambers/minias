@@ -234,36 +234,100 @@ static void assembleplusr(uint8_t opcode, AsmKind reg) {
   sb(opcode | (bits & 7));
 }
 
-/* Assemble + r <-> r/m. */
-static void assemblerrm(Instr *i, uint8_t opcode) {
+static void assembleimm(Imm *imm) {
+  switch (imm->nbytes) {
+  case 1:
+    sb((uint8_t)imm->c);
+    break;
+  case 2:
+    sw((uint16_t)imm->c);
+    break;
+  case 4:
+    sl((uint32_t)imm->c);
+    break;
+  case 8:
+    fatal("TODO 8 byte imm");
+    break;
+  default:
+    unreachable();
+  }
+}
+
+/* Assemble op + imm -> r/m. */
+static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
+                          uint8_t opsz) {
+
+  Memarg *memarg;
+  uint8_t rex, rexw, mod, rm, sib;
+  int wantsib;
+
+  wantsib = 0;
+
+  if (instr->dst->kind == ASM_MEMARG) {
+    memarg = &instr->dst->memarg;
+    rexw = opsz == 8;
+    rm = regbits(memarg->reg);
+    /* We cannot address ESP/RSP/... */
+    if ((rm & 7) == 4)
+      lfatal("addressing mode unrepresentable");
+    if (memarg->c == 0 && memarg->l == NULL) {
+      if ((rm & 7) == 5) { // BP style registers need sib
+        mod = 0x01;
+        wantsib = 1;
+        sib = 0;
+      } else {
+        mod = 0x00;
+      }
+    } else {
+      lfatal("TODO X");
+    }
+
+  } else {
+    memarg = NULL;
+    mod = 0x3;
+    rexw = isreg64(instr->dst->kind);
+    rm = regbits(instr->dst->kind);
+  }
+
+  if (opsz == 2)
+    sb(0x66);
+
+  rex = rexbyte(rexw, 0, 0, rm & (1 << 3));
+  if (rex != rexbyte(0, 0, 0, 0))
+    sb(rex);
+
+  sb2(opcode, modregrm(mod, immreg, rm));
+
+  if (wantsib)
+    sb(sib);
+
+  assembleimm(&instr->src->imm);
+}
+
+/* Assemble op + r <-> r/m. */
+static void assemblerrm(Instr *instr, uint8_t opcode) {
 
   Memarg *memarg;
   AsmKind regarg;
   uint8_t rex, mod, reg, rm, sib;
   int wantsib;
-  int64_t disp;
-  int dispsz;
-  int64_t imm;
-  int immsz;
 
-  mod = 0x03;
   wantsib = 0;
-  dispsz = 0;
-  immsz = 0;
 
-  if (i->src->kind == ASM_MEMARG) {
-    memarg = &i->src->memarg;
-    regarg = i->dst->kind;
-    reg = regbits(i->dst->kind);
-  } else if (i->dst->kind == ASM_MEMARG) {
-    memarg = &i->dst->memarg;
-    regarg = i->src->kind;
-    reg = regbits(i->src->kind);
+  if (instr->src->kind == ASM_MEMARG) {
+    memarg = &instr->src->memarg;
+    regarg = instr->dst->kind;
+    reg = regbits(instr->dst->kind);
+  } else if (instr->dst->kind == ASM_MEMARG) {
+    memarg = &instr->dst->memarg;
+    regarg = instr->src->kind;
+    reg = regbits(instr->src->kind);
   } else {
+    mod = 0x03;
     memarg = NULL;
-    regarg = i->src->kind;
-    reg = regbits(i->src->kind);
-    rm = regbits(i->dst->kind);
+    regarg = instr->src->kind;
+    reg = regbits(instr->src->kind);
+    rm = regbits(instr->dst->kind);
   }
 
   if (memarg) {
@@ -295,46 +359,10 @@ static void assemblerrm(Instr *i, uint8_t opcode) {
 
   if (wantsib)
     sb(sib);
-
-  switch (dispsz) {
-  case 1:
-    sb((uint8_t)disp);
-    break;
-  case 4:
-    sw((uint32_t)disp);
-    break;
-  }
-  switch (immsz) {
-  case 1:
-    sb((uint8_t)imm);
-    break;
-  case 4:
-    sw((uint32_t)imm);
-    break;
-  }
-}
-
-static void assembleimm(Imm *imm) {
-  switch (imm->nbytes) {
-  case 1:
-    sb((uint8_t)imm->c);
-    break;
-  case 2:
-    sw((uint16_t)imm->c);
-    break;
-  case 4:
-    sl((uint32_t)imm->c);
-    break;
-  case 8:
-    fatal("TODO 8 byte imm");
-    break;
-  default:
-    unreachable();
-  }
 }
 
 /* Assemble a 'basic op' which is just a repeated op pattern we have named. */
-static void assemblebasicop(Instr *instr, uint8_t opcode) {
+static void assemblebasicop(Instr *instr, uint8_t opcode, uint8_t immreg) {
   if (instr->variant < 4) {
     if (isreg16(instr->dst->kind))
       sb(0x66);
@@ -342,6 +370,10 @@ static void assemblebasicop(Instr *instr, uint8_t opcode) {
       sb(rexbyte(1, 0, 0, 0));
     sb(opcode);
     assembleimm(&instr->src->imm);
+  } else if (instr->variant < 12) {
+    // Note, uses a pattern in the variant array.
+    uint8_t opsize = 1 << (instr->variant % 4); // 1 2 4 8
+    assembleimmrm(instr, opcode, immreg, opsize);
   } else {
     assemblerrm(instr, opcode);
   }
@@ -371,23 +403,16 @@ static void assemblemov(Instr *mov) {
   if (mov->variant >= 8) {
     assemblerrm(mov, opcode);
   } else if (mov->variant >= 3) {
-    // c7 /0 i[bwd] encoding.
-    // dest in rm.
-    rm = regbits(mov->dst->kind);
-    rex = rexbyte(isreg64(mov->dst->kind), 0, 0, rm & (1 << 3));
-    if (isreg16(mov->dst->kind))
-      sb(0x66);
-    if (rex != rexbyte(0, 0, 0, 0))
-      sb(rex);
-    sb2(opcode, modregrm(3, 0, rm));
-    assembleimm(&mov->src->imm);
+    // Note, uses a pattern in the variant array.
+    uint8_t opsize = 1 << (mov->variant % 4);
+    assembleimmrm(mov, opcode, 0x00, opsize);
   } else {
     assembleplusr(opcode, mov->dst->kind);
     assembleimm(&mov->src->imm);
   }
 }
 
-static void assemble() {
+static void assemble(void) {
   Symbol *sym;
   Parsev *v;
   AsmLine *l;
@@ -447,47 +472,47 @@ static void assemble() {
     }
     case ASM_ADD: {
       static uint8_t variant2op[24] = {
-          0x04, 0x05, 0x05, 0x05, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x03, 0x03,
+          0x04, 0x05, 0x05, 0x05, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x02, 0x03, 0x03, 0x03,
           0x00, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01,
       };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant]);
+      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x00);
       break;
     }
     case ASM_AND: {
       static uint8_t variant2op[24] = {
-          0x24, 0x25, 0x25, 0x25, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x22, 0x23, 0x23, 0x23,
+          0x24, 0x25, 0x25, 0x25, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x22, 0x23, 0x23, 0x23,
           0x20, 0x21, 0x21, 0x21, 0x20, 0x21, 0x21, 0x21,
       };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant]);
+      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x04);
       break;
     }
     case ASM_OR: {
       static uint8_t variant2op[24] = {
-          0x0c, 0x0d, 0x0d, 0x0d, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x0a, 0x0b, 0x0b, 0x0b,
+          0x0c, 0x0d, 0x0d, 0x0d, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x0a, 0x0b, 0x0b, 0x0b,
           0x08, 0x09, 0x09, 0x09, 0x08, 0x09, 0x09, 0x09,
       };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant]);
+      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x01);
       break;
     }
     case ASM_SUB: {
       static uint8_t variant2op[24] = {
-          0x2c, 0x2d, 0x2d, 0x2d, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x2a, 0x2b, 0x2b, 0x2b,
+          0x2c, 0x2d, 0x2d, 0x2d, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x2a, 0x2b, 0x2b, 0x2b,
           0x28, 0x29, 0x29, 0x29, 0x28, 0x29, 0x29, 0x29,
       };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant]);
+      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x05);
       break;
     }
     case ASM_XOR: {
       static uint8_t variant2op[24] = {
-          0x34, 0x35, 0x35, 0x35, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x32, 0x33, 0x33, 0x33,
+          0x34, 0x35, 0x35, 0x35, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x32, 0x33, 0x33, 0x33,
           0x30, 0x31, 0x31, 0x31, 0x30, 0x31, 0x31, 0x31,
       };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant]);
+      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x06);
       break;
     }
     case ASM_XCHG: {

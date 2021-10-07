@@ -30,12 +30,26 @@ t () {
   echo -n "."
 }
 
+
 for op in mov add and or sub xor
 do
+  # Special case a register variants.
   t "${op}b \$127, %al"
-  t "${op}w \$32767, %ax" # clang disagrees
-  t "${op}l \$2147483647, %eax" # clang disagrees
-  t "${op}q \$2147483647, %rax" # clang disagrees
+  t "${op}w \$32767, %ax"
+  t "${op}l \$2147483647, %eax"
+  t "${op}q \$2147483647, %rax"
+
+  # immediate variants.
+  t "${op}b \$127, (%rbx)"
+  t "${op}w \$32767, (%rbx)"
+  t "${op}l \$2147483647, (%rbx)"
+  t "${op}q \$2147483647, (%rbx)"
+  t "${op}b \$127, %bl"
+  t "${op}w \$32767, %bx"
+  t "${op}l \$2147483647, %ebx"
+  t "${op}q \$2147483647, %rbx"
+
+  # r rm variants
   t "${op}b (%rax), %al"
   t "${op}w (%rax), %ax"
   t "${op}l (%rax), %eax"

@@ -48,6 +48,8 @@ lea =
     | 'q'? ws s:m ws? ',' ws? d:r64 { $$ = INSTR(2, s, d); }
   ) { $$.instr.kind = ASM_LEA; }
 
+#XXX Some other these rules can probably be collapsed.
+
 mov = "mov" (
     'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = INSTR(0, s, d); }
   | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = INSTR(1, s, d); }
