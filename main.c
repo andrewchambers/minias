@@ -398,11 +398,9 @@ static void assemble() {
     case ASM_RET:
       sb(0xc3);
       break;
-      /*
-      case ASM_MOVZX:
-      case ASM_MOVSX:
-      case ASM_LEA:
-      */
+    case ASM_LEA:
+      assemblerrm(&v->instr, 0x8d);
+      break;
     case ASM_ADD: {
       static uint8_t variant2op[24] = {
           0x04, 0x05, 0x05, 0x05, 0x00, 0x00, 0x00, 0x00,

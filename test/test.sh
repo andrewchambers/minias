@@ -23,7 +23,7 @@ t () {
   then
     echo ""
     echo "want: $1 -> $want"
-    echo "got:  $1 -> $got"
+    echo "got:"
     objdump -d "$tmpo"
     exit 1
   fi
@@ -82,3 +82,8 @@ t "xchg (%rax), %rax"
 t "xchg (%rax), %eax"
 t "xchg (%rax), %ax"
 t "xchg (%rax), %al"
+
+t "leaq (%rax), %rax"
+t "leal (%rax), %eax"
+t "leaw (%rax), %ax"
+

@@ -189,16 +189,6 @@ typedef struct {
   Parsev *dst;
 } Instr;
 
-/*
-typedef Instr Add;
-typedef Instr And;
-typedef Instr Lea;
-typedef Instr Mov;
-typedef Instr Movzx;
-typedef Instr Or;
-typedef Instr Sub;
-typedef Instr Xor;
-*/
 typedef Instr Xchg;
 
 union Parsev {
@@ -208,19 +198,6 @@ union Parsev {
   Balign balign;
   Memarg memarg;
   Instr instr;
-  /*
-  Add add;
-  And and;
-  Lea lea;
-  Mov mov;
-  Movzx movzx;
-  Or or;
-  */
-  Xchg xchg;
-  /*
-  Xor xor;
-  Sub sub;
-  */
   Jmp jmp;
   Byte byte;
   Imm imm;
