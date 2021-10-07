@@ -7,7 +7,7 @@ static AsmLine *allasm = NULL;
 // writing out the symtab section.
 static struct hashtable *symbols = NULL;
 
-// Linked list of relocations
+// Array of relocations.
 static Relocation *relocs = NULL;
 static size_t nrelocs = 0;
 static size_t reloccap = 0;
@@ -16,7 +16,7 @@ static size_t reloccap = 0;
 static Section sections[MAXSECTIONS];
 static size_t nsections = 1; // first is reserved.
 
-static Section *cursection;
+static Section *cursection = NULL;
 static Section *shstrtab = NULL;
 static Section *strtab = NULL;
 static Section *symtab = NULL;
@@ -292,11 +292,11 @@ static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
     memarg = &instr->dst->memarg;
     rexw = opsz == 8;
     rm = regbits(memarg->reg);
-    /* We cannot address ESP/RSP/... */
+    /* Matches '(%rsp/%esp...)'. */
     if ((rm & 7) == 4)
       lfatal("addressing mode unrepresentable");
     if (memarg->c == 0 && memarg->l == NULL) {
-      if ((rm & 7) == 5) { // BP style registers need sib
+      if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
         mod = 0x01;
         wantsib = 1;
         sib = 0;
@@ -357,11 +357,11 @@ static void assemblerrm(Instr *instr, uint8_t opcode) {
 
   if (memarg) {
     rm = regbits(memarg->reg);
-    /* We cannot address ESP/RSP/... */
+    /* Matches '(%rsp/%esp...)'. */
     if ((rm & 7) == 4)
       lfatal("addressing mode unrepresentable");
     if (memarg->c == 0 && memarg->l == NULL) {
-      if ((rm & 7) == 5) { /* BP style registers need sib */
+      if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
         mod = 0x01;
         wantsib = 1;
         sib = 0;
@@ -445,8 +445,8 @@ static void assemble(void) {
   cursection = text;
 
   for (l = allasm; l; l = l->next) {
-    curlineno = l->lineno;
     v = &l->v;
+    curlineno = l->lineno;
     switch (l->v.kind) {
     case ASM_DIR_GLOBL:
       sym = getsym(v->globl.name);
@@ -476,6 +476,8 @@ static void assemble(void) {
       sym = getsym(v->label.name);
       sym->section = cursection;
       sym->offset = cursection->hdr.sh_size;
+      if (sym->defined)
+        lfatal("%s already defined", sym->name);
       sym->defined = 1;
       break;
     case ASM_NOP:
@@ -554,7 +556,7 @@ static void assemble(void) {
       reloc->section = cursection;
       reloc->sym = sym;
       reloc->offset = cursection->hdr.sh_size;
-      sw(0x00000000);
+      sl(-4);
       break;
     }
     default:
@@ -621,12 +623,10 @@ static void handlerelocs(void) {
                  (int32_t)(rdata[2] << 16) | (int32_t)(rdata[3] << 24);
         // XXX overflow?
         value = sym->offset - (int32_t)reloc->offset + addend;
-        fprintf(stderr, "%lu %ld %d %d\n", reloc->offset, sym->offset, addend,
-                value);
-        rdata[0] = (value & 0xff);
-        rdata[1] = (value & 0xff00) >> 8;
-        rdata[2] = (value & 0xff000) >> 16;
-        rdata[3] = (value & 0xff00000) >> 24;
+        rdata[0] = ((uint32_t)value & 0xff);
+        rdata[1] = ((uint32_t)value & 0xff00) >> 8;
+        rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
+        rdata[3] = ((uint32_t)value & 0xff000000) >> 24;
         break;
       }
       default:
