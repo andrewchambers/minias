@@ -151,7 +151,7 @@ static String decodestring(char *s) {
   size_t cap = 0;
   uint8_t *data = NULL;
   uint8_t c = 0;
-  
+
   /* The string is already validated by the parser so we omit some checks*/
   while (*s) {
     if (*s == '\\') {
@@ -283,86 +283,112 @@ static void assembleplusr(uint8_t opcode, AsmKind reg) {
   sb(opcode | (bits & 7));
 }
 
-static void assembleimm(Imm *imm) {
+/* Assemble a symbolic value. */
+static void assemblevalue(const char *l, int64_t c, int nbytes) {
   Relocation *reloc;
   Symbol *sym;
 
-  if (imm->l != NULL) {
+  if (l != NULL) {
     reloc = newreloc();
-    sym = getsym(imm->l);
+    sym = getsym(l);
     reloc->kind = 0; // XXX
     reloc->section = cursection;
     reloc->sym = sym;
     reloc->offset = cursection->hdr.sh_size;
   }
 
-  switch (imm->nbytes) {
+  switch (nbytes) {
   case 1:
-    sb((uint8_t)imm->c);
+    sb((uint8_t)c);
     break;
   case 2:
-    sw((uint16_t)imm->c);
+    sw((uint16_t)c);
     break;
   case 4:
-    sl((uint32_t)imm->c);
+    sl((uint32_t)c);
     break;
   case 8:
-    fatal("TODO 8 byte imm");
+    fatal("TODO 8 byte symbolic");
     break;
   default:
     unreachable();
   }
 }
 
-/* Assemble op + imm -> r/m. */
-static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
-                          uint8_t opsz) {
+// TODO removeme...
+static void assembleimm(Imm *imm) {
+  assemblevalue(imm->l, imm->c, imm->nbytes);
+}
 
-  Memarg *memarg;
-  uint8_t rex, rexw, mod, rm, sib;
-  int wantsib;
+static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
+                           uint8_t reg, uint8_t opsz) {
+  uint8_t rex;
+  if (opsz == 2)
+    sb(0x66);
+  rex = rexbyte(rexw, 0, 0, 0);
+  if (rex != rexbyte(0, 0, 0, 0))
+    sb(rex);
+  sb2(opcode, modregrm(0x00, reg, 0x05));
+  assemblevalue(memarg->l, memarg->c, 4);
+}
+
+static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
+                        uint8_t reg, uint8_t opsz) {
+  int wantsib, wantdisp;
+  uint8_t rex, mod, rm, sib;
 
   wantsib = 0;
-
-  if (instr->dst->kind == ASM_MEMARG) {
-    memarg = &instr->dst->memarg;
-    rexw = opsz == 8;
-    rm = regbits(memarg->reg);
-    /* Matches '(%rsp/%esp...)'. */
-    if ((rm & 7) == 4)
-      lfatal("addressing mode unrepresentable");
-    if (memarg->c == 0 && memarg->l == NULL) {
-      if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
-        mod = 0x01;
-        wantsib = 1;
-        sib = 0;
-      } else {
-        mod = 0x00;
-      }
+  wantdisp = 0;
+  rm = regbits(memarg->reg);
+  /* Matches '(%rsp/%esp...)'. */
+  if ((rm & 7) == 4)
+    lfatal("addressing mode unrepresentable");
+  if (memarg->c == 0 && memarg->l == NULL) {
+    if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
+      mod = 0x01;
+      wantsib = 1;
+      sib = 0;
     } else {
-      lfatal("TODO X");
+      mod = 0x00;
     }
-
   } else {
-    memarg = NULL;
-    mod = 0x3;
-    rexw = isreg64(instr->dst->kind);
-    rm = regbits(instr->dst->kind);
+    lfatal("TODO X");
   }
 
   if (opsz == 2)
     sb(0x66);
-
   rex = rexbyte(rexw, 0, 0, rm & (1 << 3));
   if (rex != rexbyte(0, 0, 0, 0))
     sb(rex);
-
-  sb2(opcode, modregrm(mod, immreg, rm));
-
+  sb2(opcode, modregrm(mod, reg, rm));
   if (wantsib)
     sb(sib);
+  if (wantdisp)
+    assemblevalue(memarg->l, memarg->c, 4);
+}
 
-  assembleimm(&instr->src->imm);
+/* Assemble op + imm -> r/m. */
+static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
+                          uint8_t opsz) {
+
+  if (instr->dst->kind == ASM_MEMARG && instr->dst->memarg.reg == ASM_RIP) {
+    assembleriprel(&instr->dst->memarg, opsz == 8, opcode, immreg, opsz);
+    assembleimm(&instr->src->imm);
+  } else if (instr->dst->kind == ASM_MEMARG) {
+    assemblemem(&instr->dst->memarg, opsz == 8, opcode, immreg, opsz);
+    assembleimm(&instr->src->imm);
+  } else {
+    uint8_t rex, mod, rm;
+    mod = 0x3;
+    rm = regbits(instr->dst->kind);
+    if (opsz == 2)
+      sb(0x66);
+    rex = rexbyte(isreg64(instr->dst->kind), 0, 0, rm & (1 << 3));
+    if (rex != rexbyte(0, 0, 0, 0))
+      sb(rex);
+    sb2(opcode, modregrm(mod, immreg, rm));
+    assembleimm(&instr->src->imm);
+  }
 }
 
 /* Assemble op + r <-> r/m. */
@@ -433,8 +459,8 @@ static void assemblebasicop(Instr *instr, uint8_t opcode, uint8_t immreg) {
     assembleimm(&instr->src->imm);
   } else if (instr->variant < 12) {
     // Note, uses a pattern in the variant array.
-    uint8_t opsize = 1 << (instr->variant % 4); // 1 2 4 8
-    assembleimmrm(instr, opcode, immreg, opsize);
+    uint8_t opsz = 1 << (instr->variant % 4); // 1 2 4 8
+    assembleimmrm(instr, opcode, immreg, opsz);
   } else {
     assemblerrm(instr, opcode);
   }

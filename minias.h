@@ -139,6 +139,9 @@ typedef enum {
   ASM_R13,
   ASM_R14,
   ASM_R15,
+  
+  /* RIP is in a special class of its own. */
+  ASM_RIP,
 
   ASM_REG_END,
 } AsmKind;

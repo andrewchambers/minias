@@ -143,17 +143,23 @@ r-m32 =
    r:r32 { $$ = r; }
  | m:m { $$ = m; }
 
-r-m64 = 
+r-m64 =
     r:r64 { $$ = r; }
   | m:m { $$ = m; }
 
+r64-or-rip = (
+    r:r64 
+  | r:rip
+) { $$ = r; }
+
 m = 
-  '(' ws? r:r64 ws? ')'
+  '(' ws? r:r64-or-rip ws? ')'
   {  $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = NULL, .reg = r.kind  };  }
-  | <'-'?[0-9]+> ws? '(' ws? r:r64 ws? ')'
-  { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = strtoll(yytext, NULL, 10), .l = NULL, .reg = r.kind  };  }
-  | i:ident  ws? '(' ws? r:r64 ws? ')'
-  { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = i.ident.name, .reg = r.kind  };  }
+  
+  # | <'-'?[0-9]+> ws? '(' ws? r:r64 ws? ')'
+  # { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = strtoll(yytext, NULL, 10), .l = NULL, .reg = r.kind  };  }
+  # | i:ident  ws? '(' ws? r:r64 ws? ')'
+  # { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = i.ident.name, .reg = r.kind  };  }
 
 imm8 = i:imm { i.imm.nbytes = 1; $$ = i; }
 imm16 = i:imm { i.imm.nbytes = 2; $$ = i; }
@@ -167,6 +173,7 @@ al = "%al" { $$ = REG(ASM_AL); }
 ax = "%ax" { $$ = REG(ASM_AX); }
 eax = "%eax" { $$ = REG(ASM_EAX); }
 rax = "%rax" { $$ = REG(ASM_RAX); }
+rip = "%rip" { $$ = REG(ASM_RIP); }
 
 r8 =
     "%al" { $$ = REG(ASM_AL); }

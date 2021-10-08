@@ -30,8 +30,15 @@ t () {
   echo -n "."
 }
 
+
 for op in mov add and or sub xor
 do
+  # rip relative
+  t "${op}b \$127, (%rip)"
+  t "${op}w \$32767, (%rip)"
+  t "${op}l \$2147483647, (%rip)"
+  t "${op}q \$2147483647, (%rip)"
+
   # Special case a register variants.
   t "${op}b \$127, %al"
   t "${op}w \$32767, %ax"
