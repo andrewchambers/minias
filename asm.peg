@@ -45,7 +45,6 @@ instr =
   | i:sub   { $$ = i; }
   | i:xor   { $$ = i; }
 
-
 jmp = 
   "jmp" ws t:ident 
   { $$.jmp = (Jmp){ .kind = ASM_JMP, .target=t.ident.name } ; }
@@ -241,7 +240,17 @@ r64 =
   | "%r14" ![lwb] { $$ = REG(ASM_R14); }
   | "%r15" ![lwb] { $$ = REG(ASM_R15); }
 
-string = '"' <(('\\\"')|( !'"' .))*> '"' { $$.string = decodestring(yytext); }
+# We disallow newlines in our strings, it is simpler for error messages.
+string = '"' <(string-escape | ( ! '\n' ! '\\' !'"' .))*> '"'
+         { $$.string = decodestring(yytext); }
+
+string-escape = '\\' (
+    '\\'
+  | '"'
+  | [nrt]
+  | 'x' [0-9A-Fa-f]+
+  | [0-7][0-7][0-7]
+)
 
 ident = 
   <[._a-zA-Z][._a-zA-Z0-9]*>

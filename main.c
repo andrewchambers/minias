@@ -151,25 +151,26 @@ static String decodestring(char *s) {
   size_t cap = 0;
   uint8_t *data = NULL;
   uint8_t c = 0;
+  
+  /* The string is already validated by the parser so we omit some checks*/
   while (*s) {
     if (*s == '\\') {
       s++;
-      if (!*s) {
-        lfatal("bad escape in string");
-      } else if (*s >= '0' && *s <= '7') {
+      if (*s >= '0' && *s <= '7') {
         c = strtoul(s, &end, 8);
         s += 3;
-        if (s != end)
-          lfatal("invalid octal sequence");
       } else if (*s == 'x') {
         s++;
         c = strtoul(s, &end, 16);
-        if (s == end)
-          lfatal("invalid hex sequence");
         s = end;
+      } else if (*s == 'r') {
+        c = '\r';
+      } else if (*s == 'n') {
+        c = '\n';
+      } else if (*s == 't') {
+        c = '\t';
       } else {
-        c = *s;
-        s++;
+        unreachable();
       }
     } else {
       c = *s;
@@ -253,16 +254,9 @@ static void sl(uint32_t l) {
 /* Convert an AsmKind to register bits in reg/rm style.  */
 static uint8_t regbits(AsmKind k) { return (k - (ASM_REG_BEGIN + 1)) % 16; }
 
-/* Is a register. */
 static uint8_t isreg(AsmKind k) { return k > ASM_REG_BEGIN && k < ASM_REG_END; }
-
-/* Is an r$n style register variant.  */
 static uint8_t isreg8(AsmKind k) { return k >= ASM_AL && k <= ASM_R15B; }
-
-/* Is an r$n style register variant.  */
 static uint8_t isreg16(AsmKind k) { return k >= ASM_AX && k <= ASM_R15W; }
-
-/* Is an r$n style register variant.  */
 static uint8_t isreg64(AsmKind k) { return k >= ASM_RAX && k <= ASM_R15; }
 
 /* Is an r$n style register variant.  */
