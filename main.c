@@ -146,6 +146,7 @@ static Parsev *dupv(Parsev *p) {
 
 static String decodestring(char *s) {
   int i;
+  char *end;
   size_t len = 0;
   size_t cap = 0;
   uint8_t *data = NULL;
@@ -156,13 +157,16 @@ static String decodestring(char *s) {
       if (!*s) {
         lfatal("bad escape in string");
       } else if (*s >= '0' && *s <= '7') {
-        char *end;
         c = strtoul(s, &end, 8);
         s += 3;
         if (s != end)
           lfatal("invalid octal sequence");
       } else if (*s == 'x') {
-        lfatal("TODO hex escape");
+        s++;
+        c = strtoul(s, &end, 16);
+        if (s == end)
+          lfatal("invalid hex sequence");
+        s = end;
       } else {
         c = *s;
         s++;
