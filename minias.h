@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,9 +44,12 @@ typedef enum {
   ASM_IMM,
   ASM_IDENT,
   ASM_NUMBER,
+  ASM_STRING,
   ASM_MEMARG,
   // Directives
   ASM_DIR_GLOBL,
+  ASM_DIR_ASCII,
+  ASM_DIR_ASCIIZ,
   ASM_DIR_DATA,
   ASM_DIR_TEXT,
   ASM_DIR_BYTE,
@@ -187,6 +191,14 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
+  size_t len;
+  uint8_t *data;
+} String;
+typedef String Ascii;
+typedef String Asciiz;
+
+typedef struct {
+  AsmKind kind;
   const char *target;
 } Jmp;
 
@@ -197,13 +209,13 @@ typedef struct {
   Parsev *dst;
 } Instr;
 
-typedef Instr Xchg;
-
 union Parsev {
   AsmKind kind;
   Label label;
   Globl globl;
   Balign balign;
+  Ascii ascii;
+  Asciiz asciiz;
   Memarg memarg;
   Instr instr;
   Jmp jmp;
@@ -211,6 +223,7 @@ union Parsev {
   Imm imm;
   Ident ident;
   Number number;
+  String string;
 };
 
 typedef struct AsmLine AsmLine;

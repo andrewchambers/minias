@@ -144,6 +144,42 @@ static Parsev *dupv(Parsev *p) {
 #define REG(K)                                                                 \
   (Parsev) { .kind = K }
 
+static String decodestring(char *s) {
+  int i;
+  size_t len = 0;
+  size_t cap = 0;
+  uint8_t *data = NULL;
+  uint8_t c = 0;
+  while (*s) {
+    if (*s == '\\') {
+      s++;
+      if (!*s) {
+        lfatal("bad escape in string");
+      } else if (*s >= '0' && *s <= '7') {
+        char *end;
+        c = strtoul(s, &end, 8);
+        s += 3;
+        if (s != end)
+          lfatal("invalid octal sequence");
+      } else if (*s == 'x') {
+        lfatal("TODO hex escape");
+      } else {
+        c = *s;
+        s++;
+      }
+    } else {
+      c = *s;
+      s++;
+    }
+    if (len == cap) {
+      cap = cap ? len * 2 : 8;
+      data = realloc(data, cap);
+    }
+    data[len++] = c;
+  }
+  return (String){.kind = ASM_STRING, .len = len, .data = data};
+}
+
 #define YYSTYPE Parsev
 #define YY_CTX_LOCAL
 #define YY_CTX_MEMBERS Parsev v;
@@ -192,6 +228,8 @@ static void sb4(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4) {
   uint8_t buf[4] = {b1, b2, b3, b4};
   secaddbytes(cursection, buf, sizeof(buf));
 }
+
+static void sbn(uint8_t *bytes, size_t n) { secaddbytes(cursection, bytes, n); }
 
 static void sw(uint16_t w) {
   uint8_t buf[2] = {w & 0xff, (w & 0xff00) >> 8};
@@ -457,6 +495,13 @@ static void assemble(void) {
       break;
     case ASM_DIR_TEXT:
       cursection = text;
+      break;
+    case ASM_DIR_ASCII:
+      sbn(v->ascii.data, v->ascii.len);
+      break;
+    case ASM_DIR_ASCIIZ:
+      sbn(v->asciiz.data, v->asciiz.len);
+      sb(0x00);
       break;
     case ASM_DIR_BALIGN: {
       int64_t i, rem, amnt;

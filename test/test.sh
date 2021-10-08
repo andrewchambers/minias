@@ -30,7 +30,6 @@ t () {
   echo -n "."
 }
 
-
 for op in mov add and or sub xor
 do
   # Special case a register variants.

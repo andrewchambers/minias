@@ -8,21 +8,24 @@ ws = [ \t]+
 eol = ws? "\n"
 
 stmt =
-   d:directive {$$ = d;}
- | i:instr { $$ = i; }
- | l:label {  $$ = l; } 
+    d:directive {$$ = d;}
+  | i:instr { $$ = i; }
+  | l:label {  $$ = l; } 
 
-directive = 
-   ".glob" 'o'? 'l' ws i:ident
+directive = '.' (
+   "glob" 'o'? 'l' ws i:ident
    { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident.name }; }
- | ".data" 
-   { $$.kind = ASM_DIR_DATA; }
- | ".text"
-   { $$.kind = ASM_DIR_TEXT; }
- | ".balign" ws n:number 
+  | "ascii" <'z'?> ws s:string
+    { s.kind = *yytext ? ASM_DIR_ASCII : ASM_DIR_ASCIIZ ; $$ = s; }
+  | "data" 
+    { $$.kind = ASM_DIR_DATA; }
+  | "text"
+    { $$.kind = ASM_DIR_TEXT; }
+  | "balign" ws n:number 
     { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.number.v }; }
- | ".byte" ws n:number
+  | "byte" ws n:number
     { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.number.v }; }
+)
 
 label = 
   i:ident ':'
@@ -238,8 +241,10 @@ r64 =
   | "%r14" ![lwb] { $$ = REG(ASM_R14); }
   | "%r15" ![lwb] { $$ = REG(ASM_R15); }
 
+string = '"' <(('\\\"')|( !'"' .))*> '"' { $$.string = decodestring(yytext); }
+
 ident = 
-  <[_a-zA-Z][_a-zA-Z0-9]*>
+  <[._a-zA-Z][._a-zA-Z0-9]*>
   { $$.ident = (Ident){ .kind = ASM_IDENT, .name = xstrdup(yytext) }; } 
 
 number =
