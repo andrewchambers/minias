@@ -667,14 +667,14 @@ static void addtosymtab(Symbol *sym) {
     sbind = sym->global ? STB_GLOBAL : STB_LOCAL;
   } else {
     stype = 0;
-    sbind = 0;
+    sbind = STB_GLOBAL;
   }
 
   memset(&elfsym, 0, sizeof(elfsym));
   elfsym.st_name = elfstr(strtab, sym->name);
   elfsym.st_size = sym->size;
   elfsym.st_value = sym->offset;
-  elfsym.st_info = ELF32_ST_BIND(sbind) | ELF32_ST_TYPE(stype);
+  elfsym.st_info = ELF64_ST_INFO(sbind, stype);
   elfsym.st_shndx = sym->section ? sym->section->idx : SHN_UNDEF;
   secaddbytes(symtab, (uint8_t *)&elfsym, sizeof(Elf64_Sym));
 }
@@ -683,12 +683,23 @@ static void fillsymtab(void) {
   Symbol *sym;
   size_t i;
 
+  // Local symbols
+  for (i = 0; i < symbols->cap; i++) {
+    if (!symbols->keys[i].str)
+      continue;
+    sym = symbols->vals[i];
+    if (!sym->defined || sym->global)
+      continue;
+    addtosymtab(sym);
+  }
+
   // Global symbols
   for (i = 0; i < symbols->cap; i++) {
     if (!symbols->keys[i].str)
       continue;
     sym = symbols->vals[i];
-    if (!sym->global && sym->defined)
+
+    if (sym->defined && !sym->global)
       continue;
     addtosymtab(sym);
   }
