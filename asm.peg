@@ -56,7 +56,7 @@ lea =
     | 'q'? ws s:m ws? ',' ws? d:r64 { $$ = INSTR(2, s, d); }
   ) { $$.instr.kind = ASM_LEA; }
 
-imm-opargs = 
+imm-rm-opargs = 
     'b'  ws s:imm8  ws? ',' ws? d:m   { $$ = INSTR(0, s, d); }
   | 'w'  ws s:imm16 ws? ',' ws? d:m   { $$ = INSTR(1, s, d); }
   | 'l'  ws s:imm32 ws? ',' ws? d:m   { $$ = INSTR(2, s, d); }
@@ -81,18 +81,18 @@ r-rm-opargs =
   | 'q'? ws s:r64   ws? ',' ws? d:r64 { $$ = INSTR(11, s, d); }
 
 mov = "mov" (
-    args:imm-opargs { $$ = args; }
+    args:imm-rm-opargs { $$ = args; }
   | args:r-rm-opargs { args.instr.variant += 8; $$ = args; }
 )  { $$.instr.kind = ASM_MOV; }
 
 xchg = 
   'xchg' (
-      'w'? ws s:ax    ws? ',' ws? d:r16   { $$ = INSTR(0, s, d); }
-    | 'w'? ws s:r16   ws? ',' ws? d:ax    { $$ = INSTR(1, s, d); }
-    | 'l'? ws s:eax   ws? ',' ws? d:r32   { $$ = INSTR(2, s, d); }
-    | 'l'? ws s:r32   ws? ',' ws? d:eax   { $$ = INSTR(3, s, d); }
-    | 'q'? ws s:rax   ws? ',' ws? d:r64   { $$ = INSTR(4, s, d); }
-    | 'q'? ws s:r64   ws? ',' ws? d:rax   { $$ = INSTR(5, s, d); }
+      'w'? ws s:ax  ws? ',' ws? d:r16 { $$ = INSTR(0, s, d); }
+    | 'w'? ws s:r16 ws? ',' ws? d:ax  { $$ = INSTR(1, s, d); }
+    | 'l'? ws s:eax ws? ',' ws? d:r32 { $$ = INSTR(2, s, d); }
+    | 'l'? ws s:r32 ws? ',' ws? d:eax { $$ = INSTR(3, s, d); }
+    | 'q'? ws s:rax ws? ',' ws? d:r64 { $$ = INSTR(4, s, d); }
+    | 'q'? ws s:r64 ws? ',' ws? d:rax { $$ = INSTR(5, s, d); }
     | args:r-rm-opargs { args.instr.variant += 6; $$ = args; }
   ) { $$.instr.kind = ASM_XCHG; }
 
@@ -107,7 +107,7 @@ basic-op-args =
   | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = INSTR(1, s, d); }
   | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = INSTR(2, s, d); }
   | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = INSTR(3, s, d); }
-  | args:imm-opargs { args.instr.variant += 4; $$ = args; }
+  | args:imm-rm-opargs { args.instr.variant += 4; $$ = args; }
   | args:r-rm-opargs { args.instr.variant += 12; $$ = args; }
 
 r64-or-rip = (
@@ -116,13 +116,12 @@ r64-or-rip = (
 ) { $$ = r; }
 
 m = 
-  '(' ws? r:r64-or-rip ws? ')'
-  {  $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = NULL, .reg = r.kind  }; }
-  
-  # | <'-'?[0-9]+> ws? '(' ws? r:r64 ws? ')'
-  # { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = strtoll(yytext, NULL, 10), .l = NULL, .reg = r.kind  }; }
-  # | i:ident  ws? '(' ws? r:r64 ws? ')'
-  # { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = i.ident.name, .reg = r.kind  }; }
+    '(' ws? r:r64-or-rip ws? ')'
+    {  $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = NULL, .reg = r.kind  }; }
+  | <'-'?[0-9]+> ws? '(' ws? r:r64-or-rip ws? ')'
+    { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = strtoll(yytext, NULL, 10), .l = NULL, .reg = r.kind  }; }
+  | i:ident  ws? '(' ws? r:r64-or-rip ws? ')'
+    { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = i.ident.name, .reg = r.kind  }; }
 
 imm8 = i:imm { i.imm.nbytes = 1; $$ = i; }
 imm16 = i:imm { i.imm.nbytes = 2; $$ = i; }

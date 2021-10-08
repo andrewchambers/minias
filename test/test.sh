@@ -30,6 +30,11 @@ t () {
   echo -n "."
 }
 
+t "movb \$127, (%rsp)"
+t "movb \$127, (%rbp)"
+t "movb \$127, 2147483647(%rsp)"
+t "movb \$127, 2147483647(%rbp)"
+
 for r in a b
 do
   t "xchg %${r}l, %${r}l"

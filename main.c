@@ -272,6 +272,11 @@ static uint8_t modregrm(uint8_t mod, uint8_t reg, uint8_t rm) {
   return (((mod & 3) << 6) | ((reg & 7) << 3) | (rm & 7));
 }
 
+/* Compose an sib byte - See intel manual. */
+static uint8_t sibbyte(uint8_t ss, uint8_t idx, uint8_t base) {
+  return (((ss & 3) << 6) | ((idx & 7) << 3) | (base & 7));
+}
+
 /* Assemble op +rw | op + rd. */
 static void assembleplusr(uint8_t opcode, AsmKind reg) {
   uint8_t bits = regbits(reg);
@@ -331,37 +336,35 @@ static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
 /* Assemble a r <-> mem operation.  */
 static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
                         uint8_t reg, uint8_t opsz) {
-  int wantsib, wantdisp;
-  uint8_t rex, mod, rm, sib;
+  uint8_t rex, rm, sib;
 
-  wantsib = 0;
-  wantdisp = 0;
   rm = regbits(memarg->reg);
-  /* Matches '(%rsp/%esp...)'. */
-  if ((rm & 7) == 4)
-    lfatal("addressing mode unrepresentable");
-  if (memarg->c == 0 && memarg->l == NULL) {
-    if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
-      mod = 0x01;
-      wantsib = 1;
-      sib = 0;
-    } else {
-      mod = 0x00;
-    }
-  } else {
-    lfatal("TODO X");
-  }
-
   if (opsz == 2)
     sb(0x66);
-  rex = rexbyte(rexw, 0, 0, rm & (1 << 3));
+  rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
   if (rex != rexbyte(0, 0, 0, 0))
     sb(rex);
-  sb2(opcode, modregrm(mod, reg, rm));
-  if (wantsib)
-    sb(sib);
-  if (wantdisp)
+
+  if (memarg->c == 0 && memarg->l == NULL) {
+    /* No offset cases, uses the smallest we can. */
+    if ((rm & 7) == 4) { /* Matches '(%rsp/%esp...)'. */
+      sb3(opcode, modregrm(0, reg, 4), sibbyte(0, 4, 4));
+    } else if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
+      sb3(opcode, modregrm(1, reg, 5), 0);
+    } else {
+      sb2(opcode, modregrm(0, reg, rm));
+    }
+  } else {
+    /* XXX choose smaller size if not label .*/
+    if ((rm & 7) == 4) { /* Matches '(%rsp/%esp...)'. */
+      sb3(opcode, modregrm(2, reg, 4), sibbyte(0, 4, 4));
+    } else if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
+      sb2(opcode, modregrm(2, reg, 5));
+    } else {
+      sb2(opcode, modregrm(2, reg, rm));
+    }
     assemblevalue(memarg->l, memarg->c, 4);
+  }
 }
 
 /* Assemble op + imm -> r/m. */
@@ -447,7 +450,6 @@ static void assemblexchg(Instr *xchg) {
     assembleplusr(opcode,
                   (xchg->variant % 2) ? xchg->src->kind : xchg->dst->kind);
   } else {
-    /* Uses a pattern in the variant table. */
     uint8_t opsz = 1 << ((xchg->variant - 6) % 4);
     assemblerrm(xchg, opcode, opsz);
   }
