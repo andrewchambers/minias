@@ -315,11 +315,7 @@ static void assemblevalue(const char *l, int64_t c, int nbytes) {
   }
 }
 
-// TODO removeme...
-static void assembleimm(Imm *imm) {
-  assemblevalue(imm->l, imm->c, imm->nbytes);
-}
-
+/* Assemble a r <-> (%rip) operation. */
 static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
                            uint8_t reg, uint8_t opsz) {
   uint8_t rex;
@@ -332,6 +328,7 @@ static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
   assemblevalue(memarg->l, memarg->c, 4);
 }
 
+/* Assemble a r <-> mem operation.  */
 static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
                         uint8_t reg, uint8_t opsz) {
   int wantsib, wantdisp;
@@ -370,13 +367,16 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
 /* Assemble op + imm -> r/m. */
 static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
                           uint8_t opsz) {
+  Imm *imm;
+
+  imm = &instr->src->imm;
 
   if (instr->dst->kind == ASM_MEMARG && instr->dst->memarg.reg == ASM_RIP) {
     assembleriprel(&instr->dst->memarg, opsz == 8, opcode, immreg, opsz);
-    assembleimm(&instr->src->imm);
+    assemblevalue(imm->l, imm->c, imm->nbytes);
   } else if (instr->dst->kind == ASM_MEMARG) {
     assemblemem(&instr->dst->memarg, opsz == 8, opcode, immreg, opsz);
-    assembleimm(&instr->src->imm);
+    assemblevalue(imm->l, imm->c, imm->nbytes);
   } else {
     uint8_t rex, mod, rm;
     mod = 0x3;
@@ -387,82 +387,54 @@ static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
     if (rex != rexbyte(0, 0, 0, 0))
       sb(rex);
     sb2(opcode, modregrm(mod, immreg, rm));
-    assembleimm(&instr->src->imm);
+    assemblevalue(imm->l, imm->c, imm->nbytes);
   }
 }
 
 /* Assemble op + r <-> r/m. */
-static void assemblerrm(Instr *instr, uint8_t opcode) {
-
+static void assemblerrm(Instr *instr, uint8_t opcode, uint8_t opsz) {
   Memarg *memarg;
   AsmKind regarg;
-  uint8_t rex, mod, reg, rm, sib;
-  int wantsib;
-
-  wantsib = 0;
 
   if (instr->src->kind == ASM_MEMARG) {
     memarg = &instr->src->memarg;
     regarg = instr->dst->kind;
-    reg = regbits(instr->dst->kind);
+    assemblemem(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
   } else if (instr->dst->kind == ASM_MEMARG) {
     memarg = &instr->dst->memarg;
     regarg = instr->src->kind;
-    reg = regbits(instr->src->kind);
+    assemblemem(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
   } else {
+    uint8_t rex, mod, reg, rm;
     mod = 0x03;
-    memarg = NULL;
     regarg = instr->src->kind;
     reg = regbits(instr->src->kind);
     rm = regbits(instr->dst->kind);
+    if (opsz == 2)
+      sb(0x66);
+    rex = rexbyte(isreg64(regarg), reg & (1 << 3), 0, rm & (1 << 3));
+    if (rex != rexbyte(0, 0, 0, 0))
+      sb(rex);
+    sb2(opcode, modregrm(0x03, reg, rm));
   }
-
-  if (memarg) {
-    rm = regbits(memarg->reg);
-    /* Matches '(%rsp/%esp...)'. */
-    if ((rm & 7) == 4)
-      lfatal("addressing mode unrepresentable");
-    if (memarg->c == 0 && memarg->l == NULL) {
-      if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
-        mod = 0x01;
-        wantsib = 1;
-        sib = 0;
-      } else {
-        mod = 0x00;
-      }
-    } else {
-      lfatal("TODO X");
-    }
-  }
-
-  if (isreg16(regarg))
-    sb(0x66);
-
-  rex = rexbyte(isreg64(regarg), reg & (1 << 3), 0, rm & (1 << 3));
-  if (rex != rexbyte(0, 0, 0, 0))
-    sb(rex);
-
-  sb2(opcode, modregrm(mod, reg, rm));
-
-  if (wantsib)
-    sb(sib);
 }
 
 /* Assemble a 'basic op' which is just a repeated op pattern we have named. */
 static void assemblebasicop(Instr *instr, uint8_t opcode, uint8_t immreg) {
+  Imm *imm;
+  uint8_t opsz = 1 << (instr->variant % 4);
   if (instr->variant < 4) {
-    if (isreg16(instr->dst->kind))
+    if (opsz == 2)
       sb(0x66);
     if (instr->dst->kind == ASM_RAX)
       sb(rexbyte(1, 0, 0, 0));
     sb(opcode);
-    assembleimm(&instr->src->imm);
+    imm = &instr->src->imm;
+    assemblevalue(imm->l, imm->c, imm->nbytes);
   } else if (instr->variant < 12) {
-    // Note, uses a pattern in the variant array.
-    uint8_t opsz = 1 << (instr->variant % 4); // 1 2 4 8
     assembleimmrm(instr, opcode, immreg, opsz);
   } else {
-    assemblerrm(instr, opcode);
+    assemblerrm(instr, opcode, opsz);
   }
 }
 
@@ -474,11 +446,14 @@ static void assemblexchg(Instr *xchg) {
     assembleplusr(opcode,
                   (xchg->variant % 2) ? xchg->src->kind : xchg->dst->kind);
   } else {
-    assemblerrm(xchg, opcode);
+    /* Uses a pattern in the variant table. */
+    uint8_t opsz = 1 << (((xchg->variant - 6) / 2) % 4);
+    assemblerrm(xchg, opcode, opsz);
   }
 }
 
 static void assemblemov(Instr *mov) {
+  Imm *imm;
   uint8_t opcode, rex, mod, rm;
 
   static uint8_t variant2op[20] = {
@@ -487,15 +462,16 @@ static void assemblemov(Instr *mov) {
   };
 
   opcode = variant2op[mov->variant];
-  if (mov->variant >= 8) {
-    assemblerrm(mov, opcode);
-  } else if (mov->variant >= 3) {
-    // Note, uses a pattern in the variant array.
-    uint8_t opsize = 1 << (mov->variant % 4);
-    assembleimmrm(mov, opcode, 0x00, opsize);
-  } else {
+  if (mov->variant < 3) {
+    imm = &mov->src->imm;
     assembleplusr(opcode, mov->dst->kind);
-    assembleimm(&mov->src->imm);
+    assemblevalue(imm->l, imm->c, imm->nbytes);
+  } else if (mov->variant < 8) {
+    uint8_t opsz = 1 << (mov->variant % 4);
+    assembleimmrm(mov, opcode, 0x00, opsz);
+  } else {
+    uint8_t opsz = 1 << (mov->variant % 4);
+    assemblerrm(mov, opcode, opsz);
   }
 }
 
@@ -558,13 +534,14 @@ static void assemble(void) {
     case ASM_RET:
       sb(0xc3);
       break;
-    case ASM_LEA:
-      assemblerrm(&v->instr, 0x8d);
-      break;
-    case ASM_MOV: {
-      assemblemov(&v->instr);
+    case ASM_LEA: {
+      uint8_t opsz = 1 << (v->instr.variant + 1);
+      assemblerrm(&v->instr, 0x8d, opsz);
       break;
     }
+    case ASM_MOV:
+      assemblemov(&v->instr);
+      break;
     case ASM_ADD: {
       static uint8_t variant2op[24] = {
           0x04, 0x05, 0x05, 0x05, 0x80, 0x81, 0x81, 0x81,
@@ -746,6 +723,8 @@ static void outelf(void) {
       continue;
     out(sections[i].data, sections[i].hdr.sh_size);
   }
+  if (fflush(outf) != 0)
+    fatal("fflush:");
 }
 
 int main(void) {
@@ -757,7 +736,5 @@ int main(void) {
   fillsymtab();
   handlerelocs();
   outelf();
-  if (fflush(outf) != 0)
-    fatal("fflush:");
   return 0;
 }
