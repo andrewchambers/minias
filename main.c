@@ -439,15 +439,16 @@ static void assemblebasicop(Instr *instr, uint8_t opcode, uint8_t immreg) {
 }
 
 static void assemblexchg(Instr *xchg) {
-  static uint8_t variant2op[14] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x86,
-                                   0x86, 0x87, 0x87, 0x87, 0x87, 0x87, 0x87};
+  static uint8_t variant2op[18] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
+                                   0x86, 0x87, 0x87, 0x87, 0x86, 0x87,
+                                   0x87, 0x87, 0x86, 0x87, 0x87, 0x87};
   uint8_t opcode = variant2op[xchg->variant];
-  if (xchg->variant <= 5) {
+  if (xchg->variant < 6) {
     assembleplusr(opcode,
                   (xchg->variant % 2) ? xchg->src->kind : xchg->dst->kind);
   } else {
     /* Uses a pattern in the variant table. */
-    uint8_t opsz = 1 << (((xchg->variant - 6) / 2) % 4);
+    uint8_t opsz = 1 << ((xchg->variant - 6) % 4);
     assemblerrm(xchg, opcode, opsz);
   }
 }

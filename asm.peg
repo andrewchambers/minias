@@ -56,7 +56,20 @@ lea =
     | 'q'? ws s:m ws? ',' ws? d:r64 { $$ = INSTR(2, s, d); }
   ) { $$.instr.kind = ASM_LEA; }
 
-#XXX Some of these rules can probably be collapsed (or expanded for simplicity?).
+
+r-rm-opargs = 
+    'b'? ws s:m     ws? ',' ws? d:r8  { $$ = INSTR(0, s, d); }
+  | 'w'? ws s:m     ws? ',' ws? d:r16 { $$ = INSTR(1, s, d); }
+  | 'l'? ws s:m     ws? ',' ws? d:r32 { $$ = INSTR(2, s, d); }
+  | 'q'? ws s:m     ws? ',' ws? d:r64 { $$ = INSTR(3, s, d); }
+  | 'b'? ws s:r8    ws? ',' ws? d:m   { $$ = INSTR(4, s, d); }
+  | 'w'? ws s:r16   ws? ',' ws? d:m   { $$ = INSTR(5, s, d); }
+  | 'l'? ws s:r32   ws? ',' ws? d:m   { $$ = INSTR(6, s, d); }
+  | 'q'? ws s:r64   ws? ',' ws? d:m   { $$ = INSTR(7, s, d); }
+  | 'b'? ws s:r8    ws? ',' ws? d:r8  { $$ = INSTR(8, s, d); }
+  | 'w'? ws s:r16   ws? ',' ws? d:r16 { $$ = INSTR(9, s, d); }
+  | 'l'? ws s:r32   ws? ',' ws? d:r32 { $$ = INSTR(10, s, d); }
+  | 'q'? ws s:r64   ws? ',' ws? d:r64 { $$ = INSTR(11, s, d); }
 
 mov = "mov" (
     'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = INSTR(0, s, d); }
@@ -67,18 +80,7 @@ mov = "mov" (
   | 'w'  ws s:imm16 ws? ',' ws? d:m   { $$ = INSTR(5, s, d); }
   | 'l'  ws s:imm32 ws? ',' ws? d:m   { $$ = INSTR(6, s, d); }
   | 'q'  ws s:imm32 ws? ',' ws? d:m   { $$ = INSTR(7, s, d); }
-  | 'b'? ws s:m     ws? ',' ws? d:r8  { $$ = INSTR(8, s, d); }
-  | 'w'? ws s:m     ws? ',' ws? d:r16 { $$ = INSTR(9, s, d); }
-  | 'l'? ws s:m     ws? ',' ws? d:r32 { $$ = INSTR(10, s, d); }
-  | 'q'? ws s:m     ws? ',' ws? d:r64 { $$ = INSTR(11, s, d); }
-  | 'b'? ws s:r8    ws? ',' ws? d:m   { $$ = INSTR(12, s, d); }
-  | 'w'? ws s:r16   ws? ',' ws? d:m   { $$ = INSTR(13, s, d); }
-  | 'l'? ws s:r32   ws? ',' ws? d:m   { $$ = INSTR(14, s, d); }
-  | 'q'? ws s:r64   ws? ',' ws? d:m   { $$ = INSTR(15, s, d); }
-  | 'b'? ws s:r8    ws? ',' ws? d:r8  { $$ = INSTR(16, s, d); }
-  | 'w'? ws s:r16   ws? ',' ws? d:r16 { $$ = INSTR(17, s, d); }
-  | 'l'? ws s:r32   ws? ',' ws? d:r32 { $$ = INSTR(18, s, d); }
-  | 'q'? ws s:r64   ws? ',' ws? d:r64 { $$ = INSTR(19, s, d); }
+  | args:r-rm-opargs { args.instr.variant += 8; $$ = args;  }
 )  { $$.instr.kind = ASM_MOV; }
 
 xchg = 
@@ -89,14 +91,7 @@ xchg =
     | 'l'? ws s:r32   ws? ',' ws? d:eax   { $$ = INSTR(3, s, d); }
     | 'q'? ws s:rax   ws? ',' ws? d:r64   { $$ = INSTR(4, s, d); }
     | 'q'? ws s:r64   ws? ',' ws? d:rax   { $$ = INSTR(5, s, d); }
-    | 'b'? ws s:r-m8  ws? ',' ws? d:r8    { $$ = INSTR(6, s, d); }
-    | 'b'? ws s:r8    ws? ',' ws? d:r-m8  { $$ = INSTR(7, s, d); }
-    | 'w'? ws s:r16   ws? ',' ws? d:r-m16 { $$ = INSTR(8, s, d); }
-    | 'w'? ws s:r-m16 ws? ',' ws? d:r16   { $$ = INSTR(9, s, d); }
-    | 'l'? ws s:r32   ws? ',' ws? d:r-m32 { $$ = INSTR(10, s, d); }
-    | 'l'? ws s:r-m32 ws? ',' ws? d:r32   { $$ = INSTR(11, s, d); }
-    | 'q'? ws s:r64   ws? ',' ws? d:r-m64 { $$ = INSTR(12, s, d); }
-    | 'q'? ws s:r-m64 ws? ',' ws? d:r64   { $$ = INSTR(13, s, d); }
+    | args:r-rm-opargs { args.instr.variant += 6; $$ = args;  }
   ) { $$.instr.kind = ASM_XCHG; }
 
 add = "add" a:basic-op-args { a.instr.kind = ASM_ADD; $$ = a; }

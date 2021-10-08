@@ -30,6 +30,34 @@ t () {
   echo -n "."
 }
 
+for r in a b
+do
+  t "xchg %${r}l, %${r}l"
+  t "xchg %${r}x, %${r}x"
+  t "xchg %${r}x, %bx"
+  t "xchg %bx, %${r}x"
+  # t "xchg %e${r}x, %e${r}x" # clang disagrees
+  t "xchg %e${r}x, %ebx"
+  t "xchg %ebx, %e${r}x"
+  t "xchg %r${r}x, %rbx"
+  t "xchg %rbx, %r${r}x"
+  t "xchg %r${r}x, (%r${r}x)"
+  t "xchg %e${r}x, (%r${r}x)"
+  t "xchg %${r}x, (%r${r}x)"
+  t "xchg %${r}l, (%r${r}x)"
+  t "xchg (%r${r}x), %r${r}x"
+  t "xchg (%r${r}x), %e${r}x"
+  t "xchg (%r${r}x), %${r}x"
+  t "xchg (%r${r}x), %${r}l"
+done
+
+
+for r in a b
+  do
+  t "leaq (%r${r}x), %r${r}x"
+  t "leal (%r${r}x), %e${r}x"
+  t "leaw (%r${r}x), %${r}x"
+done
 
 for op in mov add and or sub xor
 do
@@ -39,69 +67,40 @@ do
   t "${op}l \$2147483647, (%rip)"
   t "${op}q \$2147483647, (%rip)"
 
-  # Special case a register variants.
-  t "${op}b \$127, %al"
-  t "${op}w \$32767, %ax"
-  t "${op}l \$2147483647, %eax"
-  t "${op}q \$2147483647, %rax"
-
-  # immediate variants.
-  t "${op}b \$127, (%rbx)"
-  t "${op}w \$32767, (%rbx)"
-  t "${op}l \$2147483647, (%rbx)"
-  t "${op}q \$2147483647, (%rbx)"
-  t "${op}b \$127, %bl"
-  t "${op}w \$32767, %bx"
-  t "${op}l \$2147483647, %ebx"
-  t "${op}q \$2147483647, %rbx"
-
-  # r rm variants
-  t "${op}b (%rax), %al"
-  t "${op}w (%rax), %ax"
-  t "${op}l (%rax), %eax"
-  t "${op}q (%rax), %rax"
-  t "${op}q (%rbp), %rax"
-  t "${op}q (%r8), %rax"
-  t "${op}q (%r13), %rax"
-  t "${op}b %al, (%rax)"
-  t "${op}w %ax, (%rax)"
-  t "${op}l %eax, (%rax)"
-  t "${op}q %rax, (%rax)"
-  t "${op}q %rax, (%rbp)"
-  t "${op}q %rax, (%r8)"
-  t "${op}q %rax, (%r13)"
-  t "${op}b %al, %al"
-  t "${op}w %ax, %ax"
-  t "${op}l %eax, %eax"
-  t "${op}q %rax, %rax"
   t "${op}q %r9, %r9"
+
+  for r in a b
+  do
+    # immediate variants.
+    t "${op}b \$127, (%r${r}x)"
+    t "${op}w \$32767, (%r${r}x)"
+    t "${op}l \$2147483647, (%r${r}x)"
+    t "${op}q \$2147483647, (%r${r}x)"
+    t "${op}b \$127, %${r}l"
+    t "${op}w \$32767, %${r}x"
+    t "${op}l \$2147483647, %e${r}x"
+    t "${op}q \$2147483647, %r${r}x"
+
+    # r rm variants
+    t "${op}b (%rax), %${r}l"
+    t "${op}w (%rax), %${r}x"
+    t "${op}l (%rax), %e${r}x"
+    t "${op}q (%rax), %r${r}x"
+    t "${op}q (%rbp), %r${r}x"
+    t "${op}q (%r8), %r${r}x"
+    t "${op}q (%r13), %r${r}x"
+    t "${op}b %${r}l, (%rax)"
+    t "${op}w %${r}x, (%rax)"
+    t "${op}l %e${r}x, (%rax)"
+    t "${op}q %r${r}x, (%rax)"
+    t "${op}q %r${r}x, (%rbp)"
+    t "${op}q %r${r}x, (%r8)"
+    t "${op}q %r${r}x, (%r13)"
+    t "${op}b %${r}l, %al"
+    t "${op}w %${r}x, %ax"
+    t "${op}l %e${r}x, %eax"
+    t "${op}q %r${r}x, %rax"
+  done
 done
 
-t "xchg %al, %al"
-t "xchg %ax, %ax"
-t "xchg %ax, %r9w"
-t "xchg %r9w, %ax"
-t "xchg %ax, %bx"
-t "xchg %bx, %ax"
-#t "xchg %eax, %eax" # clang disagrees
-t "xchg %eax, %r9d"
-t "xchg %r9d, %eax"
-t "xchg %eax, %ebx"
-t "xchg %ebx, %eax"
-t "xchg %rax, %r9"
-t "xchg %r9, %rax"
-t "xchg %rax, %rbx"
-t "xchg %rbx, %rax"
-t "xchg %rax, (%rax)"
-t "xchg %eax, (%rax)"
-t "xchg %ax, (%rax)"
-t "xchg %al, (%rax)"
-t "xchg (%rax), %rax"
-t "xchg (%rax), %eax"
-t "xchg (%rax), %ax"
-t "xchg (%rax), %al"
-
-t "leaq (%rax), %rax"
-t "leal (%rax), %eax"
-t "leaw (%rax), %ax"
 
