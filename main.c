@@ -458,16 +458,16 @@ static void assemblemov(Instr *mov) {
   uint8_t opcode, rex, mod, rm;
 
   static uint8_t variant2op[20] = {
-      0xb0, 0xb8, 0xb8, 0xc7, 0xc6, 0xc7, 0xc7, 0xc7, 0x8a, 0x8b,
+      0xc6, 0xc7, 0xc7, 0xc7, 0xb0, 0xb8, 0xb8, 0xc7, 0x8a, 0x8b,
       0x8b, 0x8b, 0x88, 0x89, 0x89, 0x89, 0x88, 0x89, 0x89, 0x89,
   };
 
   opcode = variant2op[mov->variant];
-  if (mov->variant < 3) {
+  if (mov->variant >= 4 && mov->variant <= 6) {
     imm = &mov->src->imm;
     assembleplusr(opcode, mov->dst->kind);
     assemblevalue(imm->l, imm->c, imm->nbytes);
-  } else if (mov->variant < 8) {
+  } else if (mov->variant == 7 || mov->variant < 4) {
     uint8_t opsz = 1 << (mov->variant % 4);
     assembleimmrm(mov, opcode, 0x00, opsz);
   } else {
