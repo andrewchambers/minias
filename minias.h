@@ -57,6 +57,9 @@ typedef enum {
   // Instructions
   ASM_NOP,
   ASM_RET,
+  ASM_PUSH,
+  ASM_POP,
+  ASM_CALL,
   ASM_JMP,
   ASM_LEAVE,
   ASM_ADD,
@@ -203,14 +206,25 @@ typedef String Asciiz;
 typedef struct {
   AsmKind kind;
   const char *target;
+} Call;
+
+typedef struct {
+  AsmKind kind;
+  const char *target;
 } Jmp;
+
+typedef struct {
+  AsmKind kind;
+  uint8_t variant;
+  Parsev *arg;
+} Instr1;
 
 typedef struct {
   AsmKind kind;
   uint8_t variant;
   Parsev *src;
   Parsev *dst;
-} Instr;
+} Instr2;
 
 union Parsev {
   AsmKind kind;
@@ -220,7 +234,9 @@ union Parsev {
   Ascii ascii;
   Asciiz asciiz;
   Memarg memarg;
-  Instr instr;
+  Instr1 instr1;
+  Instr2 instr2;
+  Call call;
   Jmp jmp;
   Byte byte;
   Imm imm;

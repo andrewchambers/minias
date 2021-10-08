@@ -30,6 +30,14 @@ t () {
   echo -n "."
 }
 
+t "pushq (%r9)"
+t "pushq %r9"
+t "pushq %rax"
+t "popq (%r9)"
+t "popq %r9"
+t "popq %rax"
+
+
 t "movb \$127, (%rsp)"
 t "movb \$127, (%rbp)"
 t "movb \$127, 2147483647(%rsp)"
@@ -87,6 +95,8 @@ do
     t "${op}q \$2147483647, %r${r}x"
 
     # r rm variants
+    t "${op}b (%rip), %${r}l"
+    t "${op}b (%rax), %${r}l"
     t "${op}b (%rax), %${r}l"
     t "${op}w (%rax), %${r}x"
     t "${op}l (%rax), %e${r}x"
@@ -94,6 +104,7 @@ do
     t "${op}q (%rbp), %r${r}x"
     t "${op}q (%r8), %r${r}x"
     t "${op}q (%r13), %r${r}x"
+    t "${op}b %${r}l, (%rip)"
     t "${op}b %${r}l, (%rax)"
     t "${op}w %${r}x, (%rax)"
     t "${op}l %e${r}x, (%rax)"

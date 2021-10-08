@@ -129,21 +129,6 @@ Relocation *newreloc() {
   return &relocs[nrelocs++];
 }
 
-static Parsev *dupv(Parsev *p) {
-  Parsev *r = xmalloc(sizeof(Parsev));
-  *r = *p;
-  return r;
-}
-
-#define INSTR(V, S, D)                                                         \
-  (Parsev) {                                                                   \
-    .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .src = dupv(&S), .dst = dupv(&D)                \
-    }                                                                          \
-  }
-#define REG(K)                                                                 \
-  (Parsev) { .kind = K }
-
 static String decodestring(char *s) {
   int i;
   char *end;
@@ -184,6 +169,26 @@ static String decodestring(char *s) {
   }
   return (String){.kind = ASM_STRING, .len = len, .data = data};
 }
+
+static Parsev *dupv(Parsev *p) {
+  Parsev *r = xmalloc(sizeof(Parsev));
+  *r = *p;
+  return r;
+}
+
+#define INSTR1(V, A)                                                           \
+  (Parsev) {                                                                   \
+    .instr1 = (Instr1) { .kind = 0, .variant = V, .arg = dupv(&A), }           \
+  }
+
+#define INSTR2(V, S, D)                                                        \
+  (Parsev) {                                                                   \
+    .instr2 = (Instr2) {                                                       \
+      .kind = 0, .variant = V, .src = dupv(&S), .dst = dupv(&D)                \
+    }                                                                          \
+  }
+#define REG(K)                                                                 \
+  (Parsev) { .kind = K }
 
 #define YYSTYPE Parsev
 #define YY_CTX_LOCAL
@@ -278,9 +283,9 @@ static uint8_t sibbyte(uint8_t ss, uint8_t idx, uint8_t base) {
 }
 
 /* Assemble op +rw | op + rd. */
-static void assembleplusr(uint8_t opcode, AsmKind reg) {
+static void assembleplusr(uint8_t opcode, uint8_t rexw, AsmKind reg) {
   uint8_t bits = regbits(reg);
-  uint8_t rex = rexbyte(isreg64(reg), 0, 0, bits & (1 << 3));
+  uint8_t rex = rexbyte(rexw, 0, 0, bits & (1 << 3));
   if (isreg16(reg))
     sb(0x66);
   if (rex != rexbyte(0, 0, 0, 0))
@@ -355,7 +360,7 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
       sb2(opcode, modregrm(0, reg, rm));
     }
   } else {
-    /* XXX choose smaller size if not label .*/
+    /* TODO choose smaller size if not label .*/
     if ((rm & 7) == 4) { /* Matches '(%rsp/%esp...)'. */
       sb3(opcode, modregrm(2, reg, 4), sibbyte(0, 4, 4));
     } else if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
@@ -368,7 +373,7 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
 }
 
 /* Assemble op + imm -> r/m. */
-static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
+static void assembleimmrm(Instr2 *instr, uint8_t opcode, uint8_t immreg,
                           uint8_t opsz) {
   Imm *imm;
 
@@ -395,11 +400,20 @@ static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
 }
 
 /* Assemble op + r <-> r/m. */
-static void assemblerrm(Instr *instr, uint8_t opcode, uint8_t opsz) {
+static void assemblerrm(Instr2 *instr, uint8_t opcode, uint8_t opsz) {
   Memarg *memarg;
   AsmKind regarg;
 
-  if (instr->src->kind == ASM_MEMARG) {
+  if (instr->src->kind == ASM_MEMARG && instr->src->memarg.reg == ASM_RIP) {
+    memarg = &instr->src->memarg;
+    regarg = instr->dst->kind;
+    assembleriprel(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
+  } else if (instr->dst->kind == ASM_MEMARG &&
+             instr->dst->memarg.reg == ASM_RIP) {
+    memarg = &instr->dst->memarg;
+    regarg = instr->src->kind;
+    assembleriprel(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
+  } else if (instr->src->kind == ASM_MEMARG) {
     memarg = &instr->src->memarg;
     regarg = instr->dst->kind;
     assemblemem(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
@@ -423,7 +437,7 @@ static void assemblerrm(Instr *instr, uint8_t opcode, uint8_t opsz) {
 }
 
 /* Assemble a 'basic op' which is just a repeated op pattern we have named. */
-static void assemblebasicop(Instr *instr, uint8_t opcode, uint8_t immreg) {
+static void assemblebasicop(Instr2 *instr, uint8_t opcode, uint8_t immreg) {
   Imm *imm;
   uint8_t opsz = 1 << (instr->variant % 4);
   if (instr->variant < 4) {
@@ -441,21 +455,21 @@ static void assemblebasicop(Instr *instr, uint8_t opcode, uint8_t immreg) {
   }
 }
 
-static void assemblexchg(Instr *xchg) {
+static void assemblexchg(Instr2 *xchg) {
   static uint8_t variant2op[18] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
                                    0x86, 0x87, 0x87, 0x87, 0x86, 0x87,
                                    0x87, 0x87, 0x86, 0x87, 0x87, 0x87};
   uint8_t opcode = variant2op[xchg->variant];
   if (xchg->variant < 6) {
-    assembleplusr(opcode,
-                  (xchg->variant % 2) ? xchg->src->kind : xchg->dst->kind);
+    AsmKind reg = (xchg->variant % 2) ? xchg->src->kind : xchg->dst->kind;
+    assembleplusr(opcode, isreg64(reg), reg);
   } else {
     uint8_t opsz = 1 << ((xchg->variant - 6) % 4);
     assemblerrm(xchg, opcode, opsz);
   }
 }
 
-static void assemblemov(Instr *mov) {
+static void assemblemov(Instr2 *mov) {
   Imm *imm;
   uint8_t opcode, rex, mod, rm;
 
@@ -467,7 +481,7 @@ static void assemblemov(Instr *mov) {
   opcode = variant2op[mov->variant];
   if (mov->variant >= 4 && mov->variant <= 6) {
     imm = &mov->src->imm;
-    assembleplusr(opcode, mov->dst->kind);
+    assembleplusr(opcode, isreg64(mov->dst->kind), mov->dst->kind);
     assemblevalue(imm->l, imm->c, imm->nbytes);
   } else if (mov->variant == 7 || mov->variant < 4) {
     uint8_t opsz = 1 << (mov->variant % 4);
@@ -528,70 +542,18 @@ static void assemble(void) {
         lfatal("%s already defined", sym->name);
       sym->defined = 1;
       break;
-    case ASM_NOP:
-      sb(0x90);
-      break;
-    case ASM_LEAVE:
-      sb(0xc9);
-      break;
-    case ASM_RET:
-      sb(0xc3);
-      break;
-    case ASM_LEA: {
-      uint8_t opsz = 1 << (v->instr.variant + 1);
-      assemblerrm(&v->instr, 0x8d, opsz);
-      break;
-    }
-    case ASM_MOV:
-      assemblemov(&v->instr);
-      break;
-    case ASM_ADD: {
-      static uint8_t variant2op[24] = {
-          0x04, 0x05, 0x05, 0x05, 0x80, 0x81, 0x81, 0x81,
-          0x80, 0x81, 0x81, 0x81, 0x02, 0x03, 0x03, 0x03,
-          0x00, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01,
-      };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x00);
-      break;
-    }
-    case ASM_AND: {
-      static uint8_t variant2op[24] = {
-          0x24, 0x25, 0x25, 0x25, 0x80, 0x81, 0x81, 0x81,
-          0x80, 0x81, 0x81, 0x81, 0x22, 0x23, 0x23, 0x23,
-          0x20, 0x21, 0x21, 0x21, 0x20, 0x21, 0x21, 0x21,
-      };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x04);
-      break;
-    }
-    case ASM_OR: {
-      static uint8_t variant2op[24] = {
-          0x0c, 0x0d, 0x0d, 0x0d, 0x80, 0x81, 0x81, 0x81,
-          0x80, 0x81, 0x81, 0x81, 0x0a, 0x0b, 0x0b, 0x0b,
-          0x08, 0x09, 0x09, 0x09, 0x08, 0x09, 0x09, 0x09,
-      };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x01);
-      break;
-    }
-    case ASM_SUB: {
-      static uint8_t variant2op[24] = {
-          0x2c, 0x2d, 0x2d, 0x2d, 0x80, 0x81, 0x81, 0x81,
-          0x80, 0x81, 0x81, 0x81, 0x2a, 0x2b, 0x2b, 0x2b,
-          0x28, 0x29, 0x29, 0x29, 0x28, 0x29, 0x29, 0x29,
-      };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x05);
-      break;
-    }
-    case ASM_XOR: {
-      static uint8_t variant2op[24] = {
-          0x34, 0x35, 0x35, 0x35, 0x80, 0x81, 0x81, 0x81,
-          0x80, 0x81, 0x81, 0x81, 0x32, 0x33, 0x33, 0x33,
-          0x30, 0x31, 0x31, 0x31, 0x30, 0x31, 0x31, 0x31,
-      };
-      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x06);
-      break;
-    }
-    case ASM_XCHG: {
-      assemblexchg(&v->instr);
+    case ASM_CALL: {
+      Symbol *sym;
+      Relocation *reloc;
+
+      sb(0xe8);
+      sym = getsym(v->call.target);
+      reloc = newreloc();
+      reloc->kind = 0; // XXX
+      reloc->section = cursection;
+      reloc->sym = sym;
+      reloc->offset = cursection->hdr.sh_size;
+      sl(0);
       break;
     }
     case ASM_JMP: {
@@ -608,6 +570,86 @@ static void assemble(void) {
       sl(-4);
       break;
     }
+    case ASM_PUSH:
+      if (v->instr1.arg->kind == ASM_MEMARG) {
+        assemblemem(&v->instr1.arg->memarg, 0, 0xff, 0x06, 8);
+      } else {
+        assembleplusr(0x50, 0, v->instr1.arg->kind);
+      }
+      break;
+    case ASM_POP:
+      if (v->instr1.arg->kind == ASM_MEMARG) {
+        assemblemem(&v->instr1.arg->memarg, 0, 0x8f, 0x00, 8);
+      } else {
+        assembleplusr(0x58, 0, v->instr1.arg->kind);
+      }
+      break;
+    case ASM_NOP:
+      sb(0x90);
+      break;
+    case ASM_LEAVE:
+      sb(0xc9);
+      break;
+    case ASM_RET:
+      sb(0xc3);
+      break;
+    case ASM_LEA: {
+      uint8_t opsz = 1 << (v->instr2.variant + 1);
+      assemblerrm(&v->instr2, 0x8d, opsz);
+      break;
+    }
+    case ASM_MOV:
+      assemblemov(&v->instr2);
+      break;
+    case ASM_ADD: {
+      static uint8_t variant2op[24] = {
+          0x04, 0x05, 0x05, 0x05, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x02, 0x03, 0x03, 0x03,
+          0x00, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01,
+      };
+      assemblebasicop(&v->instr2, variant2op[v->instr2.variant], 0x00);
+      break;
+    }
+    case ASM_AND: {
+      static uint8_t variant2op[24] = {
+          0x24, 0x25, 0x25, 0x25, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x22, 0x23, 0x23, 0x23,
+          0x20, 0x21, 0x21, 0x21, 0x20, 0x21, 0x21, 0x21,
+      };
+      assemblebasicop(&v->instr2, variant2op[v->instr2.variant], 0x04);
+      break;
+    }
+    case ASM_OR: {
+      static uint8_t variant2op[24] = {
+          0x0c, 0x0d, 0x0d, 0x0d, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x0a, 0x0b, 0x0b, 0x0b,
+          0x08, 0x09, 0x09, 0x09, 0x08, 0x09, 0x09, 0x09,
+      };
+      assemblebasicop(&v->instr2, variant2op[v->instr2.variant], 0x01);
+      break;
+    }
+    case ASM_SUB: {
+      static uint8_t variant2op[24] = {
+          0x2c, 0x2d, 0x2d, 0x2d, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x2a, 0x2b, 0x2b, 0x2b,
+          0x28, 0x29, 0x29, 0x29, 0x28, 0x29, 0x29, 0x29,
+      };
+      assemblebasicop(&v->instr2, variant2op[v->instr2.variant], 0x05);
+      break;
+    }
+    case ASM_XOR: {
+      static uint8_t variant2op[24] = {
+          0x34, 0x35, 0x35, 0x35, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x32, 0x33, 0x33, 0x33,
+          0x30, 0x31, 0x31, 0x31, 0x30, 0x31, 0x31, 0x31,
+      };
+      assemblebasicop(&v->instr2, variant2op[v->instr2.variant], 0x06);
+      break;
+    }
+    case ASM_XCHG: {
+      assemblexchg(&v->instr2);
+      break;
+    }
     default:
       lfatal("assemble: unexpected kind: %d", l->v.kind);
     }
@@ -618,15 +660,22 @@ static void addtosymtab(Symbol *sym) {
   Elf64_Sym elfsym;
   int stype;
   int sbind;
-  stype = (sym->section->hdr.sh_flags & SHF_EXECINSTR) ? STT_FUNC : STT_OBJECT;
-  sbind = sym->global ? STB_GLOBAL : STB_LOCAL;
+
+  if (sym->defined) {
+    stype =
+        (sym->section->hdr.sh_flags & SHF_EXECINSTR) ? STT_FUNC : STT_OBJECT;
+    sbind = sym->global ? STB_GLOBAL : STB_LOCAL;
+  } else {
+    stype = 0;
+    sbind = 0;
+  }
 
   memset(&elfsym, 0, sizeof(elfsym));
   elfsym.st_name = elfstr(strtab, sym->name);
   elfsym.st_size = sym->size;
   elfsym.st_value = sym->offset;
   elfsym.st_info = ELF32_ST_BIND(sbind) | ELF32_ST_TYPE(stype);
-  elfsym.st_shndx = sym->section->idx;
+  elfsym.st_shndx = sym->section ? sym->section->idx : SHN_UNDEF;
   secaddbytes(symtab, (uint8_t *)&elfsym, sizeof(Elf64_Sym));
 }
 
@@ -634,21 +683,12 @@ static void fillsymtab(void) {
   Symbol *sym;
   size_t i;
 
-  // Local symbols
-  for (i = 0; i < symbols->cap; i++) {
-    if (!symbols->keys[i].str)
-      continue;
-    sym = symbols->vals[i];
-    if (sym->global || !sym->section)
-      continue;
-    addtosymtab(sym);
-  }
   // Global symbols
   for (i = 0; i < symbols->cap; i++) {
     if (!symbols->keys[i].str)
       continue;
     sym = symbols->vals[i];
-    if (!sym->global || !sym->section)
+    if (!sym->global && sym->defined)
       continue;
     addtosymtab(sym);
   }
