@@ -307,6 +307,25 @@ static void assembleplusr(uint8_t opcode, uint8_t rexw, AsmKind reg) {
   sb(opcode | (bits & 7));
 }
 
+void assembleconstant(int64_t c, int nbytes) {
+  switch (nbytes) {
+  case 1:
+    sb((uint8_t)c);
+    break;
+  case 2:
+    su16((uint16_t)c);
+    break;
+  case 4:
+    su32((uint32_t)c);
+    break;
+  case 8:
+    fatal("TODO 8 byte");
+    break;
+  default:
+    unreachable();
+  }
+}
+
 /* Assemble a symbolic value. */
 static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
   Relocation *reloc;
@@ -320,36 +339,26 @@ static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
     reloc->sym = sym;
     reloc->offset = cursection->hdr.sh_size;
   }
-
-  switch (nbytes) {
-  case 1:
-    sb((uint8_t)c);
-    break;
-  case 2:
-    su16((uint16_t)c);
-    break;
-  case 4:
-    su32((uint32_t)c);
-    break;
-  case 8:
-    fatal("TODO 8 byte symbolic");
-    break;
-  default:
-    unreachable();
-  }
+  assembleconstant(c, nbytes);
 }
 
 /* Assemble a r <-> (%rip) operation. */
 static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
                            uint8_t reg, uint8_t opsz) {
   uint8_t rex;
+
   if (opsz == 2)
     sb(0x66);
   rex = rexbyte(rexw, 0, 0, 0);
   if (rex != rexbyte(0, 0, 0, 0))
     sb(rex);
   sb2(opcode, modregrm(0x00, reg, 0x05));
-  assemblereloc(memarg->l, memarg->c - 4, 4, R_X86_64_PC32);
+
+  if (memarg->l) {
+    assemblereloc(memarg->l, memarg->c - 4, 4, R_X86_64_PC32);
+  } else {
+    assembleconstant(memarg->c, 4);
+  }
 }
 
 /* Assemble a r <-> mem operation.  */

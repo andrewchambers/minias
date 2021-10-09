@@ -8,26 +8,6 @@ tmpb="$(mktemp --suffix .bin)"
 trap "rm -f \"$tmps\" \"$tmpo\" \"$tmpb\"" EXIT
 
 t () {
-  if ! ./minias < "$1" > "$tmpo"
-  then
-    echo "failed to assemble: $1"
-    exit 1
-  fi
-  clang "$tmpo" -o "$tmpb"
-  if !"$tmpb" 1>&2 2>/dev/null
-  then
-  	echo "$t failed"
-  	exit 1
-  fi
-  echo -n "."
-}
-
-for tc in $(echo test/execute/*)
-do
-  t "$tc"
-done
-
-t () {
   echo "$1" > "$tmps"
   clang -Wno-everything -c -s "$tmps" -o "$tmpo" 
   objcopy -j ".text" -O binary "$tmpo" "$tmpb"
@@ -137,4 +117,24 @@ do
     t "${op}l %e${r}x, %eax"
     t "${op}q %r${r}x, %rax"
   done
+done
+
+t () {
+  if ! ./minias < "$1" > "$tmpo"
+  then
+    echo "failed to assemble: $1"
+    exit 1
+  fi
+  clang "$tmpo" -o "$tmpb"
+  if !"$tmpb" 1>&2 2>/dev/null
+  then
+  	echo "$t failed"
+  	exit 1
+  fi
+  echo -n "."
+}
+
+for tc in $(echo test/execute/*)
+do
+  t "$tc"
 done
