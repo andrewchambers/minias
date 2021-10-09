@@ -49,6 +49,7 @@ typedef enum {
   ASM_MEMARG,
   // Directives
   ASM_DIR_GLOBL,
+  ASM_DIR_SECTION,
   ASM_DIR_ASCII,
   ASM_DIR_ASCIIZ,
   ASM_DIR_DATA,
@@ -164,6 +165,13 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
+  const char *name;
+  const char *flags;
+  int type;
+} DirSection;
+
+typedef struct {
+  AsmKind kind;
   uint8_t b;
 } Byte;
 
@@ -231,6 +239,7 @@ union Parsev {
   AsmKind kind;
   Label label;
   Globl globl;
+  DirSection section;
   Balign balign;
   Ascii ascii;
   Asciiz asciiz;
@@ -244,6 +253,9 @@ union Parsev {
   Ident ident;
   Number number;
   String string;
+  // Temporary values.
+  const char *charptr;
+  int64_t i64;
 };
 
 typedef struct AsmLine AsmLine;

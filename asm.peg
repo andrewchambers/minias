@@ -8,11 +8,11 @@ ws = [ \t]+
 eol = ws? "\n"
 
 stmt =
-    d:directive {$$ = d;}
+    '.' d:directive {$$ = d;}
   | i:instr { $$ = i; }
   | l:label {  $$ = l; } 
 
-directive = '.' (
+directive =
    "glob" 'o'? 'l' ws i:ident
    { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident.name }; }
   | "ascii" <'z'?> ws s:string
@@ -25,7 +25,23 @@ directive = '.' (
     { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.number.v }; }
   | "byte" ws n:number
     { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.number.v }; }
-)
+  | sd:section-directive { $$ = sd; }
+
+section-directive =
+  "section" ws? n:section-name (
+      ws? ',' ws? f:section-flags ws? ',' ws? t:section-type
+      {$$.section = (DirSection){.kind=ASM_DIR_SECTION, .name=n.charptr, .flags=f.charptr, .type=t.i64}; }
+    | ws? ',' ws? f:section-flags
+      {$$.section = (DirSection){.kind=ASM_DIR_SECTION, .name=n.charptr, .flags=f.charptr, .type=SHT_PROGBITS}; }
+    | 
+      {$$.section = (DirSection){.kind=ASM_DIR_SECTION, .name=n.charptr, .flags="", .type=SHT_PROGBITS}; }
+  )
+
+section-name = <[.a-zA-Z0-9\-]+> { $$.charptr = xstrdup(yytext); }
+section-flags = '"' <[awx]*> '"' { $$.charptr = xstrdup(yytext); }
+section-type =
+    "@nobits" { $$.i64 = SHT_NOBITS; }
+  | "@progbits" { $$.i64 = SHT_PROGBITS; }
 
 label = 
   i:ident ':'

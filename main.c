@@ -78,6 +78,19 @@ static Section *newsection() {
   return s;
 }
 
+static Section *getsection(const char *name) {
+  size_t i;
+  Section *s;
+
+  for (i = 0; i < nsections; i++) {
+    if (strcmp(secname(&sections[i]), name) == 0)
+      return &sections[i];
+  }
+  s = newsection();
+  s->hdr.sh_name = elfstr(shstrtab, name);
+  return s;
+}
+
 static void initsections(void) {
   Elf64_Sym elfsym;
 
@@ -530,6 +543,32 @@ static void assemble(void) {
       sym = getsym(v->globl.name);
       sym->global = 1;
       break;
+    case ASM_DIR_SECTION: {
+      size_t i;
+      const char *fp;
+      Section *s;
+
+      s = getsection(v->section.name);
+      s->hdr.sh_type = v->section.type;
+      fp = v->section.flags;
+      while (fp && *fp) {
+        switch (*(fp++)) {
+        case 'a':
+          s->hdr.sh_flags |= SHF_ALLOC;
+          break;
+        case 'w':
+          s->hdr.sh_flags |= SHF_WRITE;
+          break;
+        case 'x':
+          s->hdr.sh_flags |= SHF_EXECINSTR;
+          break;
+        default:
+          unreachable();
+        }
+      }
+      cursection = s;
+      break;
+    }
     case ASM_DIR_DATA:
       cursection = data;
       break;
