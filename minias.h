@@ -43,8 +43,6 @@ typedef enum {
   ASM_BLANK,
   ASM_LABEL,
   ASM_IMM,
-  ASM_IDENT,
-  ASM_NUMBER,
   ASM_STRING,
   ASM_MEMARG,
   // Directives
@@ -196,16 +194,6 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
-  const char *name;
-} Ident;
-
-typedef struct {
-  AsmKind kind;
-  int64_t v;
-} Number;
-
-typedef struct {
-  AsmKind kind;
   size_t len;
   uint8_t *data;
 } String;
@@ -250,8 +238,6 @@ union Parsev {
   Jmp jmp;
   Byte byte;
   Imm imm;
-  Ident ident;
-  Number number;
   String string;
   // Temporary values.
   const char *charptr;

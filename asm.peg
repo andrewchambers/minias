@@ -14,7 +14,7 @@ stmt =
 
 directive =
    "glob" 'o'? 'l' ws i:ident
-   { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.ident.name }; }
+   { $$.globl = (Globl){.kind = ASM_DIR_GLOBL, .name = i.charptr }; }
   | "ascii" <'z'?> ws s:string
     { s.kind = *yytext ? ASM_DIR_ASCII : ASM_DIR_ASCIIZ ; $$ = s; }
   | "data" 
@@ -22,9 +22,9 @@ directive =
   | "text"
     { $$.kind = ASM_DIR_TEXT; }
   | "balign" ws n:number 
-    { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.number.v }; }
+    { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.i64 }; }
   | "byte" ws n:number
-    { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.number.v }; }
+    { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.i64 }; }
   | sd:section-directive { $$ = sd; }
 
 section-directive =
@@ -45,7 +45,7 @@ section-type =
 
 label = 
   i:ident ':'
-  { $$.label = (Label){.kind = ASM_LABEL, .name = i.ident.name}; }
+  { $$.label = (Label){.kind = ASM_LABEL, .name = i.charptr}; }
 
 instr = 
   # XXX Order the rules by frequency to get better lookup time.
@@ -79,11 +79,11 @@ pop =
 
 call = 
   "call" 'q'? ws t:ident 
-  { $$.call = (Call){ .kind = ASM_CALL, .target=t.ident.name } ; }
+  { $$.call = (Call){ .kind = ASM_CALL, .target=t.charptr } ; }
 
 jmp = 
   "jmp" ws t:ident 
-  { $$.jmp = (Jmp){ .kind = ASM_JMP, .target=t.ident.name } ; }
+  { $$.jmp = (Jmp){ .kind = ASM_JMP, .target=t.charptr } ; }
 
 lea = 
   "lea" (
@@ -156,8 +156,8 @@ m =
     {  $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = NULL, .reg = r.kind  }; }
   | <'-'?[0-9]+> ws? '(' ws? r:r64-or-rip ws? ')'
     { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = strtoll(yytext, NULL, 10), .l = NULL, .reg = r.kind  }; }
-  | i:ident  ws? '(' ws? r:r64-or-rip ws? ')'
-    { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = i.ident.name, .reg = r.kind  }; }
+  | i:ident ws? '(' ws? r:r64-or-rip ws? ')'
+    { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = i.charptr, .reg = r.kind  }; }
 
 imm8 = i:imm { i.imm.nbytes = 1; $$ = i; }
 imm16 = i:imm { i.imm.nbytes = 2; $$ = i; }
@@ -259,8 +259,8 @@ string-escape = '\\' (
 
 ident = 
   <[._a-zA-Z][._a-zA-Z0-9]*>
-  { $$.ident = (Ident){ .kind = ASM_IDENT, .name = xstrdup(yytext) }; } 
+  { $$.charptr = xstrdup(yytext); } 
 
 number =
   <'-'?[0-9]+>
-  { $$.number = (Number){ .kind = ASM_NUMBER, .v = strtoll(yytext, NULL, 10) }; }
+  { $$.i64 = strtoll(yytext, NULL, 10); }
