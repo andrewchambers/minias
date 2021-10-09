@@ -339,6 +339,18 @@ void assembleconstant(int64_t c, int nbytes) {
   }
 }
 
+static void assemblemodregrm(uint8_t rexw, uint8_t opcode, uint8_t mod,
+                             uint8_t reg, uint8_t rm, uint8_t opsz) {
+  uint8_t rex;
+
+  if (opsz == 2)
+    sb(0x66);
+  rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
+  if (rex != rexbyte(0, 0, 0, 0))
+    sb(rex);
+  sb2(opcode, modregrm(mod, reg, rm));
+}
+
 /* Assemble a symbolic value. */
 static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
   Relocation *reloc;
@@ -358,14 +370,8 @@ static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
 /* Assemble a r <-> (%rip) operation. */
 static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
                            uint8_t reg, uint8_t opsz) {
-  uint8_t rex;
 
-  if (opsz == 2)
-    sb(0x66);
-  rex = rexbyte(rexw, 0, 0, 0);
-  if (rex != rexbyte(0, 0, 0, 0))
-    sb(rex);
-  sb2(opcode, modregrm(0x00, reg, 0x05));
+  assemblemodregrm(rexw, opcode, 0x00, reg, 0x05, opsz);
 
   if (memarg->l) {
     assemblereloc(memarg->l, memarg->c - 4, 4, R_X86_64_PC32);
@@ -378,6 +384,11 @@ static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
 static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
                         uint8_t reg, uint8_t opsz) {
   uint8_t rex, rm, sib;
+
+  if (memarg->reg == ASM_RIP) {
+    assembleriprel(memarg, rexw, opcode, reg, opsz);
+    return;
+  }
 
   rm = regbits(memarg->reg);
   if (opsz == 2)
@@ -415,22 +426,13 @@ static void assembleimmrm(Instr2 *instr, uint8_t opcode, uint8_t immreg,
 
   imm = &instr->src->imm;
 
-  if (instr->dst->kind == ASM_MEMARG && instr->dst->memarg.reg == ASM_RIP) {
-    assembleriprel(&instr->dst->memarg, opsz == 8, opcode, immreg, opsz);
-    assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
-  } else if (instr->dst->kind == ASM_MEMARG) {
+  if (instr->dst->kind == ASM_MEMARG) {
     assemblemem(&instr->dst->memarg, opsz == 8, opcode, immreg, opsz);
     assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   } else {
-    uint8_t rex, mod, rm;
-    mod = 0x3;
-    rm = regbits(instr->dst->kind);
-    if (opsz == 2)
-      sb(0x66);
-    rex = rexbyte(isreg64(instr->dst->kind), 0, 0, rm & (1 << 3));
-    if (rex != rexbyte(0, 0, 0, 0))
-      sb(rex);
-    sb2(opcode, modregrm(mod, immreg, rm));
+
+    assemblemodregrm(isreg64(instr->dst->kind), opcode, 0x03, immreg,
+                     regbits(instr->dst->kind), opsz);
     assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   }
 }
@@ -440,16 +442,7 @@ static void assemblerrm(Instr2 *instr, uint8_t opcode, uint8_t opsz) {
   Memarg *memarg;
   AsmKind regarg;
 
-  if (instr->src->kind == ASM_MEMARG && instr->src->memarg.reg == ASM_RIP) {
-    memarg = &instr->src->memarg;
-    regarg = instr->dst->kind;
-    assembleriprel(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
-  } else if (instr->dst->kind == ASM_MEMARG &&
-             instr->dst->memarg.reg == ASM_RIP) {
-    memarg = &instr->dst->memarg;
-    regarg = instr->src->kind;
-    assembleriprel(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
-  } else if (instr->src->kind == ASM_MEMARG) {
+  if (instr->src->kind == ASM_MEMARG) {
     memarg = &instr->src->memarg;
     regarg = instr->dst->kind;
     assemblemem(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
@@ -458,17 +451,9 @@ static void assemblerrm(Instr2 *instr, uint8_t opcode, uint8_t opsz) {
     regarg = instr->src->kind;
     assemblemem(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
   } else {
-    uint8_t rex, mod, reg, rm;
-    mod = 0x03;
-    regarg = instr->src->kind;
-    reg = regbits(instr->src->kind);
-    rm = regbits(instr->dst->kind);
-    if (opsz == 2)
-      sb(0x66);
-    rex = rexbyte(isreg64(regarg), reg & (1 << 3), 0, rm & (1 << 3));
-    if (rex != rexbyte(0, 0, 0, 0))
-      sb(rex);
-    sb2(opcode, modregrm(0x03, reg, rm));
+    assemblemodregrm(isreg64(instr->src->kind), opcode, 0x03,
+                     regbits(instr->src->kind), regbits(instr->dst->kind),
+                     opsz);
   }
 }
 
@@ -535,20 +520,10 @@ static void assemblediv(Instr1 *div, uint8_t reg) {
   opcode = opsz == 1 ? 0xf6 : 0xf7;
 
   if (div->variant < 4) {
-    if (div->arg->memarg.reg == ASM_RIP) {
-      assembleriprel(&div->arg->memarg, opsz == 8, opcode, reg, opsz);
-    } else {
-      assemblemem(&div->arg->memarg, opsz == 8, opcode, reg, opsz);
-    }
+    assemblemem(&div->arg->memarg, opsz == 8, opcode, reg, opsz);
   } else {
-    mod = 0x03;
-    rm = regbits(div->arg->kind);
-    if (opsz == 2)
-      sb(0x66);
-    rex = rexbyte(isreg64(div->arg->kind), reg & (1 << 3), 0, rm & (1 << 3));
-    if (rex != rexbyte(0, 0, 0, 0))
-      sb(rex);
-    sb2(opcode, modregrm(0x03, reg, rm));
+    assemblemodregrm(isreg64(div->arg->kind), opcode, 0x03, reg,
+                     regbits(div->arg->kind), opsz);
   }
 }
 
