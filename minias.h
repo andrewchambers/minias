@@ -22,6 +22,7 @@ typedef struct {
 
 typedef struct {
   const char *name;
+  int32_t idx;
   int64_t offset;
   int64_t size;
   int global;
@@ -32,8 +33,8 @@ typedef struct {
 typedef struct {
   Section *section;
   Symbol *sym;
-  int kind;
-  uint64_t offset;
+  int type;
+  int64_t offset;
 } Relocation;
 
 typedef enum {

@@ -7,7 +7,7 @@ static AsmLine *allasm = NULL;
 // writing out the symtab section.
 static struct hashtable *symbols = NULL;
 
-// Array of relocations.
+// Array of all relocations before adding to the rel section.
 static Relocation *relocs = NULL;
 static size_t nrelocs = 0;
 static size_t reloccap = 0;
@@ -23,6 +23,8 @@ static Section *symtab = NULL;
 static Section *bss = NULL;
 static Section *text = NULL;
 static Section *data = NULL;
+static Section *textrel = NULL;
+static Section *datarel = NULL;
 
 size_t curlineno = 0;
 
@@ -94,7 +96,7 @@ static void initsections(void) {
   symtab = newsection();
   symtab->hdr.sh_name = elfstr(shstrtab, ".symtab");
   symtab->hdr.sh_type = SHT_SYMTAB;
-  symtab->hdr.sh_link = 2;
+  symtab->hdr.sh_link = strtab->idx;
   symtab->hdr.sh_entsize = sizeof(Elf64_Sym);
   memset(&elfsym, 0, sizeof(elfsym));
   secaddbytes(symtab, (uint8_t *)&elfsym, sizeof(Elf64_Sym));
@@ -119,6 +121,18 @@ static void initsections(void) {
   text->hdr.sh_flags = SHF_EXECINSTR | SHF_ALLOC;
   text->hdr.sh_entsize = 1;
   text->hdr.sh_addralign = 4;
+
+  textrel = newsection();
+  textrel->hdr.sh_type = SHT_REL;
+  textrel->hdr.sh_info = text->idx;
+  textrel->hdr.sh_link = symtab->idx;
+  textrel->hdr.sh_entsize = sizeof(Elf64_Rel);
+
+  datarel = newsection();
+  datarel->hdr.sh_type = SHT_REL;
+  datarel->hdr.sh_info = data->idx;
+  datarel->hdr.sh_link = symtab->idx;
+  datarel->hdr.sh_entsize = sizeof(Elf64_Rel);
 }
 
 Relocation *newreloc() {
@@ -241,12 +255,12 @@ static void sb4(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4) {
 
 static void sbn(uint8_t *bytes, size_t n) { secaddbytes(cursection, bytes, n); }
 
-static void sw(uint16_t w) {
+static void su16(uint16_t w) {
   uint8_t buf[2] = {w & 0xff, (w & 0xff00) >> 8};
   secaddbytes(cursection, buf, sizeof(buf));
 }
 
-static void sl(uint32_t l) {
+static void su32(uint32_t l) {
   uint8_t buf[4] = {
       l & 0xff,
       (l & 0xff00) >> 8,
@@ -294,14 +308,14 @@ static void assembleplusr(uint8_t opcode, uint8_t rexw, AsmKind reg) {
 }
 
 /* Assemble a symbolic value. */
-static void assemblevalue(const char *l, int64_t c, int nbytes) {
+static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
   Relocation *reloc;
   Symbol *sym;
 
   if (l != NULL) {
     reloc = newreloc();
     sym = getsym(l);
-    reloc->kind = 0; // XXX
+    reloc->type = type;
     reloc->section = cursection;
     reloc->sym = sym;
     reloc->offset = cursection->hdr.sh_size;
@@ -312,10 +326,10 @@ static void assemblevalue(const char *l, int64_t c, int nbytes) {
     sb((uint8_t)c);
     break;
   case 2:
-    sw((uint16_t)c);
+    su16((uint16_t)c);
     break;
   case 4:
-    sl((uint32_t)c);
+    su32((uint32_t)c);
     break;
   case 8:
     fatal("TODO 8 byte symbolic");
@@ -335,7 +349,7 @@ static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
   if (rex != rexbyte(0, 0, 0, 0))
     sb(rex);
   sb2(opcode, modregrm(0x00, reg, 0x05));
-  assemblevalue(memarg->l, memarg->c, 4);
+  assemblereloc(memarg->l, memarg->c - 4, 4, R_X86_64_PC32);
 }
 
 /* Assemble a r <-> mem operation.  */
@@ -368,7 +382,7 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
     } else {
       sb2(opcode, modregrm(2, reg, rm));
     }
-    assemblevalue(memarg->l, memarg->c, 4);
+    assemblereloc(memarg->l, memarg->c, 4, R_X86_64_32);
   }
 }
 
@@ -381,10 +395,10 @@ static void assembleimmrm(Instr2 *instr, uint8_t opcode, uint8_t immreg,
 
   if (instr->dst->kind == ASM_MEMARG && instr->dst->memarg.reg == ASM_RIP) {
     assembleriprel(&instr->dst->memarg, opsz == 8, opcode, immreg, opsz);
-    assemblevalue(imm->l, imm->c, imm->nbytes);
+    assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   } else if (instr->dst->kind == ASM_MEMARG) {
     assemblemem(&instr->dst->memarg, opsz == 8, opcode, immreg, opsz);
-    assemblevalue(imm->l, imm->c, imm->nbytes);
+    assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   } else {
     uint8_t rex, mod, rm;
     mod = 0x3;
@@ -395,7 +409,7 @@ static void assembleimmrm(Instr2 *instr, uint8_t opcode, uint8_t immreg,
     if (rex != rexbyte(0, 0, 0, 0))
       sb(rex);
     sb2(opcode, modregrm(mod, immreg, rm));
-    assemblevalue(imm->l, imm->c, imm->nbytes);
+    assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   }
 }
 
@@ -447,7 +461,7 @@ static void assemblebasicop(Instr2 *instr, uint8_t opcode, uint8_t immreg) {
       sb(rexbyte(1, 0, 0, 0));
     sb(opcode);
     imm = &instr->src->imm;
-    assemblevalue(imm->l, imm->c, imm->nbytes);
+    assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   } else if (instr->variant < 12) {
     assembleimmrm(instr, opcode, immreg, opsz);
   } else {
@@ -482,7 +496,7 @@ static void assemblemov(Instr2 *mov) {
   if (mov->variant >= 4 && mov->variant <= 6) {
     imm = &mov->src->imm;
     assembleplusr(opcode, isreg64(mov->dst->kind), mov->dst->kind);
-    assemblevalue(imm->l, imm->c, imm->nbytes);
+    assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   } else if (mov->variant == 7 || mov->variant < 4) {
     uint8_t opsz = 1 << (mov->variant % 4);
     assembleimmrm(mov, opcode, 0x00, opsz);
@@ -547,13 +561,7 @@ static void assemble(void) {
       Relocation *reloc;
 
       sb(0xe8);
-      sym = getsym(v->call.target);
-      reloc = newreloc();
-      reloc->kind = 0; // XXX
-      reloc->section = cursection;
-      reloc->sym = sym;
-      reloc->offset = cursection->hdr.sh_size;
-      sl(0);
+      assemblereloc(v->call.target, -4, 4, R_X86_64_PC32);
       break;
     }
     case ASM_JMP: {
@@ -561,13 +569,7 @@ static void assemble(void) {
       Relocation *reloc;
 
       sb(0xe9);
-      sym = getsym(v->jmp.target);
-      reloc = newreloc();
-      reloc->kind = 0; // XXX
-      reloc->section = cursection;
-      reloc->sym = sym;
-      reloc->offset = cursection->hdr.sh_size;
-      sl(-4);
+      assemblereloc(v->call.target, -4, 4, R_X86_64_PC32);
       break;
     }
     case ASM_PUSH:
@@ -670,12 +672,14 @@ static void addtosymtab(Symbol *sym) {
     sbind = STB_GLOBAL;
   }
 
-  memset(&elfsym, 0, sizeof(elfsym));
+  sym->idx = symtab->hdr.sh_size / symtab->hdr.sh_entsize;
+
   elfsym.st_name = elfstr(strtab, sym->name);
-  elfsym.st_size = sym->size;
   elfsym.st_value = sym->offset;
+  elfsym.st_size = sym->size;
   elfsym.st_info = ELF64_ST_INFO(sbind, stype);
   elfsym.st_shndx = sym->section ? sym->section->idx : SHN_UNDEF;
+  elfsym.st_other = 0;
   secaddbytes(symtab, (uint8_t *)&elfsym, sizeof(Elf64_Sym));
 }
 
@@ -694,6 +698,10 @@ static void fillsymtab(void) {
   }
 
   // Global symbols
+
+  // Set start of global symbols.
+  symtab->hdr.sh_info = symtab->hdr.sh_size / symtab->hdr.sh_entsize;
+
   for (i = 0; i < symbols->cap; i++) {
     if (!symbols->keys[i].str)
       continue;
@@ -705,34 +713,71 @@ static void fillsymtab(void) {
   }
 }
 
-static void handlerelocs(void) {
+static void resolvereloc(Relocation *reloc) {
   Symbol *sym;
+  uint8_t *rdata;
+  int32_t addend, value;
+
+  sym = reloc->sym;
+
+  switch (reloc->type) {
+  case R_X86_64_32: {
+    rdata = &reloc->section->data[reloc->offset];
+    addend = (int32_t)rdata[0] | (int32_t)(rdata[1] << 8) |
+             (int32_t)(rdata[2] << 16) | (int32_t)(rdata[3] << 24);
+    value = sym->offset - (int32_t)reloc->offset + addend;
+    rdata[0] = ((uint32_t)value & 0xff);
+    rdata[1] = ((uint32_t)value & 0xff00) >> 8;
+    rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
+    rdata[3] = ((uint32_t)value & 0xff000000) >> 24;
+    break;
+  case R_X86_64_PC32:
+    fatal("TODO local R_X86_64_PC32");
+    break;
+  }
+  default:
+    unreachable();
+  }
+}
+
+static void appendreloc(Relocation *reloc) {
+  Symbol *sym;
+  Section *relsection;
+  Elf64_Rel elfrel;
+
+  memset(&elfrel, 0, sizeof(elfrel));
+
+  sym = reloc->sym;
+  if (reloc->section == text)
+    relsection = textrel;
+  else if (reloc->section == data)
+    relsection = datarel;
+  else
+    fatal("unexpected relocation for symbol '%s'", sym->name);
+
+  switch (reloc->type) {
+  case R_X86_64_PC32:
+  case R_X86_64_32:
+    elfrel.r_info = ELF64_R_INFO(sym->idx, reloc->type);
+    elfrel.r_offset = reloc->offset;
+    break;
+  default:
+    unreachable();
+  }
+
+  secaddbytes(relsection, (uint8_t *)&elfrel, sizeof(elfrel));
+}
+
+static void handlerelocs(void) {
   Relocation *reloc;
   size_t i;
-
   for (i = 0; i < nrelocs; i++) {
     reloc = &relocs[i];
-    sym = reloc->sym;
-    if (sym->section == reloc->section) {
-      switch (reloc->kind) {
-      case 0: {
-        uint8_t *rdata;
-        int32_t addend, value;
-        rdata = &reloc->section->data[reloc->offset];
-        addend = (int32_t)rdata[0] | (int32_t)(rdata[1] << 8) |
-                 (int32_t)(rdata[2] << 16) | (int32_t)(rdata[3] << 24);
-        // XXX overflow?
-        value = sym->offset - (int32_t)reloc->offset + addend;
-        rdata[0] = ((uint32_t)value & 0xff);
-        rdata[1] = ((uint32_t)value & 0xff00) >> 8;
-        rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
-        rdata[3] = ((uint32_t)value & 0xff000000) >> 24;
-        break;
-      }
-      default:
-        unreachable();
-      }
+    if (reloc->sym->section == reloc->section) {
+      resolvereloc(reloc);
+      continue;
     }
+    appendreloc(reloc);
   }
 }
 
