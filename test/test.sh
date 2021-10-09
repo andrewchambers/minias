@@ -36,6 +36,13 @@ t "divq (%rip)"
 t "idiv %rax"
 t "idivq (%rax)"
 t "idivq (%rip)"
+t "mul %rax"
+t "mulq (%rax)"
+t "mulq (%rip)"
+t "imul %rax"
+t "imulq (%rax)"
+t "imulq (%rip)"
+
 
 t "pushq (%r9)"
 t "pushq %r9"

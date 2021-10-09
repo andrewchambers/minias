@@ -67,6 +67,8 @@ typedef enum {
   ASM_DIV,
   ASM_IDIV,
   ASM_LEA,
+  ASM_MUL,
+  ASM_IMUL,
   ASM_MOV,
   ASM_MOVSX,
   ASM_MOVZX,
@@ -215,15 +217,10 @@ typedef struct {
 typedef struct {
   AsmKind kind;
   uint8_t variant;
-  Parsev *arg;
-} Instr1;
-
-typedef struct {
-  AsmKind kind;
-  uint8_t variant;
-  Parsev *src;
-  Parsev *dst;
-} Instr2;
+  Parsev *arg1;
+  Parsev *arg2;
+  Parsev *arg3;
+} Instr;
 
 union Parsev {
   AsmKind kind;
@@ -234,8 +231,7 @@ union Parsev {
   Ascii ascii;
   Asciiz asciiz;
   Memarg memarg;
-  Instr1 instr1;
-  Instr2 instr2;
+  Instr instr;
   Call call;
   Jmp jmp;
   Byte byte;
