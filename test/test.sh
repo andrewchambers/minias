@@ -30,6 +30,13 @@ t () {
   echo -n "."
 }
 
+t "div %rax"
+t "divq (%rax)"
+t "divq (%rip)"
+t "idiv %rax"
+t "idivq (%rax)"
+t "idivq (%rip)"
+
 t "pushq (%r9)"
 t "pushq %r9"
 t "pushq %rax"

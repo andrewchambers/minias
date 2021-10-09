@@ -64,6 +64,8 @@ typedef enum {
   ASM_LEAVE,
   ASM_ADD,
   ASM_AND,
+  ASM_DIV,
+  ASM_IDIV,
   ASM_LEA,
   ASM_MOV,
   ASM_MOVSX,

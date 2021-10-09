@@ -58,6 +58,8 @@ instr =
   | i:jmp   { $$ = i; }
   | i:add   { $$ = i; }
   | i:and   { $$ = i; }
+  | i:div   { $$ = i; }
+  | i:idiv  { $$ = i; }
   | i:lea   { $$ = i; }
   | i:mov   { $$ = i; }
   | i:or    { $$ = i; }
@@ -91,6 +93,24 @@ lea =
     | 'l'? ws s:m ws? ',' ws? d:r32 { $$ = INSTR2(1, s, d); }
     | 'q'? ws s:m ws? ',' ws? d:r64 { $$ = INSTR2(2, s, d); }
   ) { $$.instr2.kind = ASM_LEA; }
+
+div = "div" (
+    args:div-opargs { $$ = args; }
+)  { $$.instr2.kind = ASM_DIV; }
+
+idiv = "idiv" (
+    args:div-opargs { $$ = args; }
+)  { $$.instr2.kind = ASM_IDIV; }
+
+div-opargs = 
+    'b'   ws a:m  { $$ = INSTR1(0, a); }
+  | 'w'   ws a:m  { $$ = INSTR1(1, a); }
+  | 'l'   ws a:m  { $$ = INSTR1(2, a); }
+  | 'q'   ws a:m  { $$ = INSTR1(3, a); }
+  | 'b'? ws a:r8  { $$ = INSTR1(4, a); }
+  | 'w'? ws a:r16 { $$ = INSTR1(5, a); }
+  | 'l'? ws a:r32 { $$ = INSTR1(6, a); }
+  | 'q'? ws a:r64 { $$ = INSTR1(7, a); }
 
 imm-rm-opargs = 
     'b'  ws s:imm8  ws? ',' ws? d:m   { $$ = INSTR2(0, s, d); }
@@ -245,7 +265,7 @@ r64 =
   | "%r14" ![lwb] { $$ = REG(ASM_R14); }
   | "%r15" ![lwb] { $$ = REG(ASM_R15); }
 
-# We disallow newlines in our strings, it is simpler for error messages.
+# We disallow newlines in our strings, it is simpler for lineno tracking.
 string = '"' <(string-escape | ( ! '\n' ! '\\' !'"' .))*> '"'
          { $$.string = decodestring(yytext); }
 

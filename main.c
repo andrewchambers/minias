@@ -528,6 +528,30 @@ static void assemblemov(Instr2 *mov) {
   }
 }
 
+static void assemblediv(Instr1 *div, uint8_t reg) {
+  uint8_t opcode, opsz, rex, mod, rm;
+
+  opsz = 1 << (div->variant % 4);
+  opcode = opsz == 1 ? 0xf6 : 0xf7;
+
+  if (div->variant < 4) {
+    if (div->arg->memarg.reg == ASM_RIP) {
+      assembleriprel(&div->arg->memarg, opsz == 8, opcode, reg, opsz);
+    } else {
+      assemblemem(&div->arg->memarg, opsz == 8, opcode, reg, opsz);
+    }
+  } else {
+    mod = 0x03;
+    rm = regbits(div->arg->kind);
+    if (opsz == 2)
+      sb(0x66);
+    rex = rexbyte(isreg64(div->arg->kind), reg & (1 << 3), 0, rm & (1 << 3));
+    if (rex != rexbyte(0, 0, 0, 0))
+      sb(rex);
+    sb2(opcode, modregrm(0x03, reg, rm));
+  }
+}
+
 static void assemble(void) {
   Symbol *sym;
   Parsev *v;
@@ -667,6 +691,14 @@ static void assemble(void) {
           0x20, 0x21, 0x21, 0x21, 0x20, 0x21, 0x21, 0x21,
       };
       assemblebasicop(&v->instr2, variant2op[v->instr2.variant], 0x04);
+      break;
+    }
+    case ASM_DIV: {
+      assemblediv(&v->instr1, 0x06);
+      break;
+    }
+    case ASM_IDIV: {
+      assemblediv(&v->instr1, 0x07);
       break;
     }
     case ASM_OR: {
