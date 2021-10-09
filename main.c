@@ -320,17 +320,6 @@ static uint8_t sibbyte(uint8_t ss, uint8_t idx, uint8_t base) {
   return (((ss & 3) << 6) | ((idx & 7) << 3) | (base & 7));
 }
 
-/* Assemble op +rw | op + rd. */
-static void assembleplusr(uint8_t opcode, uint8_t rexw, AsmKind reg) {
-  uint8_t bits = regbits(reg);
-  uint8_t rex = rexbyte(rexw, 0, 0, bits & (1 << 3));
-  if (isreg16(reg))
-    sb(0x66);
-  if (rex != rexbyte(0, 0, 0, 0))
-    sb(rex);
-  sb(opcode | (bits & 7));
-}
-
 void assembleconstant(int64_t c, int nbytes) {
   switch (nbytes) {
   case 1:
@@ -350,7 +339,44 @@ void assembleconstant(int64_t c, int nbytes) {
   }
 }
 
-static void assemblemodregrm(uint8_t rexw, uint8_t opcode, uint8_t mod,
+/* The Opcode type encodes a variadic opcode.
+
+   The top byte is how many bytes we want less 1.
+
+   The encoding is chosen such that the common case is
+   just the opcode value, the multibyte case is a bit more
+   complex.
+
+   example:
+
+   02 03  encodes as 0x01000203
+*/
+typedef uint32_t Opcode;
+
+static void assembleopcode(Opcode opcode) {
+  int i, n;
+  uint8_t b, shift;
+
+  n = ((opcode & 0xff000000) >> 24);
+  for (i = n; i >= 0; i--) {
+    shift = i * 8;
+    b = (opcode & (0xff << shift)) >> shift;
+    sb(b);
+  }
+}
+
+/* Assemble op +rw | op + rd. */
+static void assembleplusr(Opcode opcode, uint8_t rexw, AsmKind reg) {
+  uint8_t bits = regbits(reg);
+  uint8_t rex = rexbyte(rexw, 0, 0, bits & (1 << 3));
+  if (isreg16(reg))
+    sb(0x66);
+  if (rex != rexbyte(0, 0, 0, 0))
+    sb(rex);
+  assembleopcode(opcode | (bits & 7));
+}
+
+static void assemblemodregrm(uint8_t rexw, Opcode opcode, uint8_t mod,
                              uint8_t reg, uint8_t rm, uint8_t opsz) {
   uint8_t rex;
 
@@ -359,7 +385,8 @@ static void assemblemodregrm(uint8_t rexw, uint8_t opcode, uint8_t mod,
   rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
   if (rex != rexbyte(0, 0, 0, 0))
     sb(rex);
-  sb2(opcode, modregrm(mod, reg, rm));
+  assembleopcode(opcode);
+  sb(modregrm(mod, reg, rm));
 }
 
 /* Assemble a symbolic value. */
@@ -379,7 +406,7 @@ static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
 }
 
 /* Assemble a r <-> (%rip) operation. */
-static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
+static void assembleriprel(Memarg *memarg, uint8_t rexw, Opcode opcode,
                            uint8_t reg, uint8_t opsz) {
 
   assemblemodregrm(rexw, opcode, 0x00, reg, 0x05, opsz);
@@ -392,7 +419,7 @@ static void assembleriprel(Memarg *memarg, uint8_t rexw, uint8_t opcode,
 }
 
 /* Assemble a r <-> mem operation.  */
-static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
+static void assemblemem(Memarg *memarg, uint8_t rexw, Opcode opcode,
                         uint8_t reg, uint8_t opsz) {
   uint8_t rex, rm, sib;
 
@@ -408,30 +435,32 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, uint8_t opcode,
   if (rex != rexbyte(0, 0, 0, 0))
     sb(rex);
 
+  assembleopcode(opcode);
+
   if (memarg->c == 0 && memarg->l == NULL) {
     /* No offset cases, uses the smallest we can. */
     if ((rm & 7) == 4) { /* Matches '(%rsp/%esp...)'. */
-      sb3(opcode, modregrm(0, reg, 4), sibbyte(0, 4, 4));
+      sb2(modregrm(0, reg, 4), sibbyte(0, 4, 4));
     } else if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
-      sb3(opcode, modregrm(1, reg, 5), 0);
+      sb2(modregrm(1, reg, 5), 0);
     } else {
-      sb2(opcode, modregrm(0, reg, rm));
+      sb(modregrm(0, reg, rm));
     }
   } else {
     /* TODO choose smaller size if not label .*/
     if ((rm & 7) == 4) { /* Matches '(%rsp/%esp...)'. */
-      sb3(opcode, modregrm(2, reg, 4), sibbyte(0, 4, 4));
+      sb2(modregrm(2, reg, 4), sibbyte(0, 4, 4));
     } else if ((rm & 7) == 5) { /* Matches '(%rbp/%ebp...)'. */
-      sb2(opcode, modregrm(2, reg, 5));
+      sb(modregrm(2, reg, 5));
     } else {
-      sb2(opcode, modregrm(2, reg, rm));
+      sb(modregrm(2, reg, rm));
     }
     assemblereloc(memarg->l, memarg->c, 4, R_X86_64_32);
   }
 }
 
 /* Assemble op + imm -> r/m. */
-static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
+static void assembleimmrm(Instr *instr, Opcode opcode, uint8_t immreg,
                           uint8_t opsz) {
   Imm *imm;
 
@@ -449,7 +478,7 @@ static void assembleimmrm(Instr *instr, uint8_t opcode, uint8_t immreg,
 }
 
 /* Assemble op + r <-> r/m. */
-static void assemblerrm(Instr *instr, uint8_t opcode, uint8_t opsz) {
+static void assemblerrm(Instr *instr, Opcode opcode, uint8_t opsz) {
   Memarg *memarg;
   AsmKind regarg;
 
@@ -469,7 +498,7 @@ static void assemblerrm(Instr *instr, uint8_t opcode, uint8_t opsz) {
 }
 
 /* Assemble a 'basic op' which is just a repeated op pattern we have named. */
-static void assemblebasicop(Instr *instr, uint8_t opcode, uint8_t immreg) {
+static void assemblebasicop(Instr *instr, Opcode opcode, uint8_t immreg) {
   Imm *imm;
   uint8_t opsz = 1 << (instr->variant % 4);
   if (instr->variant < 4) {
@@ -477,7 +506,7 @@ static void assemblebasicop(Instr *instr, uint8_t opcode, uint8_t immreg) {
       sb(0x66);
     if (instr->arg2->kind == ASM_RAX)
       sb(rexbyte(1, 0, 0, 0));
-    sb(opcode);
+    assembleopcode(opcode);
     imm = &instr->arg1->imm;
     assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   } else if (instr->variant < 12) {
@@ -503,7 +532,8 @@ static void assemblexchg(Instr *xchg) {
 
 static void assemblemov(Instr *mov) {
   Imm *imm;
-  uint8_t opcode, rex, mod, rm;
+  Opcode opcode;
+  uint8_t rex, mod, rm;
 
   static uint8_t variant2op[20] = {
       0xc6, 0xc7, 0xc7, 0xc7, 0xb0, 0xb8, 0xb8, 0xc7, 0x8a, 0x8b,
@@ -524,17 +554,17 @@ static void assemblemov(Instr *mov) {
   }
 }
 
-static void assembledivmul(Instr *div, uint8_t reg) {
-  uint8_t opcode, opsz, rex, mod, rm;
+static void assembledivmul(Instr *instr, uint8_t reg, uint8_t opsz) {
+  Opcode opcode;
+  uint8_t rex, mod, rm;
 
-  opsz = 1 << (div->variant % 4);
   opcode = opsz == 1 ? 0xf6 : 0xf7;
 
-  if (div->variant < 4) {
-    assemblemem(&div->arg1->memarg, opsz == 8, opcode, reg, opsz);
+  if (instr->variant < 4) {
+    assemblemem(&instr->arg1->memarg, opsz == 8, opcode, reg, opsz);
   } else {
-    assemblemodregrm(isreg64(div->arg1->kind), opcode, 0x03, reg,
-                     regbits(div->arg1->kind), opsz);
+    assemblemodregrm(isreg64(instr->arg1->kind), opcode, 0x03, reg,
+                     regbits(instr->arg1->kind), opsz);
   }
 }
 
@@ -680,22 +710,37 @@ static void assemble(void) {
       break;
     }
     case ASM_DIV: {
-      assembledivmul(&v->instr, 0x06);
+      uint8_t opsz;
+      opsz = 1 << (v->instr.variant % 4);
+      assembledivmul(&v->instr, 0x06, opsz);
       break;
     }
     case ASM_IDIV: {
-      assembledivmul(&v->instr, 0x07);
+      uint8_t opsz;
+      opsz = 1 << (v->instr.variant % 4);
+      assembledivmul(&v->instr, 0x07, opsz);
       break;
     }
     case ASM_MUL: {
-      assembledivmul(&v->instr, 0x04);
+      uint8_t opsz;
+      opsz = 1 << (v->instr.variant % 4);
+      assembledivmul(&v->instr, 0x04, opsz);
       break;
     }
     case ASM_IMUL: {
+      Opcode opcode;
+      uint8_t opsz;
+
       if (v->instr.variant < 8) {
-        assembledivmul(&v->instr, 0x05);
+        uint8_t opsz;
+        opsz = 1 << (v->instr.variant % 4);
+        assembledivmul(&v->instr, 0x05, opsz);
+      } else if (v->instr.variant < 14) {
+        opcode = 0x01000faf; // 0f af variable length opcode.
+        opsz = 1 << (1 + ((v->instr.variant - 8) % 3));
+        assemblerrm(&v->instr, opcode, opsz);
       } else {
-        fatal("TODO...");
+        unreachable();
       }
       break;
     }

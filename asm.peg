@@ -97,7 +97,7 @@ lea =
   ) { $$.instr.kind = ASM_LEA; }
 
 div = "div" (
-    args:divmul-opargs { $$ = args; }
+   args:divmul-opargs { $$ = args; }
 )  { $$.instr.kind = ASM_DIV; }
 
 idiv = "idiv" (
@@ -105,18 +105,26 @@ idiv = "idiv" (
 )  { $$.instr.kind = ASM_IDIV; }
 
 mul = "mul" (
-    args:divmul-opargs { $$ = args; }
+  args:divmul-opargs { $$ = args; }
 )  { $$.instr.kind = ASM_MUL; }
 
 imul = "imul" (
-    args:divmul-opargs { $$ = args; }
+    (
+        'w'? ws s:m   ws? ',' ws? d:r16 { $$ = INSTR2(8, s, d); }
+      | 'l'? ws s:m   ws? ',' ws? d:r32 { $$ = INSTR2(9, s, d); }
+      | 'q'? ws s:m   ws? ',' ws? d:r64 { $$ = INSTR2(10, s, d); }
+      | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = INSTR2(11, s, d); }
+      | 'l'? ws s:r32 ws? ',' ws? d:r32 { $$ = INSTR2(12, s, d); }
+      | 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = INSTR2(13, s, d); }
+    )
+    | args:divmul-opargs { $$ = args; } # Must come last due to peg ordering.
 )  { $$.instr.kind = ASM_IMUL; }
 
 divmul-opargs = 
-    'b'   ws a:m  { $$ = INSTR1(0, a); }
-  | 'w'   ws a:m  { $$ = INSTR1(1, a); }
-  | 'l'   ws a:m  { $$ = INSTR1(2, a); }
-  | 'q'   ws a:m  { $$ = INSTR1(3, a); }
+    'b'  ws a:m  { $$ = INSTR1(0, a); }
+  | 'w'  ws a:m  { $$ = INSTR1(1, a); }
+  | 'l'  ws a:m  { $$ = INSTR1(2, a); }
+  | 'q'  ws a:m  { $$ = INSTR1(3, a); }
   | 'b'? ws a:r8  { $$ = INSTR1(4, a); }
   | 'w'? ws a:r16 { $$ = INSTR1(5, a); }
   | 'l'? ws a:r32 { $$ = INSTR1(6, a); }
