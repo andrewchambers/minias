@@ -70,6 +70,8 @@ instr =
   | i:lea   { $$ = i; }
   | i:mul   { $$ = i; }
   | i:imul  { $$ = i; }
+  | i:movsx { $$ = i; }
+  | i:movzx { $$ = i; }
   | i:mov   { $$ = i; }
   | i:or    { $$ = i; }
   | i:set   { $$ = i; }
@@ -233,7 +235,27 @@ r-rm-opargs =
 mov = "mov" (
     args:imm-rm-opargs { $$ = args; }
   | args:r-rm-opargs { args.instr.variant += 8; $$ = args; }
-)  { $$.instr.kind = ASM_MOV; }
+) { $$.instr.kind = ASM_MOV; }
+
+movsx = "movs" (
+       args:mov-extend-opargs { $$ = args; }
+     | 'lq' ws s:m ws? ',' ws? d:r64 { $$ = INSTR2(10, s, d); }
+     | 'lq' ws s:r32 ws? ',' ws? d:r64 { $$ = INSTR2(10, s, d); }
+) { $$.instr.kind = ASM_MOVSX; }
+
+movzx = "movz" args:mov-extend-opargs { $$ = args; $$.instr.kind = ASM_MOVZX; }
+
+mov-extend-opargs =
+    'bw' ws s:m  ws?  ',' ws? d:r16 { $$ = INSTR2(0, s, d); }
+  | 'bl' ws s:m  ws?  ',' ws? d:r32 { $$ = INSTR2(1, s, d); }
+  | 'bq' ws s:m  ws?  ',' ws? d:r64 { $$ = INSTR2(2, s, d); }
+  | 'wl' ws s:m  ws?  ',' ws? d:r32 { $$ = INSTR2(3, s, d); }
+  | 'wq' ws s:m  ws?  ',' ws? d:r64 { $$ = INSTR2(4, s, d); }
+  | 'bw' ws s:r8 ws?  ',' ws? d:r16 { $$ = INSTR2(5, s, d); }
+  | 'bl' ws s:r8 ws?  ',' ws? d:r32 { $$ = INSTR2(6, s, d); }
+  | 'bq' ws s:r8 ws?  ',' ws? d:r64 { $$ = INSTR2(7, s, d); }
+  | 'wl' ws s:r16 ws? ',' ws? d:r32 { $$ = INSTR2(8, s, d); }
+  | 'wq' ws s:r16 ws? ',' ws? d:r64 { $$ = INSTR2(9, s, d); }
 
 xchg = 
   'xchg' (
@@ -249,7 +271,7 @@ xchg =
 add = "cmp" a:basic-op-args { a.instr.kind = ASM_CMP; $$ = a; }
 cmp = "add" a:basic-op-args { a.instr.kind = ASM_ADD; $$ = a; }
 and = "and" a:basic-op-args { a.instr.kind = ASM_AND; $$ = a; }
-or  = "or"  a:basic-op-args { a.instr.kind = ASM_OR; $$ = a; }
+or  = "or"  a:basic-op-args { a.instr.kind = ASM_OR;  $$ = a; }
 sub = "sub" a:basic-op-args { a.instr.kind = ASM_SUB; $$ = a; }
 xor = "xor" a:basic-op-args { a.instr.kind = ASM_XOR; $$ = a; }
 

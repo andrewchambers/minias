@@ -30,6 +30,29 @@ t () {
   echo -n "."
 }
 
+for x in s z
+do
+  t "mov${x}bw %al, %ax"
+  t "mov${x}bl %al, %eax"
+  t "mov${x}bq %al, %rax"
+  t "mov${x}wl %ax, %eax"
+  t "mov${x}wq %ax, %rax"
+  if test "$x" = s
+  then
+    t "mov${x}lq %eax, %rax"
+  fi
+  t "mov${x}bw (%rax), %ax"
+  t "mov${x}bl (%rax), %eax"
+  t "mov${x}bq (%rax), %rax"
+  t "mov${x}wl (%rax), %eax"
+  t "mov${x}wq (%rax), %rax"
+  if test "$x" = s
+  then
+    t "mov${x}lq (%rax), %rax"
+  fi
+done
+
+
 t "ret"
 t "cltd"
 t "cqto"

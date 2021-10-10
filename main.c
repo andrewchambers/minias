@@ -504,9 +504,8 @@ static void assemblerrm(Instr *instr, Opcode opcode, uint8_t opsz) {
     regarg = instr->arg1->kind;
     assemblemem(memarg, isreg64(regarg), opcode, regbits(regarg), opsz);
   } else {
-    assemblemodregrm(isreg64(instr->arg1->kind), opcode, 0x03,
-                     regbits(instr->arg1->kind), regbits(instr->arg2->kind),
-                     opsz);
+    assemblemodregrm(opsz == 8, opcode, 0x03, regbits(instr->arg1->kind),
+                     regbits(instr->arg2->kind), opsz);
   }
 }
 
@@ -565,6 +564,13 @@ static void assemblemov(Instr *mov) {
     uint8_t opsz = 1 << (mov->variant % 4);
     assemblerrm(mov, opcode, opsz);
   }
+}
+
+static void assemblemovextend(Instr *mov, Opcode opcode) {
+  uint8_t opsz;
+  static uint8_t variant2opsz[12] = {2, 4, 8, 4, 8, 2, 4, 8, 4, 8, 8, 8};
+  opsz = variant2opsz[mov->variant];
+  assemblerrm(mov, opcode, opsz);
 }
 
 static void assembledivmul(Instr *instr, uint8_t reg) {
@@ -742,6 +748,26 @@ static void assemble(void) {
     case ASM_MOV:
       assemblemov(&v->instr);
       break;
+    case ASM_MOVSX: {
+      Opcode opcode;
+      if (v->instr.variant >= 10) {
+        opcode = 0x63; // movsxd
+      } else {
+        static uint8_t variant2op[10] = {0xbe, 0xbe, 0xbe, 0xbf, 0xbf,
+                                         0xbe, 0xbe, 0xbe, 0xbf, 0xbf};
+        opcode = 0x01000f00 | variant2op[v->instr.variant];
+      }
+      assemblemovextend(&v->instr, opcode);
+      break;
+    }
+    case ASM_MOVZX: {
+      Opcode opcode;
+      static uint8_t variant2op[10] = {0xb6, 0xb6, 0xb6, 0xb7, 0xb7,
+                                       0xb6, 0xb6, 0xb6, 0xb7, 0xb7};
+      opcode = 0x01000f00 | variant2op[v->instr.variant];
+      assemblemovextend(&v->instr, opcode);
+      break;
+    }
     case ASM_ADD: {
       static uint8_t variant2op[24] = {
           0x04, 0x05, 0x05, 0x05, 0x80, 0x81, 0x81, 0x81,
