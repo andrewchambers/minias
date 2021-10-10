@@ -31,27 +31,32 @@ t () {
 }
 
 
-t "lea (%rsp), %rax"
-t "lea (%rbp), %rax"
-t "lea (%rax), %rax"
-t "lea 2147483647(%rsp), %rax"
-t "lea 2147483647(%rbp), %rax"
-t "lea 2147483647(%rax), %rax"
 
-t "lea (%r9, %r10), %rax"
-t "lea (%rsp, %rax), %rax"
-t "lea (%rbp, %rax), %rax"
-t "lea (%rax, %rax), %rax"
-t "lea 2147483647(%rsp, %rax), %rax"
-t "lea 2147483647(%rbp, %rax), %rax"
-t "lea 2147483647(%rax, %rax), %rax"
+for r in a b
+do
+  t "lea (%rsp), %r${r}x"
+  t "lea (%rbp), %r${r}x"
+  t "lea (%r${r}x), %r${r}x"
+  t "lea 2147483647(%rsp), %r${r}x"
+  t "lea 2147483647(%rbp), %r${r}x"
+  t "lea 2147483647(%r${r}x), %r${r}x"
 
-t "lea (%rsp, %rax, 4), %rax"
-t "lea (%rbp, %rax, 4), %rax"
-t "lea (%rax, %rax, 4), %rax"
-t "lea 2147483647(%rsp, %rax, 4), %rax"
-t "lea 2147483647(%rbp, %rax, 4), %rax"
-t "lea 2147483647(%rax, %rax, 4), %rax"
+  t "lea (%r9, %r10), %r${r}x"
+  t "lea (%rsp, %r${r}x), %r${r}x"
+  t "lea (%rbp, %r${r}x), %r${r}x"
+  t "lea (%r${r}x, %r${r}x), %r${r}x"
+  t "lea 2147483647(%rsp, %r${r}x), %r${r}x"
+  t "lea 2147483647(%rbp, %r${r}x), %r${r}x"
+  t "lea 2147483647(%r${r}x, %r${r}x), %r${r}x"
+
+  t "lea (%rsp, %r${r}x, 4), %r${r}x"
+  t "lea (%rbp, %r${r}x, 4), %r${r}x"
+  t "lea (%r${r}x, %r${r}x, 4), %r${r}x"
+  t "lea 2147483647(%rsp, %r${r}x, 4), %r${r}x"
+  t "lea 2147483647(%rbp, %r${r}x, 4), %r${r}x"
+  t "lea 2147483647(%r${r}x, %r${r}x, 4), %r${r}x"
+done
+
 
 t "ret"
 t "cltd"
@@ -170,14 +175,6 @@ do
   t "xchg (%r${r}x), %e${r}x"
   t "xchg (%r${r}x), %${r}x"
   t "xchg (%r${r}x), %${r}l"
-done
-
-
-for r in a b
-  do
-  t "leaq (%r${r}x), %r${r}x"
-  t "leal (%r${r}x), %e${r}x"
-  t "leaw (%r${r}x), %${r}x"
 done
 
 for op in mov add and cmp or sub xor test
