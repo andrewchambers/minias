@@ -673,8 +673,16 @@ static void assemble(void) {
       Symbol *sym;
       Relocation *reloc;
 
-      sb(0xe9);
-      assemblereloc(v->call.target, -4, 4, R_X86_64_PC32);
+      static uint8_t variant2op[32] = {
+          0xe9, 0x87, 0x83, 0x82, 0x86, 0x82, 0x84, 0x84, 0x8f, 0x8d, 0x8c,
+          0x8e, 0x86, 0x82, 0x83, 0x87, 0x83, 0x85, 0x8e, 0x8c, 0x8d, 0x8f,
+          0x81, 0x8b, 0x89, 0x85, 0x80, 0x8a, 0x8a, 0x8b, 0x88, 0x84,
+      };
+      if (v->jmp.variant)
+        sb(0x0f);
+      sb(variant2op[v->jmp.variant]);
+
+      assemblereloc(v->jmp.target, -4, 4, R_X86_64_PC32);
       break;
     }
     case ASM_PUSH:
@@ -724,6 +732,15 @@ static void assemble(void) {
           0x20, 0x21, 0x21, 0x21, 0x20, 0x21, 0x21, 0x21,
       };
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x04);
+      break;
+    }
+    case ASM_CMP: {
+      static uint8_t variant2op[24] = {
+          0x3c, 0x3d, 0x3d, 0x3d, 0x80, 0x81, 0x81, 0x81,
+          0x80, 0x81, 0x81, 0x81, 0x3a, 0x3b, 0x3b, 0x3b,
+          0x38, 0x39, 0x39, 0x39, 0x38, 0x39, 0x39, 0x39,
+      };
+      assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x07);
       break;
     }
     case ASM_DIV:
@@ -860,7 +877,7 @@ static void fillsymtab(void) {
 static void resolvereloc(Relocation *reloc) {
   Symbol *sym;
   uint8_t *rdata;
-  int32_t addend, value;
+  int64_t addend, value;
 
   sym = reloc->sym;
 
@@ -869,14 +886,22 @@ static void resolvereloc(Relocation *reloc) {
     rdata = &reloc->section->data[reloc->offset];
     addend = (int32_t)rdata[0] | (int32_t)(rdata[1] << 8) |
              (int32_t)(rdata[2] << 16) | (int32_t)(rdata[3] << 24);
-    value = sym->offset - (int32_t)reloc->offset + addend;
+    value = sym->offset - reloc->offset + addend;
     rdata[0] = ((uint32_t)value & 0xff);
     rdata[1] = ((uint32_t)value & 0xff00) >> 8;
     rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
     rdata[3] = ((uint32_t)value & 0xff000000) >> 24;
     break;
-  case R_X86_64_PC32:
-    fatal("TODO local R_X86_64_PC32");
+  }
+  case R_X86_64_PC32: {
+    rdata = &reloc->section->data[reloc->offset];
+    addend = (int32_t)rdata[0] | (int32_t)(rdata[1] << 8) |
+             (int32_t)(rdata[2] << 16) | (int32_t)(rdata[3] << 24);
+    value = sym->offset - reloc->offset + addend;
+    rdata[0] = ((uint32_t)value & 0xff);
+    rdata[1] = ((uint32_t)value & 0xff00) >> 8;
+    rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
+    rdata[3] = ((uint32_t)value & 0xff000000) >> 24;
     break;
   }
   default:

@@ -64,6 +64,7 @@ typedef enum {
   ASM_LEAVE,
   ASM_ADD,
   ASM_AND,
+  ASM_CMP,
   ASM_DIV,
   ASM_IDIV,
   ASM_LEA,
@@ -215,6 +216,7 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
+  uint8_t variant;
   const char *target;
 } Jmp;
 

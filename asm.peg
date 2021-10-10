@@ -58,6 +58,7 @@ instr =
   | i:jmp   { $$ = i; }
   | i:add   { $$ = i; }
   | i:and   { $$ = i; }
+  | i:cmp   { $$ = i; }
   | i:div   { $$ = i; }
   | i:idiv  { $$ = i; }
   | i:lea   { $$ = i; }
@@ -89,9 +90,41 @@ call =
   "call" 'q'? ws t:ident 
   { $$.call = (Call){ .kind = ASM_CALL, .target=t.charptr } ; }
 
-jmp = 
-  "jmp" ws t:ident 
-  { $$.jmp = (Jmp){ .kind = ASM_JMP, .target=t.charptr } ; }
+jmp = 'j' v:jmp-variant ws t:ident
+    { $$.jmp = (Jmp) {.kind = ASM_JMP, .variant=v.i64, .target=t.charptr}; }
+jmp-variant =
+      "mp"  { $$.i64 = 0; }
+    | "a"   { $$.i64 = 1; }
+    | "ae"  { $$.i64 = 2; }
+    | "b"   { $$.i64 = 3; }
+    | "be"  { $$.i64 = 4; }
+    | "c"   { $$.i64 = 5; }
+    | "e"   { $$.i64 = 6; }
+    | "z"   { $$.i64 = 7; }
+    | "g"   { $$.i64 = 8; }
+    | "ge"  { $$.i64 = 9; }
+    | "l"   { $$.i64 = 10; }
+    | "le"  { $$.i64 = 11; }
+    | "na"  { $$.i64 = 12; }
+    | "nae" { $$.i64 = 13; }
+    | "nb"  { $$.i64 = 14; }
+    | "nbe" { $$.i64 = 15; }
+    | "nc"  { $$.i64 = 16; }
+    | "ne"  { $$.i64 = 17; }
+    | "ng"  { $$.i64 = 18; }
+    | "nge" { $$.i64 = 19; }
+    | "nl"  { $$.i64 = 20; }
+    | "nle" { $$.i64 = 21; }
+    | "no"  { $$.i64 = 22; }
+    | "np"  { $$.i64 = 23; }
+    | "ns"  { $$.i64 = 24; }
+    | "nz"  { $$.i64 = 25; }
+    | "o"   { $$.i64 = 26; }
+    | "p"   { $$.i64 = 27; }
+    | "pe"  { $$.i64 = 28; }
+    | "po"  { $$.i64 = 29; }
+    | "s"   { $$.i64 = 30; }
+    | "z"   { $$.i64 = 31; }
 
 lea = 
   "lea" (
@@ -181,7 +214,8 @@ xchg =
     | args:r-rm-opargs { args.instr.variant += 6; $$ = args; }
   ) { $$.instr.kind = ASM_XCHG; }
 
-add = "add" a:basic-op-args { a.instr.kind = ASM_ADD; $$ = a; }
+add = "cmp" a:basic-op-args { a.instr.kind = ASM_CMP; $$ = a; }
+cmp = "add" a:basic-op-args { a.instr.kind = ASM_ADD; $$ = a; }
 and = "and" a:basic-op-args { a.instr.kind = ASM_AND; $$ = a; }
 or  = "or"  a:basic-op-args { a.instr.kind = ASM_OR; $$ = a; }
 sub = "sub" a:basic-op-args { a.instr.kind = ASM_SUB; $$ = a; }

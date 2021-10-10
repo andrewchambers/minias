@@ -32,18 +32,18 @@ t () {
 
 for op in sal sar shl shr
 do
-t "${op} \$3, %rax"
-t "${op} %cl, %rax"
-t "${op} \$3, %eax"
-t "${op} %cl, %eax"
-t "${op} \$3, %ax"
-t "${op} %cl, %ax"
-t "${op}w \$3, (%rax)"
-t "${op}w %cl, (%rax)"
-t "${op}l \$3, (%rax)"
-t "${op}l %cl, (%rax)"
-t "${op}q \$3, (%rax)"
-t "${op}q %cl, (%rax)"
+  t "${op} \$3, %rax"
+  t "${op} %cl, %rax"
+  t "${op} \$3, %eax"
+  t "${op} %cl, %eax"
+  t "${op} \$3, %ax"
+  t "${op} %cl, %ax"
+  t "${op}w \$3, (%rax)"
+  t "${op}w %cl, (%rax)"
+  t "${op}l \$3, (%rax)"
+  t "${op}l %cl, (%rax)"
+  t "${op}q \$3, (%rax)"
+  t "${op}q %cl, (%rax)"
 done
 
 t "div %rax"
@@ -114,7 +114,7 @@ for r in a b
   t "leaw (%r${r}x), %${r}x"
 done
 
-for op in mov add and or sub xor
+for op in mov add and cmp or sub xor
 do
   # rip relative
   t "${op}b \$127, (%rip)"
@@ -170,8 +170,8 @@ t () {
   clang "$tmpo" -o "$tmpb"
   if !"$tmpb" 1>&2 2>/dev/null
   then
-  	echo "$t failed"
-  	exit 1
+    echo "$t failed"
+    exit 1
   fi
   echo -n "."
 }
