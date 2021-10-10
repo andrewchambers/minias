@@ -216,7 +216,7 @@ do
     t "${op}l %e${r}x, %eax"
     t "${op}q %r${r}x, %rax"
 
-    if test "$op" = "test" # m -> variants are not supported by test
+    if test "$op" = "test" # m -> r variants are not supported by test
     then
       continue
     fi

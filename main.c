@@ -500,12 +500,8 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, Opcode opcode,
   }
 
   /* If our base is a bp register, we must use the index instead. */
-  if ((base & 7) == 5) {
-    if (memarg->index == ASM_NO_REG) {
-      index = base;
-    } else {
-      // lfatal("bp cannot be used as an addressing base");
-    }
+  if ((base & 7) == 5 && memarg->index == ASM_NO_REG) {
+    index = base;
   }
 
   switch (memarg->scale) {
