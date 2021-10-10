@@ -249,7 +249,7 @@ mov = "mov" (
 movsx = "movs" (
        args:mov-extend-opargs { $$ = args; }
      | 'lq' ws s:m ws? ',' ws? d:r64 { $$ = INSTR2(10, s, d); }
-     | 'lq' ws s:r32 ws? ',' ws? d:r64 { $$ = INSTR2(10, s, d); }
+     | 'lq' ws s:r32 ws? ',' ws? d:r64 { $$ = INSTR2(11, s, d); }
 ) { $$.instr.kind = ASM_MOVSX; }
 
 movzx = "movz" args:mov-extend-opargs { $$ = args; $$.instr.kind = ASM_MOVZX; }

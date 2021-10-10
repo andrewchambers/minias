@@ -299,7 +299,7 @@ static void su64(uint32_t l) {
   uint8_t buf[8] = {
       l & 0xff,
       (l & 0xff00) >> 8,
-      (l & 0xff00) >> 16,
+      (l & 0xff0000) >> 16,
       (l & 0xff000000) >> 24,
       (l & 0xff00000000) >> 32,
       (l & 0xff0000000000) >> 40,
