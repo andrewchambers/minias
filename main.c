@@ -136,12 +136,14 @@ static void initsections(void) {
   text->hdr.sh_addralign = 4;
 
   textrel = newsection();
+  textrel->hdr.sh_name = elfstr(shstrtab, ".rela.text");
   textrel->hdr.sh_type = SHT_RELA;
   textrel->hdr.sh_info = text->idx;
   textrel->hdr.sh_link = symtab->idx;
   textrel->hdr.sh_entsize = sizeof(Elf64_Rela);
 
   datarel = newsection();
+  datarel->hdr.sh_name = elfstr(shstrtab, ".rela.data");
   datarel->hdr.sh_type = SHT_RELA;
   datarel->hdr.sh_info = data->idx;
   datarel->hdr.sh_link = symtab->idx;
