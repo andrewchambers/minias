@@ -161,6 +161,7 @@ typedef enum {
   
   /* RIP is in a special class of its own. */
   ASM_RIP,
+  ASM_NO_REG,
 
   ASM_REG_END,
 } AsmKind;
@@ -213,7 +214,9 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
-  AsmKind reg;
+  AsmKind base;
+  AsmKind index;
+  uint8_t scale;
   const char *l; /* label */
   int64_t c;     /* constant */
 } Memarg;

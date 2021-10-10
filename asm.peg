@@ -336,21 +336,30 @@ r64-or-rip = (
   | r:rip
 ) { $$ = r; }
 
+scale-index-base = 
+     '(' ws? b:r64 ws? ',' ws? i:r64 ws? ',' ws? s:number ws? ')'
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = s.i64, .index=i.kind, .base = b.kind, .c = 0, .l = NULL  }; }
+   | '(' ws? b:r64 ws? ',' ws? i:r64 ')'
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 1, .index=i.kind, .base = b.kind, .c = 0, .l = NULL  }; }
+   | '(' ws? b:r64-or-rip ws? ')'
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 0, .index=ASM_NO_REG, .base = b.kind, .c = 0, .l = NULL  }; }
+
+# XXX There are more addressing modes.
 m = 
-    '(' ws? r:r64-or-rip ws? ')'
-    {  $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = NULL, .reg = r.kind  }; }
-  | <'-'?[0-9]+> ws? '(' ws? r:r64-or-rip ws? ')'
-    { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = strtoll(yytext, NULL, 10), .l = NULL, .reg = r.kind  }; }
-  | i:ident ws? '(' ws? r:r64-or-rip ws? ')'
-    { $$.memarg = (Memarg){ .kind = ASM_MEMARG, .c = 0, .l = i.charptr, .reg = r.kind  }; }
+    sib:scale-index-base
+    { $$ = sib; }
+  | disp:number ws? sib:scale-index-base
+    { sib.memarg.c = disp.i64; $$ = sib; }
+  | i:ident ws? sib:scale-index-base
+    { sib.memarg.l = i.charptr; $$ = sib; }
 
 imm8 = i:imm { i.imm.nbytes = 1; $$ = i; }
 imm16 = i:imm { i.imm.nbytes = 2; $$ = i; }
 imm32 = i:imm { i.imm.nbytes = 4; $$ = i; }
 
 imm =
-  '$' ws? <'-'?[0-9]+>
-  { $$.imm = (Imm){ .kind = ASM_IMM, .c = strtoll(yytext, NULL, 10), .l = NULL, .nbytes = 0}; }
+  '$' ws? n:number
+  { $$.imm = (Imm){ .kind = ASM_IMM, .c = n.i64, .l = NULL, .nbytes = 0}; }
 
 al = "%al" { $$ = REG(ASM_AL); }
 cl = "%cl" { $$ = REG(ASM_CL); }
