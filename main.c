@@ -136,16 +136,16 @@ static void initsections(void) {
   text->hdr.sh_addralign = 4;
 
   textrel = newsection();
-  textrel->hdr.sh_type = SHT_REL;
+  textrel->hdr.sh_type = SHT_RELA;
   textrel->hdr.sh_info = text->idx;
   textrel->hdr.sh_link = symtab->idx;
-  textrel->hdr.sh_entsize = sizeof(Elf64_Rel);
+  textrel->hdr.sh_entsize = sizeof(Elf64_Rela);
 
   datarel = newsection();
-  datarel->hdr.sh_type = SHT_REL;
+  datarel->hdr.sh_type = SHT_RELA;
   datarel->hdr.sh_info = data->idx;
   datarel->hdr.sh_link = symtab->idx;
-  datarel->hdr.sh_entsize = sizeof(Elf64_Rel);
+  datarel->hdr.sh_entsize = sizeof(Elf64_Rela);
 }
 
 Relocation *newreloc() {
@@ -415,6 +415,8 @@ static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
     reloc->section = cursection;
     reloc->sym = sym;
     reloc->offset = cursection->hdr.sh_size;
+    reloc->addend = c;
+    c = 0;
   }
   assembleconstant(c, nbytes);
 }
@@ -1035,9 +1037,7 @@ static void resolvereloc(Relocation *reloc) {
   switch (reloc->type) {
   case R_X86_64_32: {
     rdata = &reloc->section->data[reloc->offset];
-    addend = (int32_t)rdata[0] | (int32_t)(rdata[1] << 8) |
-             (int32_t)(rdata[2] << 16) | (int32_t)(rdata[3] << 24);
-    value = sym->offset - reloc->offset + addend;
+    value = sym->offset - reloc->offset + reloc->addend;
     rdata[0] = ((uint32_t)value & 0xff);
     rdata[1] = ((uint32_t)value & 0xff00) >> 8;
     rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
@@ -1046,9 +1046,7 @@ static void resolvereloc(Relocation *reloc) {
   }
   case R_X86_64_PC32: {
     rdata = &reloc->section->data[reloc->offset];
-    addend = (int32_t)rdata[0] | (int32_t)(rdata[1] << 8) |
-             (int32_t)(rdata[2] << 16) | (int32_t)(rdata[3] << 24);
-    value = sym->offset - reloc->offset + addend;
+    value = sym->offset - reloc->offset + reloc->addend;
     rdata[0] = ((uint32_t)value & 0xff);
     rdata[1] = ((uint32_t)value & 0xff00) >> 8;
     rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
@@ -1063,7 +1061,7 @@ static void resolvereloc(Relocation *reloc) {
 static void appendreloc(Relocation *reloc) {
   Symbol *sym;
   Section *relsection;
-  Elf64_Rel elfrel;
+  Elf64_Rela elfrel;
 
   memset(&elfrel, 0, sizeof(elfrel));
 
@@ -1080,6 +1078,7 @@ static void appendreloc(Relocation *reloc) {
   case R_X86_64_32:
     elfrel.r_info = ELF64_R_INFO(sym->idx, reloc->type);
     elfrel.r_offset = reloc->offset;
+    elfrel.r_addend = reloc->addend;
     break;
   default:
     unreachable();
