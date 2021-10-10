@@ -71,6 +71,7 @@ instr =
   | i:sar   { $$ = i; }
   | i:shl   { $$ = i; }
   | i:shr   { $$ = i; }
+  | i:test  { $$ = i; }
   | i:xchg  { $$ = i; }
   | i:xor   { $$ = i; }
 
@@ -153,7 +154,6 @@ imul = "imul" (
       | 'w'? ws s:r16   ws? ',' ws? d:r16 { $$ = INSTR2(11, s, d); }
       | 'l'? ws s:r32   ws? ',' ws? d:r32 { $$ = INSTR2(12, s, d); }
       | 'q'? ws s:r64   ws? ',' ws? d:r64 { $$ = INSTR2(13, s, d); }
-
       | 'w'? ws i:imm16 ',' ws? s:m   ws? ',' ws? d:r16 { $$ = INSTR3(14, s, d, i); }
       | 'l'? ws i:imm32 ',' ws? s:m   ws? ',' ws? d:r32 { $$ = INSTR3(15, s, d, i); }
       | 'q'? ws i:imm32 ',' ws? s:m   ws? ',' ws? d:r64 { $$ = INSTR3(16, s, d, i); }
@@ -239,6 +239,7 @@ shr =
   'shr' args:shift-args {$$ = args; $$.instr.kind = ASM_SHR}
 
 shift-args =
+    # There are some more specific variants we could add.
     'w'  ws c:cl ws? ',' ws? d:m { $$ = INSTR2(0, c, d); }
   | 'l'  ws c:cl ws? ',' ws? d:m { $$ = INSTR2(1, c, d); }
   | 'q'  ws c:cl ws? ',' ws? d:m { $$ = INSTR2(2, c, d); }
@@ -252,6 +253,22 @@ shift-args =
   | 'l'? ws i:imm8 ws? ',' ws? d:r32 { $$ = INSTR2(10, i, d); }
   | 'q'? ws i:imm8 ws? ',' ws? d:r64 { $$ = INSTR2(11, i, d); }
 
+test = "test" (
+   # There are some more specific variants we could add.
+    'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = INSTR2(0, s, d); }
+  | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = INSTR2(1, s, d); }
+  | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = INSTR2(2, s, d); }
+  | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = INSTR2(3, s, d); }
+  |  args:imm-rm-opargs { args.instr.variant += 4; $$ = args; }
+  | 'b'? ws s:r8  ws? ',' ws? d:m   { $$ = INSTR2(12, s, d); }
+  | 'w'? ws s:r16 ws? ',' ws? d:m   { $$ = INSTR2(13, s, d); }
+  | 'l'? ws s:r32 ws? ',' ws? d:m   { $$ = INSTR2(14, s, d); }
+  | 'q'? ws s:r64 ws? ',' ws? d:m   { $$ = INSTR2(15, s, d); }
+  | 'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = INSTR2(16, s, d); }
+  | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = INSTR2(17, s, d); }
+  | 'l'? ws s:r32 ws? ',' ws? d:r32 { $$ = INSTR2(18, s, d); }
+  | 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = INSTR2(19, s, d); }
+) { $$.instr.kind = ASM_TEST; }
 
 r64-or-rip = (
     r:r64 

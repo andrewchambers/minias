@@ -800,6 +800,24 @@ static void assemble(void) {
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x05);
       break;
     }
+    case ASM_TEST: {
+      uint8_t opsz = 1 << (v->instr.variant % 4);
+      if (v->instr.variant < 4) {
+        Imm *imm;
+        if (opsz == 2)
+          sb(0x66);
+        if (v->instr.arg2->kind == ASM_RAX)
+          sb(rexbyte(1, 0, 0, 0));
+        assembleopcode((opsz == 1) ? 0xa8 : 0xa9);
+        imm = &v->instr.arg1->imm;
+        assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
+      } else if (v->instr.variant < 12) {
+        assembleimmrm(&v->instr, (opsz == 1) ? 0xf6 : 0xf7, 0, opsz);
+      } else {
+        assemblerrm(&v->instr, (opsz == 1) ? 0x84 : 0x85, opsz);
+      }
+      break;
+    }
     case ASM_XOR: {
       static uint8_t variant2op[24] = {
           0x34, 0x35, 0x35, 0x35, 0x80, 0x81, 0x81, 0x81,

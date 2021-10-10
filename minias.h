@@ -79,6 +79,7 @@ typedef enum {
   ASM_SHL,
   ASM_SHR,
   ASM_SUB,
+  ASM_TEST,
   ASM_XCHG,
   ASM_XOR,
   // Registers, order matters.

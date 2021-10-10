@@ -114,7 +114,7 @@ for r in a b
   t "leaw (%r${r}x), %${r}x"
 done
 
-for op in mov add and cmp or sub xor
+for op in mov add and cmp or sub xor test
 do
   # rip relative
   t "${op}b \$127, (%rip)"
@@ -126,7 +126,7 @@ do
 
   for r in a b
   do
-    # immediate variants.
+    # immediate variants
     t "${op}b \$127, (%r${r}x)"
     t "${op}w \$32767, (%r${r}x)"
     t "${op}l \$2147483647, (%r${r}x)"
@@ -136,16 +136,7 @@ do
     t "${op}l \$2147483647, %e${r}x"
     t "${op}q \$2147483647, %r${r}x"
 
-    # r rm variants
-    t "${op}b (%rip), %${r}l"
-    t "${op}b (%rax), %${r}l"
-    t "${op}b (%rax), %${r}l"
-    t "${op}w (%rax), %${r}x"
-    t "${op}l (%rax), %e${r}x"
-    t "${op}q (%rax), %r${r}x"
-    t "${op}q (%rbp), %r${r}x"
-    t "${op}q (%r8), %r${r}x"
-    t "${op}q (%r13), %r${r}x"
+    # r -> m variants
     t "${op}b %${r}l, (%rip)"
     t "${op}b %${r}l, (%rax)"
     t "${op}w %${r}x, (%rax)"
@@ -158,6 +149,22 @@ do
     t "${op}w %${r}x, %ax"
     t "${op}l %e${r}x, %eax"
     t "${op}q %r${r}x, %rax"
+
+    if test "$op" = "test" # m -> variants are not supported by test
+    then
+      continue
+    fi
+
+    # m -> r variants    
+    t "${op}b (%rip), %${r}l"
+    t "${op}b (%rax), %${r}l"
+    t "${op}b (%rax), %${r}l"
+    t "${op}w (%rax), %${r}x"
+    t "${op}l (%rax), %e${r}x"
+    t "${op}q (%rax), %r${r}x"
+    t "${op}q (%rbp), %r${r}x"
+    t "${op}q (%r8), %r${r}x"
+    t "${op}q (%r13), %r${r}x"
   done
 done
 
