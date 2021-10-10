@@ -77,6 +77,7 @@ typedef enum {
   ASM_MOV,
   ASM_MOVSX,
   ASM_MOVZX,
+  ASM_NEG,
   ASM_OR,
   ASM_SAL,
   ASM_SAR,

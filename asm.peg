@@ -4,7 +4,10 @@ line  =
     | eol { yy->v.kind = ASM_BLANK; }
     | . { yy->v.kind = ASM_SYNTAX_ERROR; }
 
-ws = [ \t]+
+ws = 
+    [ \t]+
+  | "/*" (! "*/" . )* "*/" # XXX multiline comments break our line numbers.
+
 eol = ws? "\n"
 
 stmt =
@@ -70,6 +73,7 @@ instr =
   | i:lea   { $$ = i; }
   | i:mul   { $$ = i; }
   | i:imul  { $$ = i; }
+  | i:neg   { $$ = i; }
   | i:movsx { $$ = i; }
   | i:movzx { $$ = i; }
   | i:mov   { $$ = i; }
@@ -160,6 +164,11 @@ mul = "mul" (
     args:m-opargs { $$ = args; }
   | args:r-opargs { args.instr.variant += 4 ; $$ = args; }
 )  { $$.instr.kind = ASM_MUL; }
+
+neg = "neg" (
+    args:m-opargs { $$ = args; }
+  | args:r-opargs { args.instr.variant += 4 ; $$ = args; }
+)  { $$.instr.kind = ASM_NEG; }
 
 imul = "imul" (
     (

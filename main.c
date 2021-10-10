@@ -573,7 +573,7 @@ static void assemblemovextend(Instr *mov, Opcode opcode) {
   assemblerrm(mov, opcode, opsz);
 }
 
-static void assembledivmul(Instr *instr, uint8_t reg) {
+static void assembledivmulneg(Instr *instr, uint8_t reg) {
   Opcode opcode;
   uint8_t rex, mod, rm, opsz;
 
@@ -796,20 +796,20 @@ static void assemble(void) {
       break;
     }
     case ASM_DIV:
-      assembledivmul(&v->instr, 0x06);
+      assembledivmulneg(&v->instr, 0x06);
       break;
     case ASM_IDIV:
-      assembledivmul(&v->instr, 0x07);
+      assembledivmulneg(&v->instr, 0x07);
       break;
     case ASM_MUL:
-      assembledivmul(&v->instr, 0x04);
+      assembledivmulneg(&v->instr, 0x04);
       break;
     case ASM_IMUL: {
       Opcode opcode;
       uint8_t opsz;
 
       if (v->instr.variant < 8) {
-        assembledivmul(&v->instr, 0x05);
+        assembledivmulneg(&v->instr, 0x05);
       } else if (v->instr.variant < 14) {
         opcode = 0x01000faf; // 0f af variable length opcode.
         opsz = 1 << (1 + ((v->instr.variant - 8) % 3));
@@ -824,6 +824,9 @@ static void assemble(void) {
       }
       break;
     }
+    case ASM_NEG:
+      assembledivmulneg(&v->instr, 0x03);
+      break;
     case ASM_OR: {
       static uint8_t variant2op[24] = {
           0x0c, 0x0d, 0x0d, 0x0d, 0x80, 0x81, 0x81, 0x81,
