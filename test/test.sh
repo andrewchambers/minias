@@ -30,6 +30,22 @@ t () {
   echo -n "."
 }
 
+for op in sal sar shl shr
+do
+t "${op} \$3, %rax"
+t "${op} %cl, %rax"
+t "${op} \$3, %eax"
+t "${op} %cl, %eax"
+t "${op} \$3, %ax"
+t "${op} %cl, %ax"
+t "${op}w \$3, (%rax)"
+t "${op}w %cl, (%rax)"
+t "${op}l \$3, (%rax)"
+t "${op}l %cl, (%rax)"
+t "${op}q \$3, (%rax)"
+t "${op}q %cl, (%rax)"
+done
+
 t "div %rax"
 t "divq (%rax)"
 t "divq (%rip)"

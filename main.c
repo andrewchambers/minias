@@ -470,7 +470,6 @@ static void assembleimmrm(Instr *instr, Opcode opcode, uint8_t immreg,
     assemblemem(&instr->arg2->memarg, opsz == 8, opcode, immreg, opsz);
     assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   } else {
-
     assemblemodregrm(isreg64(instr->arg2->kind), opcode, 0x03, immreg,
                      regbits(instr->arg2->kind), opsz);
     assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
@@ -554,17 +553,35 @@ static void assemblemov(Instr *mov) {
   }
 }
 
-static void assembledivmul(Instr *instr, uint8_t reg, uint8_t opsz) {
+static void assembledivmul(Instr *instr, uint8_t reg) {
   Opcode opcode;
-  uint8_t rex, mod, rm;
+  uint8_t rex, mod, rm, opsz;
 
+  opsz = 1 << (instr->variant % 4);
   opcode = opsz == 1 ? 0xf6 : 0xf7;
 
-  if (instr->variant < 4) {
+  if (instr->arg1->kind == ASM_MEMARG) {
     assemblemem(&instr->arg1->memarg, opsz == 8, opcode, reg, opsz);
   } else {
     assemblemodregrm(isreg64(instr->arg1->kind), opcode, 0x03, reg,
                      regbits(instr->arg1->kind), opsz);
+  }
+}
+
+static void assembleshift(Instr *instr, uint8_t immreg) {
+  Opcode opcode;
+  uint8_t rex, mod, rm, opsz;
+
+  opcode = (instr->variant < 6) ? 0xd3 : 0xc1;
+  opsz = 1 << (1 + (instr->variant % 3));
+
+  if (instr->arg1->kind == ASM_IMM) {
+    assembleimmrm(instr, opcode, immreg, opsz);
+  } else if (instr->arg2->kind == ASM_MEMARG) {
+    assemblemem(&instr->arg2->memarg, opsz == 8, opcode, immreg, opsz);
+  } else {
+    assemblemodregrm(isreg64(instr->arg2->kind), opcode, 0x03, immreg,
+                     regbits(instr->arg2->kind), opsz);
   }
 }
 
@@ -709,32 +726,21 @@ static void assemble(void) {
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x04);
       break;
     }
-    case ASM_DIV: {
-      uint8_t opsz;
-      opsz = 1 << (v->instr.variant % 4);
-      assembledivmul(&v->instr, 0x06, opsz);
+    case ASM_DIV:
+      assembledivmul(&v->instr, 0x06);
       break;
-    }
-    case ASM_IDIV: {
-      uint8_t opsz;
-      opsz = 1 << (v->instr.variant % 4);
-      assembledivmul(&v->instr, 0x07, opsz);
+    case ASM_IDIV:
+      assembledivmul(&v->instr, 0x07);
       break;
-    }
-    case ASM_MUL: {
-      uint8_t opsz;
-      opsz = 1 << (v->instr.variant % 4);
-      assembledivmul(&v->instr, 0x04, opsz);
+    case ASM_MUL:
+      assembledivmul(&v->instr, 0x04);
       break;
-    }
     case ASM_IMUL: {
       Opcode opcode;
       uint8_t opsz;
 
       if (v->instr.variant < 8) {
-        uint8_t opsz;
-        opsz = 1 << (v->instr.variant % 4);
-        assembledivmul(&v->instr, 0x05, opsz);
+        assembledivmul(&v->instr, 0x05);
       } else if (v->instr.variant < 14) {
         opcode = 0x01000faf; // 0f af variable length opcode.
         opsz = 1 << (1 + ((v->instr.variant - 8) % 3));
@@ -758,6 +764,16 @@ static void assemble(void) {
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x01);
       break;
     }
+    case ASM_SAL:
+    case ASM_SHL:
+      assembleshift(&v->instr, 0x04);
+      break;
+    case ASM_SAR:
+      assembleshift(&v->instr, 0x07);
+      break;
+    case ASM_SHR:
+      assembleshift(&v->instr, 0x05);
+      break;
     case ASM_SUB: {
       static uint8_t variant2op[24] = {
           0x2c, 0x2d, 0x2d, 0x2d, 0x80, 0x81, 0x81, 0x81,
