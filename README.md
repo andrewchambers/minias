@@ -20,6 +20,12 @@ Non Goals:
 redo minias
 ```
 
+or
+
+```
+make
+```
+
 or 
 
 ```
