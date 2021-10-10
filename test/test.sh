@@ -1,15 +1,15 @@
 #!/bin/sh
 set -eu
 
-tmps="$(mktemp --suffix .s)"
-tmpo="$(mktemp --suffix .o)"
-tmpb="$(mktemp --suffix .bin)"
+tmps="$(mktemp)"
+tmpo="$(mktemp)"
+tmpb="$(mktemp)"
 
 trap "rm -f \"$tmps\" \"$tmpo\" \"$tmpb\"" EXIT
 
 t () {
   echo "$1" > "$tmps"
-  clang -Wno-everything -c -s "$tmps" -o "$tmpo" 
+  clang -Wno-everything -c -x assembler "$tmps" -o "$tmpo"
   objcopy -j ".text" -O binary "$tmpo" "$tmpb"
   want="$(xxd -ps "$tmpb" | head -n 1 | cut  -d ' ' -f 2-)"
   if ! ./minias < "$tmps" > "$tmpo"
