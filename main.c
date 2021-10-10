@@ -327,7 +327,7 @@ static uint8_t rexbyte(uint8_t w, uint8_t r, uint8_t x, uint8_t b) {
 }
 
 /* Compose a mod/reg/rm byte - See intel manual. */
-static uint8_t modregrm(uint8_t mod, uint8_t reg, uint8_t rm) {
+static uint8_t modregrmbyte(uint8_t mod, uint8_t reg, uint8_t rm) {
   return (((mod & 3) << 6) | ((reg & 7) << 3) | (rm & 7));
 }
 
@@ -402,7 +402,7 @@ static void assemblemodregrm(uint8_t rexw, Opcode opcode, uint8_t mod,
   if (rex != rexbyte(0, 0, 0, 0))
     sb(rex);
   assembleopcode(opcode);
-  sb(modregrm(mod, reg, rm));
+  sb(modregrmbyte(mod, reg, rm));
 }
 
 /* Assemble a symbolic value. */
@@ -466,7 +466,7 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, Opcode opcode,
     if (rex != rexbyte(0, 0, 0, 0))
       sb(rex);
     assembleopcode(opcode);
-    sb(modregrm(mod, reg, rm));
+    sb(modregrmbyte(mod, reg, rm));
 
     if (mod == 1) {
       assemblereloc(memarg->l, memarg->c, 1, R_X86_64_32);
@@ -528,7 +528,7 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, Opcode opcode,
   if (rex != rexbyte(0, 0, 0, 0))
     sb(rex);
   assembleopcode(opcode);
-  sb2(modregrm(mod, reg, rm), sibbyte(scale, index, base));
+  sb2(modregrmbyte(mod, reg, rm), sibbyte(scale, index, base));
 
   /* If mod is set, or we are indexing bp we must output a displacement. */
   if (mod)
