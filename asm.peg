@@ -110,12 +110,19 @@ mul = "mul" (
 
 imul = "imul" (
     (
-        'w'? ws s:m   ws? ',' ws? d:r16 { $$ = INSTR2(8, s, d); }
-      | 'l'? ws s:m   ws? ',' ws? d:r32 { $$ = INSTR2(9, s, d); }
-      | 'q'? ws s:m   ws? ',' ws? d:r64 { $$ = INSTR2(10, s, d); }
-      | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = INSTR2(11, s, d); }
-      | 'l'? ws s:r32 ws? ',' ws? d:r32 { $$ = INSTR2(12, s, d); }
-      | 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = INSTR2(13, s, d); }
+        'w'? ws s:m     ws? ',' ws? d:r16 { $$ = INSTR2(8, s, d); }
+      | 'l'? ws s:m     ws? ',' ws? d:r32 { $$ = INSTR2(9, s, d); }
+      | 'q'? ws s:m     ws? ',' ws? d:r64 { $$ = INSTR2(10, s, d); }
+      | 'w'? ws s:r16   ws? ',' ws? d:r16 { $$ = INSTR2(11, s, d); }
+      | 'l'? ws s:r32   ws? ',' ws? d:r32 { $$ = INSTR2(12, s, d); }
+      | 'q'? ws s:r64   ws? ',' ws? d:r64 { $$ = INSTR2(13, s, d); }
+
+      | 'w'? ws i:imm16 ',' ws? s:m   ws? ',' ws? d:r16 { $$ = INSTR3(14, s, d, i); }
+      | 'l'? ws i:imm32 ',' ws? s:m   ws? ',' ws? d:r32 { $$ = INSTR3(15, s, d, i); }
+      | 'q'? ws i:imm32 ',' ws? s:m   ws? ',' ws? d:r64 { $$ = INSTR3(16, s, d, i); }
+      | 'w'? ws i:imm16 ',' ws? s:r16 ws? ',' ws? d:r16 { $$ = INSTR3(17, s, d, i); }
+      | 'l'? ws i:imm32 ',' ws? s:r32 ws? ',' ws? d:r32 { $$ = INSTR3(18, s, d, i); }
+      | 'q'? ws i:imm32 ',' ws? s:r64 ws? ',' ws? d:r64 { $$ = INSTR3(19, s, d, i); }
     )
     | args:divmul-opargs { $$ = args; } # Must come last due to peg ordering.
 )  { $$.instr.kind = ASM_IMUL; }

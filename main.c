@@ -740,7 +740,12 @@ static void assemble(void) {
         opsz = 1 << (1 + ((v->instr.variant - 8) % 3));
         assemblerrm(&v->instr, opcode, opsz);
       } else {
-        unreachable();
+        Imm *imm;
+        opcode = 0x69;
+        opsz = 1 << (1 + ((v->instr.variant - 14) % 3));
+        assemblerrm(&v->instr, opcode, opsz);
+        imm = &v->instr.arg3->imm;
+        assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
       }
       break;
     }
