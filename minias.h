@@ -35,6 +35,7 @@ typedef struct {
   Symbol *sym;
   int type;
   int64_t offset;
+  int64_t addend;
 } Relocation;
 
 typedef enum {
