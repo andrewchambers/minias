@@ -436,19 +436,12 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, Opcode opcode,
 
   uint8_t rex, mod, rm, scale, index, base, sib;
 
+  rm = regbits(memarg->base);
+
   if (memarg->base == ASM_RIP) {
     assembleriprel(memarg, rexw, opcode, reg, opsz);
     return;
   }
-
-  rm = regbits(memarg->base);
-  if (opsz == 2)
-    sb(0x66);
-  rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
-  if (rex != rexbyte(0, 0, 0, 0))
-    sb(rex);
-
-  assembleopcode(opcode);
 
   /* Case when we don't need sib */
   if (memarg->index == ASM_NO_REG && memarg->scale == 0 && ((rm & 7) != 4)) {
@@ -463,6 +456,12 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, Opcode opcode,
       mod = 2;
     }
 
+    if (opsz == 2)
+      sb(0x66);
+    rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
+    if (rex != rexbyte(0, 0, 0, 0))
+      sb(rex);
+    assembleopcode(opcode);
     sb(modregrm(mod, reg, rm));
 
     if (mod == 1) {
@@ -473,15 +472,20 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, Opcode opcode,
     return;
   }
 
-  // TODO: if our disp fits in a +disp8, use that instead.
-  if (memarg->c == 0 && memarg->l == 0)
-    mod = 0; /* +0 */
-  else
-    mod = 2; /* +disp32 */
-
   /* Setup sib indexing. */
   base = rm;
   rm = 4;
+
+  // TODO: if our disp fits in a +disp8, use that instead.
+  if (memarg->c == 0 && memarg->l == 0 && ((base & 7) != 5)) {
+    mod = 0; /* +0 */
+  } else {
+    if (memarg->c == 0 && memarg->l == 0) {
+      mod = 1; /* +disp8 */
+    } else {
+      mod = 2; /* +disp32 */
+    }
+  }
 
   if (memarg->index == ASM_NO_REG) {
     index = 4;
@@ -496,7 +500,7 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, Opcode opcode,
     if (memarg->index == ASM_NO_REG) {
       index = base;
     } else {
-      lfatal("bp cannot be used as an addressing base");
+      // lfatal("bp cannot be used as an addressing base");
     }
   }
 
@@ -518,11 +522,17 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, Opcode opcode,
     lfatal("invalid addressing scale");
   }
 
+  if (opsz == 2)
+    sb(0x66);
+  rex = rexbyte(rexw, reg & (1 << 3), index & (1 << 3), base & (1 << 3));
+  if (rex != rexbyte(0, 0, 0, 0))
+    sb(rex);
+  assembleopcode(opcode);
   sb2(modregrm(mod, reg, rm), sibbyte(scale, index, base));
 
   /* If mod is set, or we are indexing bp we must output a displacement. */
-  if (mod || ((base & 7) == 5))
-    assemblereloc(memarg->l, memarg->c, 4, R_X86_64_32);
+  if (mod)
+    assemblereloc(memarg->l, memarg->c, (mod == 2) ? 4 : 1, R_X86_64_32);
 }
 
 /* Assemble op + imm -> r/m. */

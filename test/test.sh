@@ -30,6 +30,31 @@ t () {
   echo -n "."
 }
 
+
+t "lea (%rsp), %rax"
+t "lea (%rbp), %rax"
+t "lea (%rax), %rax"
+t "lea 2147483647(%rsp), %rax"
+t "lea 2147483647(%rbp), %rax"
+t "lea 2147483647(%rax), %rax"
+
+t "lea (%r9, %r10), %rax"
+t "lea (%rsp, %rax), %rax"
+t "lea (%rbp, %rax), %rax"
+t "lea (%rax, %rax), %rax"
+t "lea 2147483647(%rsp, %rax), %rax"
+t "lea 2147483647(%rbp, %rax), %rax"
+t "lea 2147483647(%rax, %rax), %rax"
+
+t "lea (%rsp, %rax, 4), %rax"
+t "lea (%rbp, %rax, 4), %rax"
+t "lea (%rax, %rax, 4), %rax"
+t "lea 2147483647(%rsp, %rax, 4), %rax"
+t "lea 2147483647(%rbp, %rax, 4), %rax"
+t "lea 2147483647(%rax, %rax, 4), %rax"
+
+
+
 t "ret"
 t "cltd"
 t "cqto"
