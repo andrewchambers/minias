@@ -30,6 +30,22 @@ t () {
   echo -n "."
 }
 
+conditioncodes="
+  a ae b be c e
+  z g ge l le na
+  nae nb nbe nc
+  ne ng nge nl
+  nle no np ns nz
+  o p pe po s z
+"
+
+for cc in $conditioncodes
+do
+  t "set${cc} %al"
+  t "set${cc} (%rax)"
+done
+
+
 for op in sal sar shl shr
 do
   t "${op} \$3, %rax"

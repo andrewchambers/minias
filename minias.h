@@ -76,6 +76,7 @@ typedef enum {
   ASM_OR,
   ASM_SAL,
   ASM_SAR,
+  ASM_SET,
   ASM_SHL,
   ASM_SHR,
   ASM_SUB,

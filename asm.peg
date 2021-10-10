@@ -66,6 +66,7 @@ instr =
   | i:imul  { $$ = i; }
   | i:mov   { $$ = i; }
   | i:or    { $$ = i; }
+  | i:set   { $$ = i; }
   | i:sub   { $$ = i; }
   | i:sal   { $$ = i; }
   | i:sar   { $$ = i; }
@@ -93,39 +94,42 @@ call =
 
 jmp = 'j' v:jmp-variant ws t:ident
     { $$.jmp = (Jmp) {.kind = ASM_JMP, .variant=v.i64, .target=t.charptr}; }
+
 jmp-variant =
       "mp"  { $$.i64 = 0; }
-    | "a"   { $$.i64 = 1; }
-    | "ae"  { $$.i64 = 2; }
-    | "b"   { $$.i64 = 3; }
-    | "be"  { $$.i64 = 4; }
-    | "c"   { $$.i64 = 5; }
-    | "e"   { $$.i64 = 6; }
-    | "z"   { $$.i64 = 7; }
-    | "g"   { $$.i64 = 8; }
-    | "ge"  { $$.i64 = 9; }
-    | "l"   { $$.i64 = 10; }
-    | "le"  { $$.i64 = 11; }
-    | "na"  { $$.i64 = 12; }
-    | "nae" { $$.i64 = 13; }
-    | "nb"  { $$.i64 = 14; }
-    | "nbe" { $$.i64 = 15; }
-    | "nc"  { $$.i64 = 16; }
-    | "ne"  { $$.i64 = 17; }
-    | "ng"  { $$.i64 = 18; }
-    | "nge" { $$.i64 = 19; }
-    | "nl"  { $$.i64 = 20; }
-    | "nle" { $$.i64 = 21; }
-    | "no"  { $$.i64 = 22; }
-    | "np"  { $$.i64 = 23; }
-    | "ns"  { $$.i64 = 24; }
-    | "nz"  { $$.i64 = 25; }
-    | "o"   { $$.i64 = 26; }
-    | "p"   { $$.i64 = 27; }
-    | "pe"  { $$.i64 = 28; }
-    | "po"  { $$.i64 = 29; }
-    | "s"   { $$.i64 = 30; }
-    | "z"   { $$.i64 = 31; }
+    | cc:condition-code { $$.i64 = cc.i64 + 1;}
+
+condition-code = 
+      "z"   { $$.i64 = 0; }
+    | "s"   { $$.i64 = 1; }
+    | "po"  { $$.i64 = 2; }
+    | "pe"  { $$.i64 = 3; }
+    | "p"   { $$.i64 = 4; }
+    | "o"   { $$.i64 = 5; }
+    | "nz"  { $$.i64 = 6; }
+    | "ns"  { $$.i64 = 7; }
+    | "np"  { $$.i64 = 8; }
+    | "no"  { $$.i64 = 9; }
+    | "nle" { $$.i64 = 10; }
+    | "nl"  { $$.i64 = 11; }
+    | "nge" { $$.i64 = 12; }
+    | "ng"  { $$.i64 = 13; }
+    | "ne"  { $$.i64 = 14; }
+    | "nc"  { $$.i64 = 15; }
+    | "nbe" { $$.i64 = 16; }
+    | "nb"  { $$.i64 = 17; }
+    | "nae" { $$.i64 = 18; }
+    | "na"  { $$.i64 = 19; }
+    | "le"  { $$.i64 = 20; }
+    | "l"   { $$.i64 = 21; }
+    | "ge"  { $$.i64 = 22; }
+    | "g"   { $$.i64 = 23; }
+    | "e"   { $$.i64 = 24; }
+    | "c"   { $$.i64 = 25; }
+    | "be"  { $$.i64 = 26; }
+    | "b"   { $$.i64 = 27; }
+    | "ae"  { $$.i64 = 28; }
+    | "a"   { $$.i64 = 29; }
 
 lea = 
   "lea" (
@@ -135,15 +139,18 @@ lea =
   ) { $$.instr.kind = ASM_LEA; }
 
 div = "div" (
-   args:divmul-opargs { $$ = args; }
+    args:m-opargs { $$ = args; }
+  | args:r-opargs { args.instr.variant += 4 ; $$ = args; }
 )  { $$.instr.kind = ASM_DIV; }
 
 idiv = "idiv" (
-    args:divmul-opargs { $$ = args; }
+    args:m-opargs { $$ = args; }
+  | args:r-opargs { args.instr.variant += 4 ; $$ = args; }
 )  { $$.instr.kind = ASM_IDIV; }
 
 mul = "mul" (
-  args:divmul-opargs { $$ = args; }
+    args:m-opargs { $$ = args; }
+  | args:r-opargs { args.instr.variant += 4 ; $$ = args; }
 )  { $$.instr.kind = ASM_MUL; }
 
 imul = "imul" (
@@ -161,42 +168,61 @@ imul = "imul" (
       | 'l'? ws i:imm32 ',' ws? s:r32 ws? ',' ws? d:r32 { $$ = INSTR3(18, s, d, i); }
       | 'q'? ws i:imm32 ',' ws? s:r64 ws? ',' ws? d:r64 { $$ = INSTR3(19, s, d, i); }
     )
-    | args:divmul-opargs { $$ = args; } # Must come last due to peg ordering.
+    # Must come last due to peg ordering.
+    | args:m-opargs { $$ = args; }
+    | args:r-opargs { args.instr.variant += 4 ; $$ = args; } 
 )  { $$.instr.kind = ASM_IMUL; }
 
-divmul-opargs = 
-    'b'  ws a:m  { $$ = INSTR1(0, a); }
-  | 'w'  ws a:m  { $$ = INSTR1(1, a); }
-  | 'l'  ws a:m  { $$ = INSTR1(2, a); }
-  | 'q'  ws a:m  { $$ = INSTR1(3, a); }
-  | 'b'? ws a:r8  { $$ = INSTR1(4, a); }
-  | 'w'? ws a:r16 { $$ = INSTR1(5, a); }
-  | 'l'? ws a:r32 { $$ = INSTR1(6, a); }
-  | 'q'? ws a:r64 { $$ = INSTR1(7, a); }
+m-opargs = 
+    'b' ws a:m { $$ = INSTR1(0, a); }
+  | 'w' ws a:m { $$ = INSTR1(1, a); }
+  | 'l' ws a:m { $$ = INSTR1(2, a); }
+  | 'q' ws a:m { $$ = INSTR1(3, a); }
+
+r-opargs = 
+    'b'? ws a:r8  { $$ = INSTR1(0, a); }
+  | 'w'? ws a:r16 { $$ = INSTR1(1, a); }
+  | 'l'? ws a:r32 { $$ = INSTR1(2, a); }
+  | 'q'? ws a:r64 { $$ = INSTR1(3, a); }
+
+imm-r-opargs =  
+    'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = INSTR2(0, s, d); }
+  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = INSTR2(1, s, d); }
+  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = INSTR2(2, s, d); }
+  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = INSTR2(3, s, d); }
+
+imm-m-opargs =  
+    'b'  ws s:imm8  ws? ',' ws? d:m { $$ = INSTR2(0, s, d); }
+  | 'w'  ws s:imm16 ws? ',' ws? d:m { $$ = INSTR2(1, s, d); }
+  | 'l'  ws s:imm32 ws? ',' ws? d:m { $$ = INSTR2(2, s, d); }
+  | 'q'  ws s:imm32 ws? ',' ws? d:m { $$ = INSTR2(3, s, d); }
+
+r-r-opargs =  
+    'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = INSTR2(0, s, d); }
+  | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = INSTR2(1, s, d); }
+  | 'l'? ws s:r32 ws? ',' ws? d:r32 { $$ = INSTR2(2, s, d); }
+  | 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = INSTR2(3, s, d); }
+
+r-m-opargs =  
+    'b'? ws s:r8  ws? ',' ws? d:m { $$ = INSTR2(0, s, d); }
+  | 'w'? ws s:r16 ws? ',' ws? d:m { $$ = INSTR2(1, s, d); }
+  | 'l'? ws s:r32 ws? ',' ws? d:m { $$ = INSTR2(2, s, d); }
+  | 'q'? ws s:r64 ws? ',' ws? d:m { $$ = INSTR2(3, s, d); }
+
+m-r-opargs =  
+    'b'? ws s:m ws? ',' ws? d:r8  { $$ = INSTR2(0, s, d); }
+  | 'w'? ws s:m ws? ',' ws? d:r16 { $$ = INSTR2(1, s, d); }
+  | 'l'? ws s:m ws? ',' ws? d:r32 { $$ = INSTR2(2, s, d); }
+  | 'q'? ws s:m ws? ',' ws? d:r64 { $$ = INSTR2(3, s, d); }
 
 imm-rm-opargs = 
-    'b'  ws s:imm8  ws? ',' ws? d:m   { $$ = INSTR2(0, s, d); }
-  | 'w'  ws s:imm16 ws? ',' ws? d:m   { $$ = INSTR2(1, s, d); }
-  | 'l'  ws s:imm32 ws? ',' ws? d:m   { $$ = INSTR2(2, s, d); }
-  | 'q'  ws s:imm32 ws? ',' ws? d:m   { $$ = INSTR2(3, s, d); }
-  | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = INSTR2(4, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = INSTR2(5, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = INSTR2(6, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = INSTR2(7, s, d); }
+    args:imm-m-opargs { $$ = args; } 
+  | args:imm-r-opargs { args.instr.variant += 4 ; $$ = args; } 
 
 r-rm-opargs = 
-    'b'? ws s:m   ws? ',' ws? d:r8  { $$ = INSTR2(0, s, d); }
-  | 'w'? ws s:m   ws? ',' ws? d:r16 { $$ = INSTR2(1, s, d); }
-  | 'l'? ws s:m   ws? ',' ws? d:r32 { $$ = INSTR2(2, s, d); }
-  | 'q'? ws s:m   ws? ',' ws? d:r64 { $$ = INSTR2(3, s, d); }
-  | 'b'? ws s:r8  ws? ',' ws? d:m   { $$ = INSTR2(4, s, d); }
-  | 'w'? ws s:r16 ws? ',' ws? d:m   { $$ = INSTR2(5, s, d); }
-  | 'l'? ws s:r32 ws? ',' ws? d:m   { $$ = INSTR2(6, s, d); }
-  | 'q'? ws s:r64 ws? ',' ws? d:m   { $$ = INSTR2(7, s, d); }
-  | 'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = INSTR2(8, s, d); }
-  | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = INSTR2(9, s, d); }
-  | 'l'? ws s:r32 ws? ',' ws? d:r32 { $$ = INSTR2(10, s, d); }
-  | 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = INSTR2(11, s, d); }
+    args:m-r-opargs { $$ = args; }
+  | args:r-m-opargs { args.instr.variant += 4; $$ = args; }
+  | args:r-r-opargs { args.instr.variant += 8; $$ = args; }
 
 mov = "mov" (
     args:imm-rm-opargs { $$ = args; }
@@ -229,14 +255,19 @@ basic-op-args =
   | args:imm-rm-opargs { args.instr.variant += 4; $$ = args; }
   | args:r-rm-opargs { args.instr.variant += 12; $$ = args; }
 
+set = "set" cc:condition-code (
+    'b'? ws a:m  { $$ = INSTR1(0, a); $$.instr.variant = cc.i64; }
+  | 'b'? ws a:r8 { $$ = INSTR1(0, a); $$.instr.variant = 31 + cc.i64; }
+) { $$.instr.kind = ASM_SET }
+
 sal = 
-  'sal' args:shift-args {$$ = args; $$.instr.kind = ASM_SAL}
+  "sal" args:shift-args {$$ = args; $$.instr.kind = ASM_SAL}
 sar = 
-  'sar' args:shift-args {$$ = args; $$.instr.kind = ASM_SAR}
+  "sar" args:shift-args {$$ = args; $$.instr.kind = ASM_SAR}
 shl = 
-  'shl' args:shift-args {$$ = args; $$.instr.kind = ASM_SHL}
+  "shl" args:shift-args {$$ = args; $$.instr.kind = ASM_SHL}
 shr = 
-  'shr' args:shift-args {$$ = args; $$.instr.kind = ASM_SHR}
+  "shr" args:shift-args {$$ = args; $$.instr.kind = ASM_SHR}
 
 shift-args =
     # There are some more specific variants we could add.
@@ -254,20 +285,13 @@ shift-args =
   | 'q'? ws i:imm8 ws? ',' ws? d:r64 { $$ = INSTR2(11, i, d); }
 
 test = "test" (
-   # There are some more specific variants we could add.
     'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = INSTR2(0, s, d); }
   | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = INSTR2(1, s, d); }
   | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = INSTR2(2, s, d); }
   | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = INSTR2(3, s, d); }
-  |  args:imm-rm-opargs { args.instr.variant += 4; $$ = args; }
-  | 'b'? ws s:r8  ws? ',' ws? d:m   { $$ = INSTR2(12, s, d); }
-  | 'w'? ws s:r16 ws? ',' ws? d:m   { $$ = INSTR2(13, s, d); }
-  | 'l'? ws s:r32 ws? ',' ws? d:m   { $$ = INSTR2(14, s, d); }
-  | 'q'? ws s:r64 ws? ',' ws? d:m   { $$ = INSTR2(15, s, d); }
-  | 'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = INSTR2(16, s, d); }
-  | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = INSTR2(17, s, d); }
-  | 'l'? ws s:r32 ws? ',' ws? d:r32 { $$ = INSTR2(18, s, d); }
-  | 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = INSTR2(19, s, d); }
+  |  args:imm-rm-opargs { args.instr.variant += 4;  $$ = args; }
+  |  args:r-m-opargs    { args.instr.variant += 12; $$ = args; }
+  |  args:r-r-opargs    { args.instr.variant += 16; $$ = args; }
 ) { $$.instr.kind = ASM_TEST; }
 
 r64-or-rip = (
