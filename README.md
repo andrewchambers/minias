@@ -17,12 +17,6 @@ Non Goals:
 # Building
 
 ```
-redo minias
-```
-
-or
-
-```
 make
 ```
 
