@@ -53,6 +53,8 @@ typedef enum {
   ASM_DIR_DATA,
   ASM_DIR_TEXT,
   ASM_DIR_BYTE,
+  ASM_DIR_INT,
+  ASM_DIR_QUAD,
   ASM_DIR_BALIGN,
   // Instructions
   ASM_NOP,
@@ -60,6 +62,8 @@ typedef enum {
   ASM_PUSH,
   ASM_POP,
   ASM_CALL,
+  ASM_CLTD,
+  ASM_CQTO,
   ASM_JMP,
   ASM_LEAVE,
   ASM_ADD,
@@ -181,8 +185,18 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
-  uint8_t b;
+  int64_t v;
 } Byte;
+
+typedef struct {
+  AsmKind kind;
+  int64_t v;
+} Int;
+
+typedef struct {
+  AsmKind kind;
+  int64_t v;
+} Quad;
 
 typedef struct {
   AsmKind kind;
@@ -242,7 +256,9 @@ union Parsev {
   Instr instr;
   Call call;
   Jmp jmp;
-  Byte byte;
+  Byte dirbyte;
+  Int dirint;
+  Quad dirquad;
   Imm imm;
   String string;
   // Temporary values.

@@ -293,6 +293,20 @@ static void su32(uint32_t l) {
   secaddbytes(cursection, buf, sizeof(buf));
 }
 
+static void su64(uint32_t l) {
+  uint8_t buf[8] = {
+      l & 0xff,
+      (l & 0xff00) >> 8,
+      (l & 0xff00) >> 16,
+      (l & 0xff000000) >> 24,
+      (l & 0xff00000000) >> 32,
+      (l & 0xff0000000000) >> 40,
+      (l & 0xff000000000000) >> 48,
+      (l & 0xff00000000000000) >> 56,
+  };
+  secaddbytes(cursection, buf, sizeof(buf));
+}
+
 /* Convert an AsmKind to register bits in reg/rm style.  */
 static uint8_t regbits(AsmKind k) { return (k - (ASM_REG_BEGIN + 1)) % 16; }
 
@@ -332,7 +346,7 @@ void assembleconstant(int64_t c, int nbytes) {
     su32((uint32_t)c);
     break;
   case 8:
-    fatal("TODO 8 byte");
+    su64((uint64_t)c);
     break;
   default:
     unreachable();
@@ -651,7 +665,13 @@ static void assemble(void) {
       break;
     }
     case ASM_DIR_BYTE:
-      sb(v->byte.b);
+      sb((uint8_t)v->dirbyte.v);
+      break;
+    case ASM_DIR_INT:
+      su32((uint32_t)v->dirint.v);
+      break;
+    case ASM_DIR_QUAD:
+      su64((uint64_t)v->dirquad.v);
       break;
     case ASM_LABEL:
       sym = getsym(v->label.name);
@@ -704,6 +724,12 @@ static void assemble(void) {
       break;
     case ASM_LEAVE:
       sb(0xc9);
+      break;
+    case ASM_CLTD:
+      sb(0x99);
+      break;
+    case ASM_CQTO:
+      sb2(0x48, 0x99);
       break;
     case ASM_RET:
       sb(0xc3);

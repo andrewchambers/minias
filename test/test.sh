@@ -30,6 +30,10 @@ t () {
   echo -n "."
 }
 
+t "ret"
+t "cltd"
+t "cqto"
+
 conditioncodes="
   a ae b be c e
   z g ge l le na
@@ -44,7 +48,6 @@ do
   t "set${cc} %al"
   t "set${cc} (%rax)"
 done
-
 
 for op in sal sar shl shr
 do
@@ -94,7 +97,6 @@ t "pushq %rax"
 t "popq (%r9)"
 t "popq %r9"
 t "popq %rax"
-
 
 t "movb \$127, (%rsp)"
 t "movb \$127, (%rbp)"

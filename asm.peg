@@ -24,7 +24,11 @@ directive =
   | "balign" ws n:number 
     { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.i64 }; }
   | "byte" ws n:number
-    { $$.byte = (Byte){.kind = ASM_DIR_BYTE, .b = (uint8_t)n.i64 }; }
+    { $$.dirbyte = (Byte){.kind = ASM_DIR_BYTE, .v = n.i64 }; }
+  | "int" ws n:number
+    { $$.dirint = (Int){.kind = ASM_DIR_INT, .v = n.i64 }; }
+  | "quad" ws n:number
+    { $$.dirquad = (Quad){.kind = ASM_DIR_QUAD, .v = n.i64 }; }
   | sd:section-directive { $$ = sd; }
 
 section-directive =
@@ -52,6 +56,8 @@ instr =
     "nop"   { $$.kind = ASM_NOP; }
   | "leave" { $$.kind = ASM_LEAVE; }
   | "ret"   { $$.kind = ASM_RET; }
+  | "cltd"  { $$.kind = ASM_CLTD; }
+  | "cqto"  { $$.kind = ASM_CQTO; }
   | i:push  { $$ = i; }
   | i:pop   { $$ = i; }
   | i:call  { $$ = i; }
