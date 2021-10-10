@@ -46,7 +46,7 @@ static const char *secname(Section *s) {
   return (const char *)shstrtab->data + s->hdr.sh_name;
 }
 
-static void secaddbytes(Section *s, uint8_t *bytes, size_t n) {
+static void secaddbytes(Section *s, const void *bytes, size_t n) {
   while (s->capacity < s->hdr.sh_size + n) {
     s->capacity = s->capacity ? (s->capacity * 2) : 64;
     s->data = xrealloc(s->data, s->capacity);
@@ -64,7 +64,7 @@ static Elf64_Word elfstr(Section *sec, const char *s) {
       if (strcmp(s, (char *)&sec->data[i]) == 0)
         return i;
   }
-  secaddbytes(sec, (uint8_t *)s, strlen(s) + 1);
+  secaddbytes(sec, s, strlen(s) + 1);
   return i;
 }
 
@@ -112,7 +112,7 @@ static void initsections(void) {
   symtab->hdr.sh_link = strtab->idx;
   symtab->hdr.sh_entsize = sizeof(Elf64_Sym);
   memset(&elfsym, 0, sizeof(elfsym));
-  secaddbytes(symtab, (uint8_t *)&elfsym, sizeof(Elf64_Sym));
+  secaddbytes(symtab, &elfsym, sizeof(Elf64_Sym));
 
   bss = newsection();
   bss->hdr.sh_name = elfstr(shstrtab, ".bss");
@@ -992,7 +992,7 @@ static void addtosymtab(Symbol *sym) {
   elfsym.st_info = ELF64_ST_INFO(sbind, stype);
   elfsym.st_shndx = sym->section ? sym->section->idx : SHN_UNDEF;
   elfsym.st_other = 0;
-  secaddbytes(symtab, (uint8_t *)&elfsym, sizeof(Elf64_Sym));
+  secaddbytes(symtab, &elfsym, sizeof(Elf64_Sym));
 }
 
 static void fillsymtab(void) {
@@ -1085,7 +1085,7 @@ static void appendreloc(Relocation *reloc) {
     unreachable();
   }
 
-  secaddbytes(relsection, (uint8_t *)&elfrel, sizeof(elfrel));
+  secaddbytes(relsection, &elfrel, sizeof(elfrel));
 }
 
 static void handlerelocs(void) {
@@ -1101,7 +1101,7 @@ static void handlerelocs(void) {
   }
 }
 
-static void out(uint8_t *buf, size_t n) {
+static void out(const void *buf, size_t n) {
   fwrite(buf, 1, n, outf);
   if (ferror(outf))
     fatal("fwrite:");
@@ -1129,12 +1129,12 @@ static void outelf(void) {
   ehdr.e_shnum = nsections;
   ehdr.e_shstrndx = 1;
 
-  out((uint8_t *)&ehdr, sizeof(ehdr));
+  out(&ehdr, sizeof(ehdr));
   offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Shdr) * nsections;
 
   for (i = 0; i < nsections; i++) {
     sections[i].hdr.sh_offset = offset;
-    out((uint8_t *)&sections[i].hdr, sizeof(Elf64_Shdr));
+    out(&sections[i].hdr, sizeof(Elf64_Shdr));
     offset += sections[i].hdr.sh_size;
   }
   for (i = 0; i < nsections; i++) {
