@@ -43,7 +43,6 @@ t "mulss %xmm1, %xmm10"
 t "mulss %xmm10, %xmm11"
 t "mulss (%rax), %xmm11"
 
-
 t "ucomisd %xmm0, %xmm1"
 t "ucomisd (%rax), %xmm1"
 t "ucomisd %xmm10, %xmm1"
@@ -56,7 +55,6 @@ t "ucomiss %xmm10, %xmm1"
 t "ucomiss %xmm1, %xmm10"
 t "ucomiss %xmm10, %xmm11"
 t "ucomiss (%rax), %xmm11"
-
 
 for r in a b
 do
