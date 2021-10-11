@@ -30,6 +30,32 @@ t () {
   echo -n "."
 }
 
+t "mulsd %xmm0, %xmm1"
+t "mulsd (%rax), %xmm1"
+t "mulsd %xmm10, %xmm1"
+t "mulsd %xmm1, %xmm10"
+t "mulsd %xmm10, %xmm11"
+t "mulsd (%rax), %xmm11"
+t "mulss %xmm0, %xmm1"
+t "mulss (%rax), %xmm1"
+t "mulss %xmm10, %xmm1"
+t "mulss %xmm1, %xmm10"
+t "mulss %xmm10, %xmm11"
+t "mulss (%rax), %xmm11"
+
+
+t "ucomisd %xmm0, %xmm1"
+t "ucomisd (%rax), %xmm1"
+t "ucomisd %xmm10, %xmm1"
+t "ucomisd %xmm1, %xmm10"
+t "ucomisd %xmm10, %xmm11"
+t "ucomisd (%rax), %xmm11"
+t "ucomiss %xmm0, %xmm1"
+t "ucomiss (%rax), %xmm1"
+t "ucomiss %xmm10, %xmm1"
+t "ucomiss %xmm1, %xmm10"
+t "ucomiss %xmm10, %xmm11"
+t "ucomiss (%rax), %xmm11"
 
 
 for r in a b
@@ -56,7 +82,6 @@ do
   t "lea 2147483647(%rbp, %r${r}x, 4), %r${r}x"
   t "lea 2147483647(%r${r}x, %r${r}x, 4), %r${r}x"
 done
-
 
 t "ret"
 t "cltd"

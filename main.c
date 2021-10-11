@@ -667,6 +667,29 @@ static void assembleshift(Instr *instr, uint8_t immreg) {
   }
 }
 
+static void assemblemuls(Instr *instr, uint8_t prefix) {
+  Opcode opcode;
+
+  opcode = 0x01000f59;
+  sb(prefix);
+
+  if (instr->arg1->kind == ASM_MEMARG) {
+    assemblemem(&instr->arg1->memarg, 0, opcode, regbits(instr->arg2->kind), 8);
+  } else {
+    assemblemodregrm(0, opcode, 3, regbits(instr->arg2->kind),
+                     regbits(instr->arg1->kind), 8);
+  }
+}
+
+static void assembleucomis(Instr *instr, Opcode opcode) {
+  if (instr->arg1->kind == ASM_MEMARG) {
+    assemblemem(&instr->arg1->memarg, 0, opcode, regbits(instr->arg2->kind), 8);
+  } else {
+    assemblemodregrm(0, opcode, 3, regbits(instr->arg2->kind),
+                     regbits(instr->arg1->kind), 8);
+  }
+}
+
 static void assemble(void) {
   Symbol *sym;
   Parsev *v;
@@ -866,6 +889,12 @@ static void assemble(void) {
     case ASM_MUL:
       assembledivmulneg(&v->instr, 0x04);
       break;
+    case ASM_MULSD:
+      assemblemuls(&v->instr, 0xf2);
+      break;
+    case ASM_MULSS:
+      assemblemuls(&v->instr, 0xf3);
+      break;
     case ASM_IMUL: {
       Opcode opcode;
       uint8_t opsz;
@@ -949,6 +978,34 @@ static void assemble(void) {
       } else {
         assemblerrm(&v->instr, (opsz == 1) ? 0x84 : 0x85, opsz);
       }
+      break;
+    }
+    case ASM_UCOMISD: {
+      Opcode opcode = 0x01000f2e;
+
+      sb(0x66);
+
+      if (v->instr.arg1->kind == ASM_MEMARG) {
+        assemblemem(&v->instr.arg1->memarg, 0, opcode,
+                    regbits(v->instr.arg2->kind), 8);
+      } else {
+        assemblemodregrm(0, opcode, 3, regbits(v->instr.arg2->kind),
+                         regbits(v->instr.arg1->kind), 8);
+      }
+
+      break;
+    }
+    case ASM_UCOMISS: {
+      Opcode opcode = 0x01000f2e;
+
+      if (v->instr.arg1->kind == ASM_MEMARG) {
+        assemblemem(&v->instr.arg1->memarg, 0, opcode,
+                    regbits(v->instr.arg2->kind), 8);
+      } else {
+        assemblemodregrm(0, opcode, 3, regbits(v->instr.arg2->kind),
+                         regbits(v->instr.arg1->kind), 8);
+      }
+
       break;
     }
     case ASM_XOR: {

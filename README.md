@@ -29,7 +29,7 @@ cc -O2 *.c -o minias
 
 # Resources
 
-- [intel reference](https://software.intel.com/content/dam/develop/external/us/en/documents-tps/325383-sdm-vol-2abcd.pdf) - Especially chapter 2 section 1.
+- [intel reference](https://software.intel.com/content/dam/develop/external/us/en/documents-tps/325383-sdm-vol-2abcd.pdf) - Specifically chapter 2.1 and chapter 3.1.
 - [elf spec](https://refspecs.linuxfoundation.org/elf/elf.pdf)
 - [goas](https://github.com/DQNEO/goas)
 - [neatas](https://repo.or.cz/neatas.git)
