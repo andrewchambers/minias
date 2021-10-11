@@ -56,42 +56,48 @@ label =
 
 instr = 
   # XXX Order the rules by frequency to get better lookup time.
-    "nop"     { $$.kind = ASM_NOP; }
-  | "leave"   { $$.kind = ASM_LEAVE; }
-  | "ret"     { $$.kind = ASM_RET; }
-  | "cltd"    { $$.kind = ASM_CLTD; }
-  | "cqto"    { $$.kind = ASM_CQTO; }
-  | i:push    { $$ = i; }
-  | i:pop     { $$ = i; }
-  | i:call    { $$ = i; }
-  | i:jmp     { $$ = i; }
-  | i:add     { $$ = i; }
-  | i:and     { $$ = i; }
-  | i:cmp     { $$ = i; }
-  | i:div     { $$ = i; }
-  | i:idiv    { $$ = i; }
-  | i:lea     { $$ = i; }
-  | i:mulsd   { $$ = i; }
-  | i:mulss   { $$ = i; }
-  | i:mul     { $$ = i; }
-  | i:imul    { $$ = i; }
-  | i:neg     { $$ = i; }
-  | i:movsx   { $$ = i; }
-  | i:movzx   { $$ = i; }
-  | i:mov     { $$ = i; }
-  | i:or      { $$ = i; }
-  | i:set     { $$ = i; }
-  | i:sub     { $$ = i; }
-  | i:sal     { $$ = i; }
-  | i:sar     { $$ = i; }
-  | i:shl     { $$ = i; }
-  | i:shr     { $$ = i; }
-  | i:test    { $$ = i; }
-  | i:ucomisd { $$ = i; }
-  | i:ucomiss { $$ = i; }
-  | i:test    { $$ = i; }
-  | i:xchg    { $$ = i; }
-  | i:xor     { $$ = i; }
+    "nop"      { $$.kind = ASM_NOP; }
+  | "leave"    { $$.kind = ASM_LEAVE; }
+  | "ret"      { $$.kind = ASM_RET; }
+  | "cltd"     { $$.kind = ASM_CLTD; }
+  | "cqto"     { $$.kind = ASM_CQTO; }
+  | i:push     { $$ = i; }
+  | i:pop      { $$ = i; }
+  | i:call     { $$ = i; }
+  | i:jmp      { $$ = i; }
+  | i:add      { $$ = i; }
+  | i:and      { $$ = i; }
+  | i:cvtss2sd { $$ = i; }
+  | i:cvtsd2ss { $$ = i; }
+  | i:cmp      { $$ = i; }
+  | i:div      { $$ = i; }
+  | i:idiv     { $$ = i; }
+  | i:lea      { $$ = i; }
+  | i:mulsd    { $$ = i; }
+  | i:mulss    { $$ = i; }
+  | i:mul      { $$ = i; }
+  | i:imul     { $$ = i; }
+  | i:neg      { $$ = i; }
+  | i:movsd    { $$ = i; }
+  | i:movss    { $$ = i; }
+  | i:movsx    { $$ = i; }
+  | i:movzx    { $$ = i; }
+  | i:mov      { $$ = i; }
+  | i:or       { $$ = i; }
+  | i:set      { $$ = i; }
+  | i:sub      { $$ = i; }
+  | i:sal      { $$ = i; }
+  | i:sar      { $$ = i; }
+  | i:shl      { $$ = i; }
+  | i:shr      { $$ = i; }
+  | i:test     { $$ = i; }
+  | i:ucomisd  { $$ = i; }
+  | i:ucomiss  { $$ = i; }
+  | i:test     { $$ = i; }
+  | i:xchg     { $$ = i; }
+  | i:xorpd    { $$ = i; }
+  | i:xorps    { $$ = i; }
+  | i:xor      { $$ = i; }
 
 push = 
   "push" (
@@ -165,25 +171,59 @@ idiv = "idiv" (
   | args:r-opargs { args.instr.variant += 4 ; $$ = args; }
 )  { $$.instr.kind = ASM_IDIV; }
 
+# TODO XXX Combine the xmm variants into single instructions??
+
+cvtss2sd = "cvtss2sd" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m     ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_CVTSS2SD; }
+
+cvtsd2ss = "cvtsd2ss" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m     ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_CVTSD2SS; }
+
 mulsd = "mulsd" (
-    ws s:r-xmm ws? ',' ws? d:r-xmm { $$ = INSTR2(0, s, d); }
-  | ws s:m     ws? ',' ws? d:r-xmm { $$ = INSTR2(1, s, d); }
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m     ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_MULSD; }
 
 mulss = "mulss" (
-    ws s:r-xmm ws? ',' ws? d:r-xmm { $$ = INSTR2(0, s, d); }
-  | ws s:m     ws? ',' ws? d:r-xmm { $$ = INSTR2(1, s, d); }
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m     ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_MULSS; }
 
+movss = "movss" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:xmm ws? ',' ws? d:m   { $$ = INSTR2(2, s, d); }
+)  { $$.instr.kind = ASM_MOVSS; }
+
+movsd = "movsd" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:xmm ws? ',' ws? d:m   { $$ = INSTR2(2, s, d); }
+)  { $$.instr.kind = ASM_MOVSD; }
+
 ucomiss = "ucomiss" (
-    ws s:r-xmm ws? ',' ws? d:r-xmm { $$ = INSTR2(0, s, d); }
-  | ws s:m     ws? ',' ws? d:r-xmm { $$ = INSTR2(1, s, d); }
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m     ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_UCOMISS; }
 
 ucomisd = "ucomisd" (
-    ws s:r-xmm ws? ',' ws? d:r-xmm { $$ = INSTR2(0, s, d); }
-  | ws s:m     ws? ',' ws? d:r-xmm { $$ = INSTR2(1, s, d); }
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m     ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_UCOMISD; }
+
+xorpd = "xorpd" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_XORPD; }
+
+xorps = "xorps" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_XORPS; }
 
 mul = "mul" (
     args:m-opargs { $$ = args; }
@@ -465,17 +505,7 @@ r64 =
   | "%r14" ![lwb] { $$ = REG(ASM_R14); }
   | "%r15" ![lwb] { $$ = REG(ASM_R15); }
 
-r-mm = 
-    "%mm0" { $$ = REG(ASM_MM0); }
-  | "%mm1" { $$ = REG(ASM_MM1); }
-  | "%mm2" { $$ = REG(ASM_MM2); }
-  | "%mm3" { $$ = REG(ASM_MM3); }
-  | "%mm4" { $$ = REG(ASM_MM4); }
-  | "%mm5" { $$ = REG(ASM_MM5); }
-  | "%mm6" { $$ = REG(ASM_MM6); }
-  | "%mm7" { $$ = REG(ASM_MM7); }
-
-r-xmm = 
+xmm = 
   # Reverse order due to peg ordering.
     "%xmm15" { $$ = REG(ASM_XMM15); }
   | "%xmm14" { $$ = REG(ASM_XMM14); }

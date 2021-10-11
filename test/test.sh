@@ -30,6 +30,40 @@ t () {
   echo -n "."
 }
 
+t "cvtss2sd %xmm0, %xmm1"
+t "cvtss2sd %xmm10, %xmm1"
+t "cvtss2sd (%rax), %xmm0"
+t "cvtss2sd (%rax), %xmm10"
+
+t "cvtsd2ss %xmm0, %xmm1"
+t "cvtsd2ss %xmm10, %xmm1"
+t "cvtsd2ss (%rax), %xmm0"
+t "cvtsd2ss (%rax), %xmm10"
+
+t "xorps %xmm0, %xmm1"
+t "xorps %xmm10, %xmm1"
+t "xorps (%rax), %xmm0"
+t "xorps (%rax), %xmm10"
+
+t "xorpd %xmm0, %xmm1"
+t "xorpd %xmm10, %xmm1"
+t "xorpd (%rax), %xmm0"
+t "xorpd (%rax), %xmm10"
+
+t "movsd %xmm0, %xmm1"
+t "movsd %xmm0, (%rax)"
+t "movsd (%rax), %xmm0"
+t "movsd %xmm0, %xmm1"
+t "movsd %xmm10, (%rax)"
+t "movsd (%rax), %xmm10"
+
+t "movss %xmm0, %xmm1"
+t "movss %xmm0, (%rax)"
+t "movss (%rax), %xmm0"
+t "movss %xmm0, %xmm1"
+t "movss %xmm10, (%rax)"
+t "movss (%rax), %xmm10"
+
 t "mulsd %xmm0, %xmm1"
 t "mulsd (%rax), %xmm1"
 t "mulsd %xmm10, %xmm1"

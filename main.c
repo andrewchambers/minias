@@ -679,13 +679,24 @@ static void assembleshift(Instr *instr, uint8_t immreg) {
   }
 }
 
-static void assemblemulsucomis(Instr *instr, VarBytes prefix, VarBytes opcode) {
+static void assemblexmmbasicop(Instr *instr, VarBytes prefix, VarBytes opcode) {
   if (instr->arg1->kind == ASM_MEMARG) {
     assemblemem(&instr->arg1->memarg, 0, prefix, opcode,
                 regbits(instr->arg2->kind));
   } else {
     assemblemodregrm(0, prefix, opcode, 3, regbits(instr->arg2->kind),
                      regbits(instr->arg1->kind));
+  }
+}
+
+static void assemblemovsmmx(Instr *instr, VarBytes prefix) {
+  VarBytes opcode;
+  if (instr->variant == 2) {
+    opcode = 0x01000f11;
+    assemblerrm(instr, prefix, opcode);
+  } else {
+    opcode = 0x01000f10;
+    assemblexmmbasicop(instr, prefix, opcode);
   }
 }
 
@@ -833,6 +844,18 @@ static void assemble(void) {
     case ASM_MOV:
       assemblemov(&v->instr);
       break;
+    case ASM_CVTSS2SD:
+      assemblexmmbasicop(&v->instr, 0xf3, 0x01000f5A);
+      break;
+    case ASM_CVTSD2SS:
+      assemblexmmbasicop(&v->instr, 0xf2, 0x01000f5A);
+      break;
+    case ASM_MOVSD:
+      assemblemovsmmx(&v->instr, 0xf2);
+      break;
+    case ASM_MOVSS:
+      assemblemovsmmx(&v->instr, 0xf3);
+      break;
     case ASM_MOVSX: {
       VarBytes opcode;
       if (v->instr.variant >= 10) {
@@ -890,10 +913,10 @@ static void assemble(void) {
       assembledivmulneg(&v->instr, 0x04);
       break;
     case ASM_MULSD:
-      assemblemulsucomis(&v->instr, 0xf2, 0x01000f59);
+      assemblexmmbasicop(&v->instr, 0xf2, 0x01000f59);
       break;
     case ASM_MULSS:
-      assemblemulsucomis(&v->instr, 0xf3, 0x01000f59);
+      assemblexmmbasicop(&v->instr, 0xf3, 0x01000f59);
       break;
     case ASM_IMUL: {
       VarBytes prefix, opcode;
@@ -987,10 +1010,16 @@ static void assemble(void) {
       break;
     }
     case ASM_UCOMISD:
-      assemblemulsucomis(&v->instr, 0x66, 0x01000f2e);
+      assemblexmmbasicop(&v->instr, 0x66, 0x01000f2e);
       break;
     case ASM_UCOMISS:
-      assemblemulsucomis(&v->instr, EMPTY_VBYTES, 0x01000f2e);
+      assemblexmmbasicop(&v->instr, EMPTY_VBYTES, 0x01000f2e);
+      break;
+    case ASM_XORPD:
+      assemblexmmbasicop(&v->instr, 0x66, 0x01000f57);
+      break;
+    case ASM_XORPS:
+      assemblexmmbasicop(&v->instr, EMPTY_VBYTES, 0x01000f57);
       break;
     case ASM_XOR: {
       static uint8_t variant2op[24] = {
