@@ -367,14 +367,14 @@ void assembleconstant(int64_t c, int nbytes) {
 typedef uint32_t VarBytes;
 #define EMPTY_VBYTES 0xff000000
 
-static void assemblevbytes(VarBytes opcode) {
+static void assemblevbytes(VarBytes bytes) {
   int i, n;
   uint8_t b, shift;
 
-  n = (int8_t)(uint8_t)((opcode & 0xff000000) >> 24);
+  n = (int8_t)(uint8_t)((bytes & 0xff000000) >> 24);
   for (i = n; i >= 0; i--) {
     shift = i * 8;
-    b = (opcode & (0xff << shift)) >> shift;
+    b = (bytes & (0xff << shift)) >> shift;
     sb(b);
   }
 }
