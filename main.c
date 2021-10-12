@@ -380,7 +380,7 @@ static void assemblevbytes(VarBytes bytes) {
 }
 
 /* Assemble op +rw | op + rd. */
-static void assembleplusr(VarBytes prefix, VarBytes opcode, uint8_t rexw,
+static void assembleplusr(uint8_t rexw, VarBytes prefix, VarBytes opcode,
                           AsmKind reg) {
   uint8_t bits;
   uint8_t rex;
@@ -393,12 +393,9 @@ static void assembleplusr(VarBytes prefix, VarBytes opcode, uint8_t rexw,
   assemblevbytes(opcode | (bits & 7));
 }
 
-static void assemblemodregrm(uint8_t rexw, VarBytes prefix, VarBytes opcode,
+static void assemblemodregrm(uint8_t rex, VarBytes prefix, VarBytes opcode,
                              uint8_t mod, uint8_t reg, uint8_t rm) {
-  uint8_t rex;
-
   assemblevbytes(prefix);
-  rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
   if (rex != rexbyte(0, 0, 0, 0))
     sb(rex);
   assemblevbytes(opcode);
@@ -423,29 +420,26 @@ static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
   assembleconstant(c, nbytes);
 }
 
-/* Assemble a r <-> (%rip) operation. */
-static void assembleriprel(Memarg *memarg, uint8_t rexw, VarBytes prefix,
-                           VarBytes opcode, uint8_t reg) {
-  assemblemodregrm(rexw, prefix, opcode, 0x00, reg, 0x05);
-  if (memarg->l) {
-    assemblereloc(memarg->l, memarg->c - 4, 4, R_X86_64_PC32);
-  } else {
-    assembleconstant(memarg->c, 4);
-  }
-}
-
 /* Assemble a r <-> mem operation.  */
 static void assemblemem(Memarg *memarg, uint8_t rexw, VarBytes prefix,
                         VarBytes opcode, uint8_t reg) {
 
   uint8_t rex, mod, rm, scale, index, base, sib;
 
-  rm = regbits(memarg->base);
-
+  /* rip relative addressing. */
   if (memarg->base == ASM_RIP) {
-    assembleriprel(memarg, rexw, prefix, opcode, reg);
+    rm = 0x05;
+    rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
+    assemblemodregrm(rex, prefix, opcode, 0x00, reg, rm);
+    if (memarg->l) {
+      assemblereloc(memarg->l, memarg->c - 4, 4, R_X86_64_PC32);
+    } else {
+      assembleconstant(memarg->c, 4);
+    }
     return;
   }
+
+  rm = regbits(memarg->base);
 
   /* Case when we don't need sib */
   if (memarg->index == ASM_NO_REG && memarg->scale == 0 && ((rm & 7) != 4)) {
@@ -460,12 +454,8 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, VarBytes prefix,
       mod = 2;
     }
 
-    assemblevbytes(prefix);
     rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
-    if (rex != rexbyte(0, 0, 0, 0))
-      sb(rex);
-    assemblevbytes(opcode);
-    sb(modregrmbyte(mod, reg, rm));
+    assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
 
     if (mod == 1) {
       assemblereloc(memarg->l, memarg->c, 1, R_X86_64_32);
@@ -521,14 +511,10 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, VarBytes prefix,
     lfatal("invalid addressing scale");
   }
 
-  assemblevbytes(prefix);
   rex = rexbyte(rexw, reg & (1 << 3), index & (1 << 3), base & (1 << 3));
-  if (rex != rexbyte(0, 0, 0, 0))
-    sb(rex);
-  assemblevbytes(opcode);
-  sb2(modregrmbyte(mod, reg, rm), sibbyte(scale, index, base));
+  assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
+  sb(sibbyte(scale, index, base));
 
-  /* If mod is set, or we are indexing bp we must output a displacement. */
   if (mod)
     assemblereloc(memarg->l, memarg->c, (mod == 2) ? 4 : 1, R_X86_64_32);
 }
@@ -536,6 +522,7 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, VarBytes prefix,
 /* Assemble op + imm -> r/m. */
 static void assembleimmrm(Instr *instr, uint8_t rexw, VarBytes prefix,
                           VarBytes opcode, uint8_t immreg) {
+  uint8_t rex, rm;
   Imm *imm;
 
   imm = &instr->arg1->imm;
@@ -543,14 +530,16 @@ static void assembleimmrm(Instr *instr, uint8_t rexw, VarBytes prefix,
   if (instr->arg2->kind == ASM_MEMARG) {
     assemblemem(&instr->arg2->memarg, rexw, prefix, opcode, immreg);
   } else {
-    assemblemodregrm(rexw, prefix, opcode, 0x03, immreg,
-                     regbits(instr->arg2->kind));
+    rm = regbits(instr->arg2->kind);
+    rex = rexbyte(rexw, immreg & (1 << 3), 0, rm & (1 << 3));
+    assemblemodregrm(rex, prefix, opcode, 0x03, immreg, rm);
   }
   assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
 }
 
 /* Assemble op + r <-> r/m. */
 static void assemblerrm(Instr *instr, VarBytes prefix, VarBytes opcode) {
+  uint8_t rexw, rex, reg1, reg2, rm;
   Memarg *memarg;
   AsmKind regarg;
 
@@ -563,8 +552,11 @@ static void assemblerrm(Instr *instr, VarBytes prefix, VarBytes opcode) {
     regarg = instr->arg1->kind;
     assemblemem(memarg, isreg64(regarg), prefix, opcode, regbits(regarg));
   } else {
-    assemblemodregrm(isreg64(instr->arg2->kind), prefix, opcode, 0x03,
-                     regbits(instr->arg1->kind), regbits(instr->arg2->kind));
+    rexw = isreg64(instr->arg2->kind);
+    reg1 = regbits(instr->arg1->kind);
+    reg2 = regbits(instr->arg2->kind);
+    rex = rexbyte(rexw, reg1 & (1 << 3), 0, reg2 & (1 << 3));
+    assemblemodregrm(rex, prefix, opcode, 0x03, reg1, reg2);
   }
 }
 
@@ -600,7 +592,7 @@ static void assemblexchg(Instr *xchg) {
   if (xchg->variant < 6) {
     AsmKind reg = (xchg->variant % 2) ? xchg->arg1->kind : xchg->arg2->kind;
     prefix = (xchg->variant < 2) ? 0x66 : EMPTY_VBYTES;
-    assembleplusr(prefix, opcode, isreg64(reg), reg);
+    assembleplusr(isreg64(reg), prefix, opcode, reg);
   } else {
     prefix = (((xchg->variant - 6) % 4) == 1) ? 0x66 : EMPTY_VBYTES;
     assemblerrm(xchg, prefix, opcode);
@@ -622,13 +614,12 @@ static void assemblemov(Instr *mov) {
 
   if (mov->variant >= 4 && mov->variant <= 6) {
     imm = &mov->arg1->imm;
-    assembleplusr(prefix, opcode, isreg64(mov->arg2->kind), mov->arg2->kind);
+    assembleplusr(isreg64(mov->arg2->kind), prefix, opcode, mov->arg2->kind);
     assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
   } else if (mov->variant == 7 || mov->variant < 4) {
     rexw = ((mov->variant % 4) == 3);
     assembleimmrm(mov, rexw, prefix, opcode, 0x00);
   } else {
-    rexw = ((mov->variant % 4) == 3);
     assemblerrm(mov, prefix, opcode);
   }
 }
@@ -646,7 +637,7 @@ static void assemblemovextend(Instr *mov, VarBytes opcode) {
 
 static void assembledivmulneg(Instr *instr, uint8_t reg) {
   VarBytes prefix, opcode;
-  uint8_t rexw, mod, rm, opsz;
+  uint8_t rexw, rex, mod, rm, opsz;
 
   rexw = (instr->variant % 4) == 3;
   prefix = (instr->variant % 4) == 1 ? 0x66 : EMPTY_VBYTES;
@@ -655,8 +646,9 @@ static void assembledivmulneg(Instr *instr, uint8_t reg) {
   if (instr->arg1->kind == ASM_MEMARG) {
     assemblemem(&instr->arg1->memarg, rexw, prefix, opcode, reg);
   } else {
+    rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
     rm = regbits(instr->arg1->kind);
-    assemblemodregrm(rexw, prefix, opcode, 0x03, reg, rm);
+    assemblemodregrm(rex, prefix, opcode, 0x03, reg, rm);
   }
 }
 
@@ -674,18 +666,23 @@ static void assembleshift(Instr *instr, uint8_t immreg) {
     assemblemem(&instr->arg2->memarg, rexw, prefix, opcode, immreg);
   } else {
     rexw = isreg64(instr->arg2->kind);
-    assemblemodregrm(rexw, prefix, opcode, 0x03, immreg,
-                     regbits(instr->arg2->kind));
+    rm = regbits(instr->arg2->kind);
+    rex = rexbyte(rexw, immreg & (1 << 3), 0, rm & (1 << 3));
+    assemblemodregrm(rex, prefix, opcode, 0x03, immreg, rm);
   }
 }
 
 static void assemblexmmbasicop(Instr *instr, VarBytes prefix, VarBytes opcode) {
+  uint8_t rex, reg, rm;
+
   if (instr->arg1->kind == ASM_MEMARG) {
     assemblemem(&instr->arg1->memarg, 0, prefix, opcode,
                 regbits(instr->arg2->kind));
   } else {
-    assemblemodregrm(0, prefix, opcode, 3, regbits(instr->arg2->kind),
-                     regbits(instr->arg1->kind));
+    reg = regbits(instr->arg2->kind);
+    rm = regbits(instr->arg1->kind);
+    rex = rexbyte(0, reg & (1 << 3), 0, rm & (1 << 3));
+    assemblemodregrm(rex, prefix, opcode, 0x03, reg, rm);
   }
 }
 
@@ -697,6 +694,29 @@ static void assemblemovsmmx(Instr *instr, VarBytes prefix) {
   } else {
     opcode = 0x01000f10;
     assemblexmmbasicop(instr, prefix, opcode);
+  }
+}
+
+static void assembletest(Instr *instr) {
+  VarBytes prefix;
+  uint8_t rexw, byteop;
+
+  byteop = ((instr->variant % 4) == 0);
+  prefix = ((instr->variant % 4) == 1) ? 0x66 : EMPTY_VBYTES;
+  rexw = ((instr->variant % 4) == 3);
+
+  if (instr->variant < 4) {
+    Imm *imm;
+    assemblevbytes(prefix);
+    if (rexw)
+      sb(rexbyte(1, 0, 0, 0));
+    assemblevbytes(byteop ? 0xa8 : 0xa9);
+    imm = &instr->arg1->imm;
+    assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
+  } else if (instr->variant < 12) {
+    assembleimmrm(instr, rexw, prefix, byteop ? 0xf6 : 0xf7, 0);
+  } else {
+    assemblerrm(instr, prefix, byteop ? 0x84 : 0x85);
   }
 }
 
@@ -810,14 +830,14 @@ static void assemble(void) {
       if (v->instr.arg1->kind == ASM_MEMARG) {
         assemblemem(&v->instr.arg1->memarg, 0, EMPTY_VBYTES, 0xff, 0x06);
       } else {
-        assembleplusr(EMPTY_VBYTES, 0x50, 0, v->instr.arg1->kind);
+        assembleplusr(0, EMPTY_VBYTES, 0x50, v->instr.arg1->kind);
       }
       break;
     case ASM_POP:
       if (v->instr.arg1->kind == ASM_MEMARG) {
         assemblemem(&v->instr.arg1->memarg, 0, EMPTY_VBYTES, 0x8f, 0x00);
       } else {
-        assembleplusr(EMPTY_VBYTES, 0x58, 0, v->instr.arg1->kind);
+        assembleplusr(0, EMPTY_VBYTES, 0x58, v->instr.arg1->kind);
       }
       break;
     case ASM_NOP:
@@ -924,7 +944,7 @@ static void assemble(void) {
       if (v->instr.variant < 8) {
         assembledivmulneg(&v->instr, 0x05);
       } else if (v->instr.variant < 14) {
-        opcode = 0x01000faf; // 0f af variable length opcode.
+        opcode = 0x01000faf;
         prefix = ((v->instr.variant - 8) % 3) == 0 ? 0x66 : EMPTY_VBYTES;
         assemblerrm(&v->instr, prefix, opcode);
       } else {
@@ -951,6 +971,7 @@ static void assemble(void) {
     }
     case ASM_SET: {
       VarBytes prefix, opcode;
+      uint8_t rex, reg, rm;
       static uint8_t variant2op[30] = {
           0x94, 0x98, 0x9b, 0x9a, 0x9a, 0x90, 0x95, 0x99, 0x9b, 0x91,
           0x9f, 0x9d, 0x9c, 0x9e, 0x95, 0x93, 0x97, 0x93, 0x92, 0x96,
@@ -961,8 +982,11 @@ static void assemble(void) {
       if (v->instr.arg1->kind == ASM_MEMARG) {
         assemblemem(&v->instr.arg1->memarg, 0, prefix, opcode, 0);
       } else {
-        assemblemodregrm(isreg64(v->instr.arg1->kind), prefix, opcode, 0x03,
-                         0x00, regbits(v->instr.arg1->kind));
+        reg = 0;
+        rm = regbits(v->instr.arg1->kind);
+        rex = rexbyte(isreg64(v->instr.arg1->kind), reg & (1 << 3), 0,
+                      rm & (1 << 3));
+        assemblemodregrm(rex, prefix, opcode, 0x03, reg, rm);
       }
       break;
     }
@@ -985,30 +1009,9 @@ static void assemble(void) {
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x05);
       break;
     }
-    case ASM_TEST: {
-
-      VarBytes prefix;
-      uint8_t rexw, byteop;
-
-      byteop = ((v->instr.variant % 4) == 0);
-      prefix = ((v->instr.variant % 4) == 1) ? 0x66 : EMPTY_VBYTES;
-      rexw = ((v->instr.variant % 4) == 3);
-
-      if (v->instr.variant < 4) {
-        Imm *imm;
-        assemblevbytes(prefix);
-        if (rexw)
-          sb(rexbyte(1, 0, 0, 0));
-        assemblevbytes(byteop ? 0xa8 : 0xa9);
-        imm = &v->instr.arg1->imm;
-        assemblereloc(imm->l, imm->c, imm->nbytes, R_X86_64_32);
-      } else if (v->instr.variant < 12) {
-        assembleimmrm(&v->instr, rexw, prefix, byteop ? 0xf6 : 0xf7, 0);
-      } else {
-        assemblerrm(&v->instr, prefix, byteop ? 0x84 : 0x85);
-      }
+    case ASM_TEST:
+      assembletest(&v->instr);
       break;
-    }
     case ASM_UCOMISD:
       assemblexmmbasicop(&v->instr, 0x66, 0x01000f2e);
       break;
