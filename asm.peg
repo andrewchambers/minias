@@ -26,13 +26,20 @@ directive =
     { $$.kind = ASM_DIR_TEXT; }
   | "balign" ws n:number 
     { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.i64 }; }
-  | "byte" ws n:number
-    { $$.dirbyte = (Byte){.kind = ASM_DIR_BYTE, .v = n.i64 }; }
-  | "int" ws n:number
-    { $$.dirint = (Int){.kind = ASM_DIR_INT, .v = n.i64 }; }
-  | "quad" ws n:number
-    { $$.dirquad = (Quad){.kind = ASM_DIR_QUAD, .v = n.i64 }; }
-  | sd:section-directive { $$ = sd; }
+  | "byte" ws v:value
+    { $$.dirbyte = (Byte){.kind = ASM_DIR_BYTE, .value = v.value }; }
+  | "int" ws v:value
+    { $$.dirint = (Int){.kind = ASM_DIR_INT,  .value = v.value }; }
+  | "quad" ws v:value
+    { $$.dirquad = (Quad){.kind = ASM_DIR_QUAD, .value = v.value }; }
+  | fd:fill-directive
+    { $$ = fd; }
+  | sd:section-directive
+    { $$ = sd; }
+
+fill-directive = 
+  "fill" ws r:number ws? "," ws? s:number ws? "," ws? v:number
+  { $$.fill = (Fill){ .kind=ASM_DIR_FILL, .repeat = r.i64, .size = s.i64, .value = v.i64 }; }
 
 section-directive =
   "section" ws? n:section-name (
@@ -243,12 +250,12 @@ imul = "imul" (
       | 'w'? ws s:r16   ws? ',' ws? d:r16 { $$ = INSTR2(11, s, d); }
       | 'l'? ws s:r32   ws? ',' ws? d:r32 { $$ = INSTR2(12, s, d); }
       | 'q'? ws s:r64   ws? ',' ws? d:r64 { $$ = INSTR2(13, s, d); }
-      | 'w'? ws i:imm16 ',' ws? s:m   ws? ',' ws? d:r16 { $$ = INSTR3(14, s, d, i); }
-      | 'l'? ws i:imm32 ',' ws? s:m   ws? ',' ws? d:r32 { $$ = INSTR3(15, s, d, i); }
-      | 'q'? ws i:imm32 ',' ws? s:m   ws? ',' ws? d:r64 { $$ = INSTR3(16, s, d, i); }
-      | 'w'? ws i:imm16 ',' ws? s:r16 ws? ',' ws? d:r16 { $$ = INSTR3(17, s, d, i); }
-      | 'l'? ws i:imm32 ',' ws? s:r32 ws? ',' ws? d:r32 { $$ = INSTR3(18, s, d, i); }
-      | 'q'? ws i:imm32 ',' ws? s:r64 ws? ',' ws? d:r64 { $$ = INSTR3(19, s, d, i); }
+      | 'w'? ws i:imm16 ws? ',' ws? s:m   ws? ',' ws? d:r16 { $$ = INSTR3(14, s, d, i); }
+      | 'l'? ws i:imm32 ws? ',' ws? s:m   ws? ',' ws? d:r32 { $$ = INSTR3(15, s, d, i); }
+      | 'q'? ws i:imm32 ws? ',' ws? s:m   ws? ',' ws? d:r64 { $$ = INSTR3(16, s, d, i); }
+      | 'w'? ws i:imm16 ws? ',' ws? s:r16 ws? ',' ws? d:r16 { $$ = INSTR3(17, s, d, i); }
+      | 'l'? ws i:imm32 ws? ',' ws? s:r32 ws? ',' ws? d:r32 { $$ = INSTR3(18, s, d, i); }
+      | 'q'? ws i:imm32 ws? ',' ws? s:r64 ws? ',' ws? d:r64 { $$ = INSTR3(19, s, d, i); }
     )
     # Must come last due to peg ordering.
     | args:m-opargs { $$ = args; }
@@ -403,28 +410,25 @@ r64-or-rip = (
 
 scale-index-base = 
      '(' ws? b:r64 ws? ',' ws? i:r64 ws? ',' ws? s:number ws? ')'
-     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = s.i64, .index=i.kind, .base = b.kind, .c = 0, .l = NULL  }; }
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = s.i64, .index=i.kind, .base = b.kind, .disp = (Value){ .c = 0, .l = NULL }  }; }
    | '(' ws? b:r64 ws? ',' ws? i:r64 ')'
-     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 1, .index=i.kind, .base = b.kind, .c = 0, .l = NULL  }; }
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 1, .index=i.kind, .base = b.kind, .disp = (Value){ .c = 0, .l = NULL }  }; }
    | '(' ws? b:r64-or-rip ws? ')'
-     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 0, .index=ASM_NO_REG, .base = b.kind, .c = 0, .l = NULL  }; }
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 0, .index=ASM_NO_REG, .base = b.kind, .disp = (Value){ .c = 0, .l = NULL }  }; }
 
-# XXX There are more addressing modes.
 m = 
     sib:scale-index-base
     { $$ = sib; }
-  | disp:number ws? sib:scale-index-base
-    { sib.memarg.c = disp.i64; $$ = sib; }
-  | i:ident ws? sib:scale-index-base
-    { sib.memarg.l = i.charptr; $$ = sib; }
+  | d:value ws? sib:scale-index-base
+    { sib.memarg.disp = d.value; $$ = sib; }
 
 imm8 = i:imm { i.imm.nbytes = 1; $$ = i; }
 imm16 = i:imm { i.imm.nbytes = 2; $$ = i; }
 imm32 = i:imm { i.imm.nbytes = 4; $$ = i; }
 
-imm =
-  '$' ws? n:number
-  { $$.imm = (Imm){ .kind = ASM_IMM, .c = n.i64, .l = NULL, .nbytes = 0}; }
+imm = 
+    '$' ws? val:value
+    { $$.imm = (Imm){ .kind = ASM_IMM, .v = val.value, .nbytes = 0}; }
 
 al = "%al" { $$ = REG(ASM_AL); }
 cl = "%cl" { $$ = REG(ASM_CL); }
@@ -536,10 +540,21 @@ string-escape = '\\' (
   | [0-7][0-7][0-7]
 )
 
+value = 
+    n:number { $$.value = (Value){ .l = NULL, .c = n.i64 }; }
+  |
+    i:ident ws? ( 
+      '+' ws? n:number    { $$.value = (Value){ .c = n.i64 }; }
+      | &'-' n:number { $$.value = (Value){ .c = n.i64 }; }
+      | { $$.value = (Value){ .c = 0 }; }
+    ) { $$.value.l = i.charptr; }
+
 ident = 
   <[._a-zA-Z][._a-zA-Z0-9]*>
   { $$.charptr = xstrdup(yytext); } 
 
 number =
-  <'-'?[0-9]+>
-  { $$.i64 = strtoll(yytext, NULL, 10); }
+    <'-'? ws? [0-9]+>
+    { $$.i64 = strtoll(yytext, NULL, 10); }
+  | <[0-9]+>
+    { $$.i64 = (int64_t)strtoull(yytext, NULL, 10); }

@@ -53,6 +53,7 @@ typedef enum {
   ASM_DIR_ASCIIZ,
   ASM_DIR_DATA,
   ASM_DIR_TEXT,
+  ASM_DIR_FILL,
   ASM_DIR_BYTE,
   ASM_DIR_INT,
   ASM_DIR_QUAD,
@@ -214,18 +215,23 @@ typedef struct {
 } DirSection;
 
 typedef struct {
+  int64_t c;
+  const char *l;
+} Value;
+
+typedef struct {
   AsmKind kind;
-  int64_t v;
+  Value value;
 } Byte;
 
 typedef struct {
   AsmKind kind;
-  int64_t v;
+  Value value;
 } Int;
 
 typedef struct {
   AsmKind kind;
-  int64_t v;
+  Value value;
 } Quad;
 
 typedef struct {
@@ -235,9 +241,15 @@ typedef struct {
 
 typedef struct {
   AsmKind kind;
+  int32_t size;
+  int32_t repeat;
+  int64_t value;
+} Fill;
+
+typedef struct {
+  AsmKind kind;
   uint8_t nbytes;
-  const char *l; /* label */
-  int64_t c;     /* constant */
+  Value v;
 } Imm;
 
 typedef struct {
@@ -245,8 +257,7 @@ typedef struct {
   AsmKind base;
   AsmKind index;
   uint8_t scale;
-  const char *l; /* label */
-  int64_t c;     /* constant */
+  Value disp;
 } Memarg;
 
 typedef struct {
@@ -288,12 +299,14 @@ union Parsev {
   Instr instr;
   Call call;
   Jmp jmp;
+  Fill fill;
   Byte dirbyte;
   Int dirint;
   Quad dirquad;
   Imm imm;
   String string;
   // Temporary values.
+  Value value;
   const char *charptr;
   int64_t i64;
 };
