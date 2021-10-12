@@ -118,9 +118,14 @@ pop =
     | 'q'  ws d:m   { $$ = INSTR1(1, d); }
   ) { $$.instr.kind = ASM_POP; }
 
-call = 
-  "call" 'q'? ws t:ident 
-  { $$.call = (Call){ .kind = ASM_CALL, .target=t.charptr } ; }
+call = "call" 'q'? ws (
+    '*' t:m 
+      { $$.call = (Call){ .kind = ASM_CALL, .target.indirect=dupv(&t), .indirect=1 } ; }
+  | '*' t:r64 
+      { $$.call = (Call){ .kind = ASM_CALL, .target.indirect=dupv(&t), .indirect=1 } ; }
+  | t:value 
+      { $$.call = (Call){ .kind = ASM_CALL, .target.direct=t.value, .indirect=0 } ; }
+)
 
 jmp = 'j' v:jmp-variant ws t:ident
     { $$.jmp = (Jmp) {.kind = ASM_JMP, .variant=v.i64, .target=t.charptr}; }
@@ -408,19 +413,21 @@ r64-or-rip = (
   | r:rip
 ) { $$ = r; }
 
-scale-index-base = 
-     '(' ws? b:r64 ws? ',' ws? i:r64 ws? ',' ws? s:number ws? ')'
-     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = s.i64, .index=i.kind, .base = b.kind, .disp = (Value){ .c = 0, .l = NULL }  }; }
-   | '(' ws? b:r64 ws? ',' ws? i:r64 ')'
-     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 1, .index=i.kind, .base = b.kind, .disp = (Value){ .c = 0, .l = NULL }  }; }
-   | '(' ws? b:r64-or-rip ws? ')'
-     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 0, .index=ASM_NO_REG, .base = b.kind, .disp = (Value){ .c = 0, .l = NULL }  }; }
+m =
+    d:value ws? sib:opt-scale-index-base { $$ = sib; $$.memarg.disp = d.value; }
+  | sib:scale-index-base { $$ = sib; }
 
-m = 
-    sib:scale-index-base
-    { $$ = sib; }
-  | d:value ws? sib:scale-index-base
-    { sib.memarg.disp = d.value; $$ = sib; }
+opt-scale-index-base =
+    sib:scale-index-base { $$ = sib; }
+  | {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 0, .index=ASM_NO_REG, .base = ASM_NO_REG, .disp = {0}  }; }
+
+scale-index-base =
+     '(' ws? b:r64 ws? ',' ws? i:r64 ws? ',' ws? s:number ws? ')'
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = s.i64, .index=i.kind, .base = b.kind, .disp = {0}  }; }
+   | '(' ws? b:r64 ws? ',' ws? i:r64 ')'
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 1, .index=i.kind, .base = b.kind, .disp = {0}  }; }
+   | '(' ws? b:r64-or-rip ws? ')'
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 0, .index=ASM_NO_REG, .base = b.kind, .disp = {0}  }; }
 
 imm8 = i:imm { i.imm.nbytes = 1; $$ = i; }
 imm16 = i:imm { i.imm.nbytes = 2; $$ = i; }

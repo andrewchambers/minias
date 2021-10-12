@@ -426,6 +426,21 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, VarBytes prefix,
 
   uint8_t rex, mod, rm, scale, index, base, sib;
 
+  /* Direct memory access */
+  if (memarg->base == ASM_NO_REG) {
+    mod = 0;
+    rm = 4;
+    rex = rexbyte(rexw, reg & (1 << 3), 0, 0);
+    assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
+    sb(sibbyte(0, 4, 5));
+    if (memarg->disp.l) {
+      assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_PC32);
+    } else {
+      assembleconstant(memarg->disp.c, 4);
+    }
+    return;
+  }
+
   /* rip relative addressing. */
   if (memarg->base == ASM_RIP) {
     rm = 0x05;
@@ -821,11 +836,22 @@ static void assemble(void) {
       sym->defined = 1;
       break;
     case ASM_CALL: {
-      Symbol *sym;
-      Relocation *reloc;
+      uint8_t rm, rex;
 
-      sb(0xe8);
-      assemblereloc(v->call.target, -4, 4, R_X86_64_PC32);
+      if (v->call.indirect) {
+        if (v->call.target.indirect->kind == ASM_MEMARG) {
+          assemblemem(&v->call.target.indirect->memarg, 0, EMPTY_VBYTES, 0xff,
+                      0x02);
+        } else {
+          rm = regbits(v->call.target.indirect->kind);
+          rex = rexbyte(0, 0, 0, rm & (1 << 3));
+          assemblemodregrm(rex, EMPTY_VBYTES, 0xff, 0x03, 0x02, rm);
+        }
+      } else {
+        sb(0xe8);
+        assemblereloc(v->call.target.direct.l, v->call.target.direct.c - 4, 4,
+                      R_X86_64_PC32);
+      }
       break;
     }
     case ASM_JMP: {

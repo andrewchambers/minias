@@ -270,7 +270,11 @@ typedef String Asciiz;
 
 typedef struct {
   AsmKind kind;
-  const char *target;
+  uint8_t indirect;
+  union {
+    Parsev *indirect;
+    Value  direct;
+  } target;
 } Call;
 
 typedef struct {

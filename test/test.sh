@@ -30,6 +30,9 @@ t () {
   echo -n "."
 }
 
+t "callq *%rax"
+t "callq *%r10"
+
 t "cvtss2sd %xmm0, %xmm1"
 t "cvtss2sd %xmm10, %xmm1"
 t "cvtss2sd (%rax), %xmm0"
