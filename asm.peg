@@ -554,7 +554,13 @@ ident =
   { $$.charptr = xstrdup(yytext); } 
 
 number =
-    <'-'? ws? [0-9]+>
-    { $$.i64 = strtoll(yytext, NULL, 10); }
+  '-' ws? n:unsigned-number
+    { $$.i64 = -n.i64; }
+  | n:unsigned-number
+    { $$.i64 = n.i64; }
+
+unsigned-number = 
+    '0' [xX] <[0-9a-fA-F]+>
+    { $$.i64 = (int64_t)strtoull(yytext, NULL, 16); }
   | <[0-9]+>
     { $$.i64 = (int64_t)strtoull(yytext, NULL, 10); }
