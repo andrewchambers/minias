@@ -498,9 +498,9 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, VarBytes prefix,
   if (memarg->index == ASM_NO_REG) {
     index = 4;
   } else {
+    if (memarg->index == ASM_RSP)
+      lfatal("rsp cannot be used as an index");
     index = regbits(memarg->index);
-    if ((index & 7) == 4)
-      lfatal("sp cannot be used as an index");
   }
 
   /* If our base is a bp register, we must use the index instead. */

@@ -33,6 +33,8 @@ t () {
 t "callq *%rax"
 t "callq *%r10"
 
+t "movb %r11b, (%rsi, %r12, 1)"
+
 t "cvtsi2sd %rax, %xmm1"
 t "cvtsi2sd %rax, %xmm10"
 t "cvtsi2sd (%rax), %xmm1"
