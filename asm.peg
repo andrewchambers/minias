@@ -53,8 +53,8 @@ section-directive =
       {$$.section = (DirSection){.kind=ASM_DIR_SECTION, .name=n.charptr, .flags="", .type=SHT_PROGBITS}; }
   )
 
-section-name = <[.a-zA-Z0-9\-]+> { $$.charptr = xstrdup(yytext); }
-section-flags = '"' <[awx]*> '"' { $$.charptr = xstrdup(yytext); }
+section-name = <[.a-zA-Z0-9\-]+> { $$.charptr = internstring(yytext); }
+section-flags = '"' <[awx]*> '"' { $$.charptr = internstring(yytext); }
 section-type =
     "@nobits" { $$.i64 = SHT_NOBITS; }
   | "@progbits" { $$.i64 = SHT_PROGBITS; }
@@ -589,7 +589,7 @@ value =
 
 ident = 
   <[._a-zA-Z][._a-zA-Z0-9]*>
-  { $$.charptr = xstrdup(yytext); } 
+  { $$.charptr = internstring(yytext); } 
 
 number =
   '-' ws? n:unsigned-number

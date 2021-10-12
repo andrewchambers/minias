@@ -349,6 +349,8 @@ char *xmemdup(const char *, size_t);
 char *xstrdup(const char *s);
 void *zalloc(size_t n);
 
+const char *internstring(const char *s);
+
 struct hashtable {
   size_t len, cap;
   struct hashtablekey *keys;
