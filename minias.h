@@ -55,6 +55,7 @@ typedef enum {
   ASM_DIR_TEXT,
   ASM_DIR_FILL,
   ASM_DIR_BYTE,
+  ASM_DIR_SHORT,
   ASM_DIR_INT,
   ASM_DIR_QUAD,
   ASM_DIR_BALIGN,
@@ -73,6 +74,8 @@ typedef enum {
   ASM_CMP,
   ASM_CVTSS2SD,
   ASM_CVTSD2SS,
+  ASM_CVTSI2SD,
+  ASM_CVTSI2SS,
   ASM_DIV,
   ASM_IDIV,
   ASM_LEA,
@@ -81,12 +84,14 @@ typedef enum {
   ASM_MULSS,
   ASM_IMUL,
   ASM_MOV,
+  ASM_MOVAPS,
   ASM_MOVSD,
   ASM_MOVSS,
   ASM_MOVSX,
   ASM_MOVZX,
   ASM_NEG,
   ASM_OR,
+  ASM_PXOR,
   ASM_SAL,
   ASM_SAR,
   ASM_SET,
@@ -227,6 +232,11 @@ typedef struct {
 typedef struct {
   AsmKind kind;
   Value value;
+} Short;
+
+typedef struct {
+  AsmKind kind;
+  Value value;
 } Int;
 
 typedef struct {
@@ -305,6 +315,7 @@ union Parsev {
   Jmp jmp;
   Fill fill;
   Byte dirbyte;
+  Short dirshort;
   Int dirint;
   Quad dirquad;
   Imm imm;

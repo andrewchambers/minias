@@ -1,19 +1,19 @@
 
 line  =
-      ws? s:stmt eol { yy->v = s; }
+      ws? s:stmt { yy->v = s; }
     | eol { yy->v.kind = ASM_BLANK; }
     | . { yy->v.kind = ASM_SYNTAX_ERROR; }
 
-ws = 
-    [ \t]+
-  | "/*" (! "*/" . )* "*/" # XXX multiline comments break our line numbers.
+ws = ([ \t] | comment)+
+
+comment = "/*" (! "*/" . )* "*/"   # XXX multiline comments break our line numbers.
 
 eol = ws? "\n"
 
 stmt =
-    '.' d:directive {$$ = d;}
-  | i:instr { $$ = i; }
-  | l:label {  $$ = l; } 
+    '.' d:directive eol {$$ = d;}
+  | l:label eol {  $$ = l; } 
+  | i:instr eol { $$ = i; }
 
 directive =
    "glob" 'o'? 'l' ws i:ident
@@ -28,6 +28,8 @@ directive =
     { $$.balign = (Balign){.kind = ASM_DIR_BALIGN, .align = n.i64 }; }
   | "byte" ws v:value
     { $$.dirbyte = (Byte){.kind = ASM_DIR_BYTE, .value = v.value }; }
+  | "short" ws v:value
+    { $$.dirshort = (Short){.kind = ASM_DIR_BYTE, .value = v.value }; }
   | "int" ws v:value
     { $$.dirint = (Int){.kind = ASM_DIR_INT,  .value = v.value }; }
   | "quad" ws v:value
@@ -74,6 +76,8 @@ instr =
   | i:jmp      { $$ = i; }
   | i:add      { $$ = i; }
   | i:and      { $$ = i; }
+  | i:cvtsi2sd { $$ = i; }
+  | i:cvtsi2ss { $$ = i; }
   | i:cvtss2sd { $$ = i; }
   | i:cvtsd2ss { $$ = i; }
   | i:cmp      { $$ = i; }
@@ -85,12 +89,14 @@ instr =
   | i:mul      { $$ = i; }
   | i:imul     { $$ = i; }
   | i:neg      { $$ = i; }
+  | i:movaps   { $$ = i; }
   | i:movsd    { $$ = i; }
   | i:movss    { $$ = i; }
   | i:movsx    { $$ = i; }
   | i:movzx    { $$ = i; }
   | i:mov      { $$ = i; }
   | i:or       { $$ = i; }
+  | i:pxor     { $$ = i; }
   | i:set      { $$ = i; }
   | i:sub      { $$ = i; }
   | i:sal      { $$ = i; }
@@ -185,6 +191,20 @@ idiv = "idiv" (
 
 # TODO XXX Combine the xmm variants into single instructions??
 
+cvtsi2sd = "cvtsi2sd" (
+     ws s:r32 ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  |  ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  |  ws s:r64 ws? ',' ws? d:xmm { $$ = INSTR2(2, s, d); }
+  |  ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(3, s, d); }
+)  { $$.instr.kind = ASM_CVTSI2SD; }
+
+cvtsi2ss = "cvtsi2ss" (
+     ws s:r32 ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  |  ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  |  ws s:r64 ws? ',' ws? d:xmm { $$ = INSTR2(2, s, d); }
+  |  ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(3, s, d); }
+)  { $$.instr.kind = ASM_CVTSI2SS; }
+
 cvtss2sd = "cvtss2sd" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
   | ws s:m     ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
@@ -194,6 +214,12 @@ cvtsd2ss = "cvtsd2ss" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
   | ws s:m     ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_CVTSD2SS; }
+
+movaps = "movaps" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:xmm ws? ',' ws? d:m   { $$ = INSTR2(2, s, d); }
+)  { $$.instr.kind = ASM_MOVAPS; }
 
 mulsd = "mulsd" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
@@ -226,6 +252,11 @@ ucomisd = "ucomisd" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
   | ws s:m     ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_UCOMISD; }
+
+pxor = "pxor" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:m   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_PXOR; }
 
 xorpd = "xorpd" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }

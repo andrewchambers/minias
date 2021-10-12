@@ -33,6 +33,32 @@ t () {
 t "callq *%rax"
 t "callq *%r10"
 
+t "cvtsi2sd %rax, %xmm1"
+t "cvtsi2sd %rax, %xmm10"
+t "cvtsi2sd (%rax), %xmm1"
+t "cvtsi2sd (%rax), %xmm10"
+t "cvtsi2sd %eax, %xmm1"
+t "cvtsi2sd %eax, %xmm10"
+
+t "cvtsi2ss %rax, %xmm1"
+t "cvtsi2ss %rax, %xmm10"
+t "cvtsi2ss (%rax), %xmm1"
+t "cvtsi2ss (%rax), %xmm10"
+t "cvtsi2ss %eax, %xmm1"
+t "cvtsi2ss %eax, %xmm10"
+
+t "pxor %xmm0, %xmm1"
+t "pxor %xmm10, %xmm1"
+t "pxor (%rax), %xmm0"
+t "pxor (%rax), %xmm10"
+
+t "movaps %xmm0, %xmm1"
+t "movaps %xmm0, (%rax)"
+t "movaps (%rax), %xmm0"
+t "movaps %xmm0, %xmm1"
+t "movaps %xmm10, (%rax)"
+t "movaps (%rax), %xmm10"
+
 t "cvtss2sd %xmm0, %xmm1"
 t "cvtss2sd %xmm10, %xmm1"
 t "cvtss2sd (%rax), %xmm0"
@@ -42,6 +68,9 @@ t "cvtsd2ss %xmm0, %xmm1"
 t "cvtsd2ss %xmm10, %xmm1"
 t "cvtsd2ss (%rax), %xmm0"
 t "cvtsd2ss (%rax), %xmm10"
+
+t "pxor %xmm0, %xmm1"
+t "pxor (%rax), %xmm1"
 
 t "xorps %xmm0, %xmm1"
 t "xorps %xmm10, %xmm1"

@@ -689,15 +689,19 @@ static void assembleshift(Instr *instr, uint8_t immreg) {
 }
 
 static void assemblexmmbasicop(Instr *instr, VarBytes prefix, VarBytes opcode) {
-  uint8_t rex, reg, rm;
+  uint8_t rexw, rex, reg, rm;
 
   if (instr->arg1->kind == ASM_MEMARG) {
     assemblemem(&instr->arg1->memarg, 0, prefix, opcode,
                 regbits(instr->arg2->kind));
+  } else if (instr->arg2->kind == ASM_MEMARG) {
+    assemblemem(&instr->arg2->memarg, 0, prefix, opcode,
+                regbits(instr->arg1->kind));
   } else {
+    rexw = isreg64(instr->arg1->kind);
     reg = regbits(instr->arg2->kind);
     rm = regbits(instr->arg1->kind);
-    rex = rexbyte(0, reg & (1 << 3), 0, rm & (1 << 3));
+    rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
     assemblemodregrm(rex, prefix, opcode, 0x03, reg, rm);
   }
 }
@@ -821,6 +825,9 @@ static void assemble(void) {
     case ASM_DIR_BYTE:
       assemblereloc(v->dirbyte.value.l, v->dirbyte.value.c, 1, R_X86_64_32);
       break;
+    case ASM_DIR_SHORT:
+      assemblereloc(v->dirshort.value.l, v->dirshort.value.c, 2, R_X86_64_32);
+      break;
     case ASM_DIR_INT:
       assemblereloc(v->dirint.value.l, v->dirint.value.c, 4, R_X86_64_32);
       break;
@@ -896,6 +903,18 @@ static void assemble(void) {
     case ASM_CQTO:
       sb2(0x48, 0x99);
       break;
+    case ASM_CVTSI2SD:
+      assemblexmmbasicop(&v->instr, 0xf2, 0x01000f2A);
+      break;
+    case ASM_CVTSI2SS:
+      assemblexmmbasicop(&v->instr, 0xf3, 0x01000f2A);
+      break;
+    case ASM_CVTSS2SD:
+      assemblexmmbasicop(&v->instr, 0xf3, 0x01000f5A);
+      break;
+    case ASM_CVTSD2SS:
+      assemblexmmbasicop(&v->instr, 0xf2, 0x01000f5A);
+      break;
     case ASM_RET:
       sb(0xc3);
       break;
@@ -905,14 +924,15 @@ static void assemble(void) {
       assemblerrm(&v->instr, prefix, 0x8d);
       break;
     }
+    case ASM_MOVAPS: {
+      VarBytes prefix, opcode;
+      prefix = EMPTY_VBYTES;
+      opcode = v->instr.variant == 2 ? 0x01000f29 : 0x01000f28;
+      assemblexmmbasicop(&v->instr, prefix, opcode);
+      break;
+    }
     case ASM_MOV:
       assemblemov(&v->instr);
-      break;
-    case ASM_CVTSS2SD:
-      assemblexmmbasicop(&v->instr, 0xf3, 0x01000f5A);
-      break;
-    case ASM_CVTSD2SS:
-      assemblexmmbasicop(&v->instr, 0xf2, 0x01000f5A);
       break;
     case ASM_MOVSD:
       assemblemovsmmx(&v->instr, 0xf2);
@@ -1011,6 +1031,10 @@ static void assemble(void) {
           0x08, 0x09, 0x09, 0x09, 0x08, 0x09, 0x09, 0x09,
       };
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x01);
+      break;
+    }
+    case ASM_PXOR: {
+      assemblexmmbasicop(&v->instr, 0x66, 0x01000fef);
       break;
     }
     case ASM_SET: {
