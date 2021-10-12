@@ -195,7 +195,7 @@ static String decodestring(char *s) {
   return (String){.kind = ASM_STRING, .len = len, .data = data};
 }
 
-static Parsev *dupv(Parsev *p) {
+static const Parsev *dupv(Parsev *p) {
   Parsev *r = xmalloc(sizeof(Parsev));
   *r = *p;
   return r;
@@ -309,9 +309,6 @@ static void su64(uint32_t l) {
 static uint8_t regbits(AsmKind k) { return (k - (ASM_REG_BEGIN + 1)) % 16; }
 
 static uint8_t isreg(AsmKind k) { return k > ASM_REG_BEGIN && k < ASM_REG_END; }
-static uint8_t isreg8(AsmKind k) { return k >= ASM_AL && k <= ASM_R15B; }
-static uint8_t isreg16(AsmKind k) { return k >= ASM_AX && k <= ASM_R15W; }
-static uint8_t isreg32(AsmKind k) { return k >= ASM_EAX && k <= ASM_R15D; }
 static uint8_t isreg64(AsmKind k) { return k >= ASM_RAX && k <= ASM_R15; }
 
 /* Is an r$n style register variant.  */
@@ -416,7 +413,7 @@ static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
 }
 
 /* Assemble a r <-> mem operation.  */
-static void assemblemem(Memarg *memarg, uint8_t rexw, VarBytes prefix,
+static void assemblemem(const Memarg *memarg, uint8_t rexw, VarBytes prefix,
                         VarBytes opcode, uint8_t reg) {
 
   uint8_t rex, mod, rm, scale, index, base, sib;
@@ -534,7 +531,7 @@ static void assemblemem(Memarg *memarg, uint8_t rexw, VarBytes prefix,
 static void assembleimmrm(Instr *instr, uint8_t rexw, VarBytes prefix,
                           VarBytes opcode, uint8_t immreg) {
   uint8_t rex, rm;
-  Imm *imm;
+  const Imm *imm;
 
   imm = &instr->arg1->imm;
 
@@ -551,7 +548,7 @@ static void assembleimmrm(Instr *instr, uint8_t rexw, VarBytes prefix,
 /* Assemble op + r <-> r/m. */
 static void assemblerrm(Instr *instr, VarBytes prefix, VarBytes opcode) {
   uint8_t rexw, rex, reg1, reg2, rm;
-  Memarg *memarg;
+  const Memarg *memarg;
   AsmKind regarg;
 
   if (instr->arg1->kind == ASM_MEMARG) {
@@ -574,7 +571,7 @@ static void assemblerrm(Instr *instr, VarBytes prefix, VarBytes opcode) {
 /* Assemble a 'basic op' which is just a repeated op pattern we have named. */
 static void assemblebasicop(Instr *instr, VarBytes opcode, uint8_t immreg) {
   VarBytes prefix;
-  Imm *imm;
+  const Imm *imm;
   uint8_t rexw;
 
   prefix = (instr->variant % 4) == 1 ? 0x66 : EMPTY_VBYTES;
@@ -611,7 +608,7 @@ static void assemblexchg(Instr *xchg) {
 }
 
 static void assemblemov(Instr *mov) {
-  Imm *imm;
+  const Imm *imm;
   VarBytes prefix, opcode;
   uint8_t rexw;
 
@@ -721,7 +718,7 @@ static void assembletest(Instr *instr) {
   rexw = ((instr->variant % 4) == 3);
 
   if (instr->variant < 4) {
-    Imm *imm;
+    const Imm *imm;
     assemblevbytes(prefix);
     if (rexw)
       sb(rexbyte(1, 0, 0, 0));
@@ -1007,7 +1004,7 @@ static void assemble(void) {
         prefix = ((v->instr.variant - 8) % 3) == 0 ? 0x66 : EMPTY_VBYTES;
         assemblerrm(&v->instr, prefix, opcode);
       } else {
-        Imm *imm;
+        const Imm *imm;
         imm = &v->instr.arg3->imm;
         opcode = 0x69;
         prefix = ((v->instr.variant - 14) % 3) == 0 ? 0x66 : EMPTY_VBYTES;

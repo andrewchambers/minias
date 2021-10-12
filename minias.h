@@ -200,6 +200,7 @@ typedef enum {
   ASM_REG_END,
 } AsmKind;
 
+
 typedef union Parsev Parsev;
 
 typedef struct {
@@ -282,7 +283,7 @@ typedef struct {
   AsmKind kind;
   uint8_t indirect;
   union {
-    Parsev *indirect;
+    const Parsev *indirect;
     Value  direct;
   } target;
 } Call;
@@ -296,9 +297,9 @@ typedef struct {
 typedef struct {
   AsmKind kind;
   uint8_t variant;
-  Parsev *arg1;
-  Parsev *arg2;
-  Parsev *arg3;
+  const Parsev *arg1;
+  const Parsev *arg2;
+  const Parsev *arg3;
 } Instr;
 
 union Parsev {
