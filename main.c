@@ -59,12 +59,7 @@ static void secaddbytes(Section *s, const void *bytes, size_t n) {
 static void secaddbyte(Section *s, uint8_t b) { secaddbytes(s, &b, 1); }
 
 static Elf64_Word elfstr(Section *sec, const char *s) {
-  Elf64_Word i;
-  for (i = 0; i < sec->hdr.sh_size; i++) {
-    if (i == 0 || (sec->data[i - 1] == 0))
-      if (strcmp(s, (char *)&sec->data[i]) == 0)
-        return i;
-  }
+  Elf64_Word i = sec->hdr.sh_size;
   secaddbytes(sec, s, strlen(s) + 1);
   return i;
 }
