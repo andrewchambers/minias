@@ -133,8 +133,5 @@ AsmLine *parse(void) {
     prevl = l;
   }
 
-  if (!result)
-    fatal("io error");
-
   return result;
 }

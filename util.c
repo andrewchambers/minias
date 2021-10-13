@@ -18,7 +18,7 @@ void fatal(const char *fmt, ...) {
   exit(1);
 }
 
-void unreachable(void) { lfatal("BUG: unexpected internal condition"); }
+void unreachable(void) { fatal("BUG: unexpected internal condition"); }
 
 void *xmalloc(size_t n) {
   void *p;
