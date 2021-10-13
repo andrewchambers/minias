@@ -108,7 +108,7 @@ static String decodestring(char *s) {
   }
 
 #define REG(K)                                                                 \
-  (Parsev) { .kind = K }
+  (Parsev) { .kind = ASM_##K }
 
 #define YYSTYPE Parsev
 #define YY_CTX_LOCAL
