@@ -126,9 +126,9 @@ pop =
 
 call = "call" 'q'? ws (
     '*' t:m 
-      { $$.call = (Call){ .kind = ASM_CALL, .target.indirect=dupv(&t), .indirect=1 } ; }
+      { $$.call = (Call){ .kind = ASM_CALL, .target.indirect=internparsev(&t), .indirect=1 } ; }
   | '*' t:r64 
-      { $$.call = (Call){ .kind = ASM_CALL, .target.indirect=dupv(&t), .indirect=1 } ; }
+      { $$.call = (Call){ .kind = ASM_CALL, .target.indirect=internparsev(&t), .indirect=1 } ; }
   | t:value 
       { $$.call = (Call){ .kind = ASM_CALL, .target.direct=t.value, .indirect=0 } ; }
 )

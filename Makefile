@@ -7,6 +7,7 @@ CFLAGS+=-D _GNU_SOURCE
 
 OBJ=\
 	main.o\
+	parse.o\
 	util.o
 
 all: minias
@@ -17,8 +18,8 @@ minias: $(OBJ)
 asm.peg.inc: asm.peg
 	leg -o $@ asm.peg
 
-main.o: asm.peg.inc
-main.o util.o: minias.h
+parse.o: asm.peg.inc
+main.o parse.o util.o: minias.h
 
 check:
 	sh test/test.sh

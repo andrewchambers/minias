@@ -76,22 +76,6 @@ char *xmemdup(const char *s, size_t n) {
 
 char *xstrdup(const char *s) { return xmemdup(s, strlen(s) + 1); }
 
-const char *internstring(const char *s) {
-  size_t idx, len;
-  const char *interned;
-  static const char *cache[4096] = {0};
-
-  len = strlen(s);
-  idx = murmurhash64a(s, len) % sizeof(cache)/sizeof(cache[0]);
-  interned = cache[idx];
-  if (interned && strcmp(s, cache[idx]) == 0) {
-    return interned;
-  }
-  interned = xstrdup(s);
-  cache[idx] = interned;
-  return interned;
-}
-
 void htabkey(struct hashtablekey *k, const char *s, size_t n) {
   k->str = s;
   k->len = n;

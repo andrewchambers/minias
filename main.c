@@ -154,107 +154,6 @@ Relocation *newreloc() {
   return &relocs[nrelocs++];
 }
 
-static String decodestring(char *s) {
-  int i;
-  char *end;
-  size_t len = 0;
-  size_t cap = 0;
-  uint8_t *data = NULL;
-  uint8_t c = 0;
-
-  /* The string is already validated by the parser so we omit some checks*/
-  while (*s) {
-    if (*s == '\\') {
-      s++;
-      if (*s >= '0' && *s <= '7') {
-        c = strtoul(s, &end, 8);
-        s += 3;
-      } else if (*s == 'x') {
-        s++;
-        c = strtoul(s, &end, 16);
-        s = end;
-      } else if (*s == 'r') {
-        c = '\r';
-      } else if (*s == 'n') {
-        c = '\n';
-      } else if (*s == 't') {
-        c = '\t';
-      } else {
-        unreachable();
-      }
-    } else {
-      c = *s;
-      s++;
-    }
-    if (len == cap) {
-      cap = cap ? len * 2 : 8;
-      data = realloc(data, cap);
-    }
-    data[len++] = c;
-  }
-  return (String){.kind = ASM_STRING, .len = len, .data = data};
-}
-
-static const Parsev *dupv(Parsev *p) {
-  Parsev *r = xmalloc(sizeof(Parsev));
-  *r = *p;
-  return r;
-}
-
-#define INSTR1(V, A1)                                                          \
-  (Parsev) {                                                                   \
-    .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .arg1 = dupv(&A1), .arg2 = NULL, .arg3 = NULL   \
-    }                                                                          \
-  }
-#define INSTR2(V, A1, A2)                                                      \
-  (Parsev) {                                                                   \
-    .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .arg1 = dupv(&A1), .arg2 = dupv(&A2),           \
-      .arg3 = NULL                                                             \
-    }                                                                          \
-  }
-#define INSTR3(V, A1, A2, A3)                                                  \
-  (Parsev) {                                                                   \
-    .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .arg1 = dupv(&A1), .arg2 = dupv(&A2),           \
-      .arg3 = dupv(&A3)                                                        \
-    }                                                                          \
-  }
-
-#define REG(K)                                                                 \
-  (Parsev) { .kind = K }
-
-#define YYSTYPE Parsev
-#define YY_CTX_LOCAL
-#define YY_CTX_MEMBERS Parsev v;
-#include "asm.peg.inc"
-
-void parse(void) {
-  AsmLine *l, *prevl;
-  yycontext ctx;
-
-  memset(&ctx, 0, sizeof(yycontext));
-  prevl = NULL;
-  curlineno = 0;
-
-  while (yyparse(&ctx)) {
-    curlineno += 1;
-    if (ctx.v.kind == ASM_SYNTAX_ERROR)
-      lfatal("syntax error\n");
-    if (ctx.v.kind == ASM_BLANK)
-      continue;
-    l = zalloc(sizeof(AsmLine));
-    l->v = ctx.v;
-    l->lineno = curlineno;
-    if (prevl)
-      prevl->next = l;
-    else
-      allasm = l;
-    prevl = l;
-  }
-}
-
 /* Shorthand helpers to write section data. */
 
 static void sb(uint8_t b) { secaddbyte(cursection, b); }
@@ -738,11 +637,13 @@ static void assemble(void) {
   AsmLine *l;
 
   cursection = text;
-
+  curlineno = 0;
   for (l = allasm; l; l = l->next) {
+    curlineno++;
     v = &l->v;
-    curlineno = l->lineno;
     switch (l->v.kind) {
+    case ASM_BLANK:
+      break;
     case ASM_DIR_GLOBL:
       sym = getsym(v->globl.name);
       sym->global = 1;
@@ -1279,8 +1180,8 @@ static void outelf(void) {
 int main(void) {
   symbols = mkhtab(256);
   outf = stdout;
+  allasm = parse();
   initsections();
-  parse();
   assemble();
   fillsymtab();
   handlerelocs();

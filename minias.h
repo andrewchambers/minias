@@ -327,6 +327,10 @@ union Parsev {
   int64_t i64;
 };
 
+extern size_t curlineno;
+
+/* parse.c */
+
 typedef struct AsmLine AsmLine;
 struct AsmLine {
   int64_t lineno;
@@ -334,7 +338,7 @@ struct AsmLine {
   AsmLine *next;
 };
 
-extern size_t curlineno;
+AsmLine *parse(void);
 
 /* util.c */
 
@@ -348,8 +352,6 @@ void *xreallocarray(void *, size_t, size_t);
 char *xmemdup(const char *, size_t);
 char *xstrdup(const char *s);
 void *zalloc(size_t n);
-
-const char *internstring(const char *s);
 
 struct hashtable {
   size_t len, cap;
