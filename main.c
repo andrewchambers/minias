@@ -638,6 +638,26 @@ static void assembletest(const Instr *instr) {
   }
 }
 
+static void assembleset(const Instr *instr) {
+  VarBytes prefix, opcode;
+  uint8_t rex, reg, rm;
+  static uint8_t variant2op[30] = {
+      0x94, 0x98, 0x9b, 0x9a, 0x9a, 0x90, 0x95, 0x99, 0x9b, 0x91,
+      0x9f, 0x9d, 0x9c, 0x9e, 0x95, 0x93, 0x97, 0x93, 0x92, 0x96,
+      0x9e, 0x9c, 0x9d, 0x9f, 0x94, 0x92, 0x96, 0x92, 0x93, 0x97,
+  };
+  opcode = 0x01000f00 | variant2op[instr->variant % 31];
+  prefix = -1;
+  if (instr->arg1->kind == ASM_MEMARG) {
+    assemblemem(&instr->arg1->memarg, 0, prefix, opcode, 0);
+  } else {
+    reg = 0;
+    rm = regbits(instr->arg1->kind);
+    rex = rexbyte(isreg64(instr->arg1->kind), reg & (1 << 3), 0, rm & (1 << 3));
+    assemblemodregrm(rex, prefix, opcode, 0x03, reg, rm);
+  }
+}
+
 static void assemble(void) {
   Symbol *sym;
   AsmLine *l;
@@ -948,28 +968,11 @@ static void assemble(void) {
       assemblexmmbasicop(&v->instr, 0x66, 0x01000fef);
       break;
     }
-    case ASM_SET: {
-      VarBytes prefix, opcode;
-      uint8_t rex, reg, rm;
-      static uint8_t variant2op[30] = {
-          0x94, 0x98, 0x9b, 0x9a, 0x9a, 0x90, 0x95, 0x99, 0x9b, 0x91,
-          0x9f, 0x9d, 0x9c, 0x9e, 0x95, 0x93, 0x97, 0x93, 0x92, 0x96,
-          0x9e, 0x9c, 0x9d, 0x9f, 0x94, 0x92, 0x96, 0x92, 0x93, 0x97,
-      };
-      opcode = 0x01000f00 | variant2op[v->instr.variant % 31];
-      prefix = -1;
-      if (v->instr.arg1->kind == ASM_MEMARG) {
-        assemblemem(&v->instr.arg1->memarg, 0, prefix, opcode, 0);
-      } else {
-        reg = 0;
-        rm = regbits(v->instr.arg1->kind);
-        rex = rexbyte(isreg64(v->instr.arg1->kind), reg & (1 << 3), 0,
-                      rm & (1 << 3));
-        assemblemodregrm(rex, prefix, opcode, 0x03, reg, rm);
-      }
+    case ASM_SET:
+      assembleset(&v->instr);
       break;
-    }
     case ASM_SAL:
+      /* fallthrough */
     case ASM_SHL:
       assembleshift(&v->instr, 0x04);
       break;
