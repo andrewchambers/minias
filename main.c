@@ -251,12 +251,11 @@ void assembleconstant(int64_t c, int nbytes) {
    The top byte is how many bytes we encode less 1.
 
    examples:
-
+   <nothing> encodes as -1 
    0c encodes as 0x0000000c
    02 03  encodes as 0x01000203
 */
-typedef uint32_t VarBytes;
-#define EMPTY_VBYTES 0xff000000
+typedef int32_t VarBytes;
 
 static void assemblevbytes(VarBytes bytes) {
   int i, n;
@@ -427,7 +426,7 @@ static void assemblemem(const Memarg *memarg, uint8_t rexw, VarBytes prefix,
 }
 
 /* Assemble op + imm -> r/m. */
-static void assembleimmrm(Instr *instr, uint8_t rexw, VarBytes prefix,
+static void assembleimmrm(const Instr *instr, uint8_t rexw, VarBytes prefix,
                           VarBytes opcode, uint8_t immreg) {
   uint8_t rex, rm;
   const Imm *imm;
@@ -445,7 +444,7 @@ static void assembleimmrm(Instr *instr, uint8_t rexw, VarBytes prefix,
 }
 
 /* Assemble op + r <-> r/m. */
-static void assemblerrm(Instr *instr, VarBytes prefix, VarBytes opcode) {
+static void assemblerrm(const Instr *instr, VarBytes prefix, VarBytes opcode) {
   uint8_t rexw, rex, reg1, reg2, rm;
   const Memarg *memarg;
   AsmKind regarg;
@@ -468,12 +467,12 @@ static void assemblerrm(Instr *instr, VarBytes prefix, VarBytes opcode) {
 }
 
 /* Assemble a 'basic op' which is just a repeated op pattern we have named. */
-static void assemblebasicop(Instr *instr, VarBytes opcode, uint8_t immreg) {
+static void assemblebasicop(const Instr *instr, VarBytes opcode, uint8_t immreg) {
   VarBytes prefix;
   const Imm *imm;
   uint8_t rexw;
 
-  prefix = (instr->variant % 4) == 1 ? 0x66 : EMPTY_VBYTES;
+  prefix = (instr->variant % 4) == 1 ? 0x66 : -1;
   rexw = (instr->variant % 4) == 3;
 
   if (instr->variant < 4) {
@@ -490,7 +489,7 @@ static void assemblebasicop(Instr *instr, VarBytes opcode, uint8_t immreg) {
   }
 }
 
-static void assemblexchg(Instr *xchg) {
+static void assemblexchg(const Instr *xchg) {
   VarBytes prefix, opcode;
   static uint8_t variant2op[18] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
                                    0x86, 0x87, 0x87, 0x87, 0x86, 0x87,
@@ -498,15 +497,15 @@ static void assemblexchg(Instr *xchg) {
   opcode = variant2op[xchg->variant];
   if (xchg->variant < 6) {
     AsmKind reg = (xchg->variant % 2) ? xchg->arg1->kind : xchg->arg2->kind;
-    prefix = (xchg->variant < 2) ? 0x66 : EMPTY_VBYTES;
+    prefix = (xchg->variant < 2) ? 0x66 : -1;
     assembleplusr(isreg64(reg), prefix, opcode, reg);
   } else {
-    prefix = (((xchg->variant - 6) % 4) == 1) ? 0x66 : EMPTY_VBYTES;
+    prefix = (((xchg->variant - 6) % 4) == 1) ? 0x66 : -1;
     assemblerrm(xchg, prefix, opcode);
   }
 }
 
-static void assemblemov(Instr *mov) {
+static void assemblemov(const Instr *mov) {
   const Imm *imm;
   VarBytes prefix, opcode;
   uint8_t rexw;
@@ -516,7 +515,7 @@ static void assemblemov(Instr *mov) {
       0x8b, 0x8b, 0x88, 0x89, 0x89, 0x89, 0x88, 0x89, 0x89, 0x89,
   };
 
-  prefix = ((mov->variant % 4) == 1) ? 0x66 : EMPTY_VBYTES;
+  prefix = ((mov->variant % 4) == 1) ? 0x66 : -1;
   opcode = variant2op[mov->variant];
 
   if (mov->variant >= 4 && mov->variant <= 6) {
@@ -531,23 +530,23 @@ static void assemblemov(Instr *mov) {
   }
 }
 
-static void assemblemovextend(Instr *mov, VarBytes opcode) {
+static void assemblemovextend(const Instr *mov, VarBytes opcode) {
   VarBytes prefix;
 
   if (mov->variant == 0 || mov->variant == 5)
     prefix = 0x66;
   else
-    prefix = EMPTY_VBYTES;
+    prefix = -1;
 
   assemblerrm(mov, prefix, opcode);
 }
 
-static void assembledivmulneg(Instr *instr, uint8_t reg) {
+static void assembledivmulneg(const Instr *instr, uint8_t reg) {
   VarBytes prefix, opcode;
   uint8_t rexw, rex, mod, rm, opsz;
 
   rexw = (instr->variant % 4) == 3;
-  prefix = (instr->variant % 4) == 1 ? 0x66 : EMPTY_VBYTES;
+  prefix = (instr->variant % 4) == 1 ? 0x66 : -1;
   opcode = (instr->variant % 4) == 1 ? 0xf6 : 0xf7;
 
   if (instr->arg1->kind == ASM_MEMARG) {
@@ -559,13 +558,13 @@ static void assembledivmulneg(Instr *instr, uint8_t reg) {
   }
 }
 
-static void assembleshift(Instr *instr, uint8_t immreg) {
+static void assembleshift(const Instr *instr, uint8_t immreg) {
   VarBytes prefix, opcode;
   uint8_t rexw, rex, mod, rm;
 
   opcode = (instr->variant < 6) ? 0xd3 : 0xc1;
   rexw = (instr->variant % 3) == 2;
-  prefix = (instr->variant % 3) == 0 ? 0x66 : EMPTY_VBYTES;
+  prefix = (instr->variant % 3) == 0 ? 0x66 : -1;
 
   if (instr->arg1->kind == ASM_IMM) {
     assembleimmrm(instr, rexw, prefix, opcode, immreg);
@@ -579,7 +578,7 @@ static void assembleshift(Instr *instr, uint8_t immreg) {
   }
 }
 
-static void assemblexmmbasicop(Instr *instr, VarBytes prefix, VarBytes opcode) {
+static void assemblexmmbasicop(const Instr *instr, VarBytes prefix, VarBytes opcode) {
   uint8_t rexw, rex, reg, rm;
 
   if (instr->arg1->kind == ASM_MEMARG) {
@@ -597,7 +596,7 @@ static void assemblexmmbasicop(Instr *instr, VarBytes prefix, VarBytes opcode) {
   }
 }
 
-static void assemblemovsmmx(Instr *instr, VarBytes prefix) {
+static void assemblemovsmmx(const Instr *instr, VarBytes prefix) {
   VarBytes opcode;
   if (instr->variant == 2) {
     opcode = 0x01000f11;
@@ -608,12 +607,12 @@ static void assemblemovsmmx(Instr *instr, VarBytes prefix) {
   }
 }
 
-static void assembletest(Instr *instr) {
+static void assembletest(const Instr *instr) {
   VarBytes prefix;
   uint8_t rexw, byteop;
 
   byteop = ((instr->variant % 4) == 0);
-  prefix = ((instr->variant % 4) == 1) ? 0x66 : EMPTY_VBYTES;
+  prefix = ((instr->variant % 4) == 1) ? 0x66 : -1;
   rexw = ((instr->variant % 4) == 3);
 
   if (instr->variant < 4) {
@@ -633,15 +632,15 @@ static void assembletest(Instr *instr) {
 
 static void assemble(void) {
   Symbol *sym;
-  Parsev *v;
   AsmLine *l;
+  const Parsev *v;
 
   cursection = text;
   curlineno = 0;
   for (l = allasm; l; l = l->next) {
     curlineno++;
-    v = &l->v;
-    switch (l->v.kind) {
+    v = l->v;
+    switch (v->kind) {
     case ASM_BLANK:
       break;
     case ASM_DIR_GLOBL:
@@ -740,12 +739,12 @@ static void assemble(void) {
 
       if (v->call.indirect) {
         if (v->call.target.indirect->kind == ASM_MEMARG) {
-          assemblemem(&v->call.target.indirect->memarg, 0, EMPTY_VBYTES, 0xff,
+          assemblemem(&v->call.target.indirect->memarg, 0, -1, 0xff,
                       0x02);
         } else {
           rm = regbits(v->call.target.indirect->kind);
           rex = rexbyte(0, 0, 0, rm & (1 << 3));
-          assemblemodregrm(rex, EMPTY_VBYTES, 0xff, 0x03, 0x02, rm);
+          assemblemodregrm(rex, -1, 0xff, 0x03, 0x02, rm);
         }
       } else {
         sb(0xe8);
@@ -772,16 +771,16 @@ static void assemble(void) {
     }
     case ASM_PUSH:
       if (v->instr.arg1->kind == ASM_MEMARG) {
-        assemblemem(&v->instr.arg1->memarg, 0, EMPTY_VBYTES, 0xff, 0x06);
+        assemblemem(&v->instr.arg1->memarg, 0, -1, 0xff, 0x06);
       } else {
-        assembleplusr(0, EMPTY_VBYTES, 0x50, v->instr.arg1->kind);
+        assembleplusr(0, -1, 0x50, v->instr.arg1->kind);
       }
       break;
     case ASM_POP:
       if (v->instr.arg1->kind == ASM_MEMARG) {
-        assemblemem(&v->instr.arg1->memarg, 0, EMPTY_VBYTES, 0x8f, 0x00);
+        assemblemem(&v->instr.arg1->memarg, 0, -1, 0x8f, 0x00);
       } else {
-        assembleplusr(0, EMPTY_VBYTES, 0x58, v->instr.arg1->kind);
+        assembleplusr(0, -1, 0x58, v->instr.arg1->kind);
       }
       break;
     case ASM_NOP:
@@ -813,13 +812,13 @@ static void assemble(void) {
       break;
     case ASM_LEA: {
       VarBytes prefix;
-      prefix = v->instr.variant == 0 ? 0x66 : EMPTY_VBYTES;
+      prefix = v->instr.variant == 0 ? 0x66 : -1;
       assemblerrm(&v->instr, prefix, 0x8d);
       break;
     }
     case ASM_MOVAPS: {
       VarBytes prefix, opcode;
-      prefix = EMPTY_VBYTES;
+      prefix = -1;
       opcode = v->instr.variant == 2 ? 0x01000f29 : 0x01000f28;
       assemblexmmbasicop(&v->instr, prefix, opcode);
       break;
@@ -902,13 +901,13 @@ static void assemble(void) {
         assembledivmulneg(&v->instr, 0x05);
       } else if (v->instr.variant < 14) {
         opcode = 0x01000faf;
-        prefix = ((v->instr.variant - 8) % 3) == 0 ? 0x66 : EMPTY_VBYTES;
+        prefix = ((v->instr.variant - 8) % 3) == 0 ? 0x66 : -1;
         assemblerrm(&v->instr, prefix, opcode);
       } else {
         const Imm *imm;
         imm = &v->instr.arg3->imm;
         opcode = 0x69;
-        prefix = ((v->instr.variant - 14) % 3) == 0 ? 0x66 : EMPTY_VBYTES;
+        prefix = ((v->instr.variant - 14) % 3) == 0 ? 0x66 : -1;
         assemblerrm(&v->instr, prefix, opcode);
         assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
       }
@@ -939,7 +938,7 @@ static void assemble(void) {
           0x9e, 0x9c, 0x9d, 0x9f, 0x94, 0x92, 0x96, 0x92, 0x93, 0x97,
       };
       opcode = 0x01000f00 | variant2op[v->instr.variant % 31];
-      prefix = EMPTY_VBYTES;
+      prefix = -1;
       if (v->instr.arg1->kind == ASM_MEMARG) {
         assemblemem(&v->instr.arg1->memarg, 0, prefix, opcode, 0);
       } else {
@@ -977,13 +976,13 @@ static void assemble(void) {
       assemblexmmbasicop(&v->instr, 0x66, 0x01000f2e);
       break;
     case ASM_UCOMISS:
-      assemblexmmbasicop(&v->instr, EMPTY_VBYTES, 0x01000f2e);
+      assemblexmmbasicop(&v->instr, -1, 0x01000f2e);
       break;
     case ASM_XORPD:
       assemblexmmbasicop(&v->instr, 0x66, 0x01000f57);
       break;
     case ASM_XORPS:
-      assemblexmmbasicop(&v->instr, EMPTY_VBYTES, 0x01000f57);
+      assemblexmmbasicop(&v->instr, -1, 0x01000f57);
       break;
     case ASM_XOR: {
       static uint8_t variant2op[24] = {
@@ -999,7 +998,7 @@ static void assemble(void) {
       break;
     }
     default:
-      lfatal("assemble: unexpected kind: %d", l->v.kind);
+      lfatal("assemble: unexpected kind: %d", v->kind);
     }
   }
 }

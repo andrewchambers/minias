@@ -128,7 +128,7 @@ AsmLine *parse(void) {
     if (ctx.v.kind == ASM_SYNTAX_ERROR)
       lfatal("syntax error\n");
     l = zalloc(sizeof(AsmLine));
-    l->v = ctx.v;
+    l->v = internparsev(&ctx.v);
     if (prevl)
       prevl->next = l;
     else

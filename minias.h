@@ -334,7 +334,7 @@ extern size_t curlineno;
 typedef struct AsmLine AsmLine;
 struct AsmLine {
   int64_t lineno;
-  Parsev v;
+  const Parsev *v;
   AsmLine *next;
 };
 
