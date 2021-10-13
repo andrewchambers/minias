@@ -27,7 +27,17 @@ static Section *data = NULL;
 static Section *textrel = NULL;
 static Section *datarel = NULL;
 
+char *filename = "<stdin>";
 size_t curlineno = 0;
+
+void lfatal(const char *fmt, ...) {
+  va_list ap;
+  fprintf(stderr, "%s:%ld: ", filename, curlineno);
+  va_start(ap, fmt);
+  vwarn(fmt, ap);
+  va_end(ap);
+  exit(1);
+}
 
 static Symbol *getsym(const char *name) {
   Symbol **ps, *s;
@@ -639,6 +649,9 @@ static void assemble(void) {
     curlineno++;
     v = l->v;
     switch (v->kind) {
+    case ASM_SYNTAX_ERROR:
+      lfatal("syntax error");
+      break;
     case ASM_BLANK:
       break;
     case ASM_DIR_GLOBL:

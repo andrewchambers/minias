@@ -329,8 +329,6 @@ union Parsev {
   int64_t i64;
 };
 
-extern size_t curlineno;
-
 /* parse.c */
 
 typedef struct AsmLine AsmLine;
@@ -344,7 +342,7 @@ AsmLine *parse(void);
 
 /* util.c */
 
-void lfatal(const char *fmt, ...);
+void vwarn(const char *fmt, va_list ap);
 void fatal(const char *fmt, ...);
 void unreachable(void);
 

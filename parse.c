@@ -120,13 +120,10 @@ AsmLine *parse(void) {
   yycontext ctx;
 
   memset(&ctx, 0, sizeof(yycontext));
+  result = NULL;
   prevl = NULL;
-  curlineno = 0;
 
   while (yyparse(&ctx)) {
-    curlineno += 1;
-    if (ctx.v.kind == ASM_SYNTAX_ERROR)
-      lfatal("syntax error\n");
     l = zalloc(sizeof(AsmLine));
     l->v = internparsev(&ctx.v);
     if (prevl)
@@ -135,5 +132,9 @@ AsmLine *parse(void) {
       result = l;
     prevl = l;
   }
+
+  if (!result)
+    fatal("io error");
+
   return result;
 }

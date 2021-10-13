@@ -1,6 +1,6 @@
 #include "minias.h"
 
-static void vwarn(const char *fmt, va_list ap) {
+void vwarn(const char *fmt, va_list ap) {
   vfprintf(stderr, fmt, ap);
   if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
     putc(' ', stderr);
@@ -8,15 +8,6 @@ static void vwarn(const char *fmt, va_list ap) {
   } else {
     putc('\n', stderr);
   }
-}
-
-void lfatal(const char *fmt, ...) {
-  va_list ap;
-  fprintf(stderr, "%ld: ", curlineno);
-  va_start(ap, fmt);
-  vwarn(fmt, ap);
-  va_end(ap);
-  exit(1);
 }
 
 void fatal(const char *fmt, ...) {
