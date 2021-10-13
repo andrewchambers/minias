@@ -19,7 +19,7 @@ static const Parsev *internparsev(Parsev *p) {
   return interned;
 }
 
-/* Maintain a direct cache of strings. */
+/* Maintain a direct map cache of strings. */
 const char *internstring(const char *s) {
   size_t idx, len;
   const char *interned;
