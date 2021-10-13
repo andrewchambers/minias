@@ -109,7 +109,7 @@ instr =
   | i:cltd      { $$ = i; }
   | i:cqto      { $$ = i; }
   | i:nop       { $$ = i; }
-  # Floating point is less common, socheck last.
+  # Floating point is less common, so check last.
   | i:divsd     { $$ = i; }
   | i:pxor      { $$ = i; }
   | i:xorpd     { $$ = i; }
