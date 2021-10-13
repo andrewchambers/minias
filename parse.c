@@ -1,6 +1,6 @@
 #include "minias.h"
 
-/* Maintain a direct mapped cache of Parsev* to avoid duplication. */
+/* Maintain a direct mapped cache of Parsev*. */
 static const Parsev *internparsev(Parsev *p) {
   /* An extremely simple direct mapped cache of *Parsev,
      It relies on direct pointer comparison, which
@@ -9,23 +9,24 @@ static const Parsev *internparsev(Parsev *p) {
   const Parsev *interned;
   static const Parsev *cache[4096] = {0};
 
-  idx = murmurhash64a((char *)p, sizeof(Parsev)) % sizeof(cache)/sizeof(cache[0]);
+  idx = murmurhash64a((char *)p, sizeof(Parsev)) % sizeof(cache) /
+        sizeof(cache[0]);
   interned = cache[idx];
   if (interned && memcmp(p, interned, sizeof(Parsev)) == 0)
     return interned;
-  interned = (const Parsev *)xmemdup((char*)p, sizeof(Parsev));
+  interned = (const Parsev *)xmemdup((char *)p, sizeof(Parsev));
   cache[idx] = interned;
   return interned;
 }
 
-/* Maintain a direct cache of strings to avoid duplication. */
+/* Maintain a direct cache of strings. */
 const char *internstring(const char *s) {
   size_t idx, len;
   const char *interned;
   static const char *cache[4096] = {0};
 
   len = strlen(s);
-  idx = murmurhash64a(s, len) % sizeof(cache)/sizeof(cache[0]);
+  idx = murmurhash64a(s, len) % sizeof(cache) / sizeof(cache[0]);
   interned = cache[idx];
   if (interned && strcmp(s, cache[idx]) == 0)
     return interned;
@@ -78,21 +79,22 @@ static String decodestring(char *s) {
 #define INSTR1(V, A1)                                                          \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .arg1 = internparsev(&A1), .arg2 = NULL, .arg3 = NULL   \
+      .kind = 0, .variant = V, .arg1 = internparsev(&A1), .arg2 = NULL,        \
+      .arg3 = NULL                                                             \
     }                                                                          \
   }
 #define INSTR2(V, A1, A2)                                                      \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .arg1 = internparsev(&A1), .arg2 = internparsev(&A2),           \
-      .arg3 = NULL                                                             \
+      .kind = 0, .variant = V, .arg1 = internparsev(&A1),                      \
+      .arg2 = internparsev(&A2), .arg3 = NULL                                  \
     }                                                                          \
   }
 #define INSTR3(V, A1, A2, A3)                                                  \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .arg1 = internparsev(&A1), .arg2 = internparsev(&A2),           \
-      .arg3 = internparsev(&A3)                                                        \
+      .kind = 0, .variant = V, .arg1 = internparsev(&A1),                      \
+      .arg2 = internparsev(&A2), .arg3 = internparsev(&A3)                     \
     }                                                                          \
   }
 

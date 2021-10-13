@@ -445,8 +445,8 @@ r64-or-rip = (
 ) { $$ = r; }
 
 m =
-    d:value ws? sib:opt-scale-index-base { $$ = sib; $$.memarg.disp = d.value; }
-  | sib:scale-index-base { $$ = sib; }
+    d:value ws? sib:opt-scale-index-base { $$ = (Parsev){ .memarg=sib.memarg }; $$.memarg.disp = d.value; }
+  | sib:scale-index-base { $$ = (Parsev){ .memarg=sib.memarg }; }
 
 opt-scale-index-base =
     sib:scale-index-base { $$ = sib; }
@@ -466,7 +466,7 @@ imm32 = i:imm { i.imm.nbytes = 4; $$ = i; }
 
 imm = 
     '$' ws? val:value
-    { $$.imm = (Imm){ .kind = ASM_IMM, .v = val.value, .nbytes = 0}; }
+    { $$ = (Parsev) { .imm = (Imm){ .kind = ASM_IMM, .v = val.value, .nbytes = 0} }; }
 
 al = "%al" { $$ = REG(ASM_AL); }
 cl = "%cl" { $$ = REG(ASM_CL); }
