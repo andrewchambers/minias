@@ -1,6 +1,6 @@
 #include "minias.h"
 
-/* Maintain a direct mapped cache of Parsev*. */
+/* Cache of Parsev* by value. */
 static const Parsev *internparsev(Parsev *p) {
   /*
      A simple direct mapped cache that prevents our parser
@@ -28,7 +28,7 @@ static const Parsev *internparsev(Parsev *p) {
   return interned;
 }
 
-/* Maintain a direct map cache of strings. */
+/* Cache of char* by value. */
 const char *internstring(const char *s) {
   size_t idx, len;
   const char *interned;

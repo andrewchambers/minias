@@ -21,6 +21,9 @@ asm.peg.inc: asm.peg
 parse.o: asm.peg.inc
 main.o parse.o util.o: minias.h
 
+fmt:
+	clang-format -i *.c *.h
+
 check:
 	sh test/test.sh
 
