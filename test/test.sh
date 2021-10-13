@@ -35,15 +35,15 @@ t "callq *%r10"
 
 t "movb %r11b, (%rsi, %r12, 1)"
 
-t "cvtsd2si %xmm1, %rax"
-t "cvtsd2si %xmm10, %rax"
-t "cvtsd2si %xmm1, %eax"
-t "cvtsd2si %xmm10, %eax"
+t "cvttsd2si %xmm1, %rax"
+t "cvttsd2si %xmm10, %rax"
+t "cvttsd2si %xmm1, %eax"
+t "cvttsd2si %xmm10, %eax"
 
-t "cvtss2si %xmm1, %rax"
-t "cvtss2si %xmm10, %rax"
-t "cvtss2si %xmm1, %eax"
-t "cvtss2si %xmm10, %eax"
+t "cvttss2si %xmm1, %rax"
+t "cvttss2si %xmm10, %rax"
+t "cvttss2si %xmm1, %eax"
+t "cvttss2si %xmm10, %eax"
 
 t "cvtsi2sd %rax, %xmm1"
 t "cvtsi2sd %rax, %xmm10"

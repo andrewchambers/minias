@@ -507,23 +507,23 @@ static void assemblemov(const Instr *mov) {
   uint8_t rexw;
 
   static uint8_t variant2op[20] = {
-      0xc6, 0xc7, 0xc7, 0xc7, 0xb0, 0xb8, 0xb8, 0xc7, 0x8a, 0x8b,
-      0x8b, 0x8b, 0x88, 0x89, 0x89, 0x89, 0x88, 0x89, 0x89, 0x89,
-  };
+      0x88, 0x89, 0x89, 0x89, 0x88, 0x89, 0x89, 0x89, 0x8a, 0x8b, 0x8b, 0x8b,
+
+      0xc6, 0xc7, 0xc7, 0xc7, 0xb0, 0xb8, 0xb8, 0xc7};
 
   prefix = ((mov->variant % 4) == 1) ? 0x66 : -1;
   opcode = variant2op[mov->variant];
 
-  if (mov->variant >= 4 && mov->variant <= 6) {
+  if (mov->variant < 12) {
+    assemblerrm(mov, prefix, opcode);
+  } else if (mov->variant < 16 || mov->variant == 19) {
+    rexw = ((mov->variant % 4) == 3);
+    assembleimmrm(mov, rexw, prefix, opcode, 0x00);
+  } else {
     imm = &mov->arg1->imm;
     assembleplusr(isreg64(mov->arg2->kind), prefix, opcode,
                   regbits(mov->arg2->kind));
     assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
-  } else if (mov->variant == 7 || mov->variant < 4) {
-    rexw = ((mov->variant % 4) == 3);
-    assembleimmrm(mov, rexw, prefix, opcode, 0x00);
-  } else {
-    assemblerrm(mov, prefix, opcode);
   }
 }
 
@@ -804,11 +804,11 @@ static void assemble(void) {
     case ASM_CVTSD2SS:
       assemblexmmbasicop(&v->instr, 0xf2, 0x01000f5a);
       break;
-    case ASM_CVTSD2SI:
-      assemblexmmbasicop(&v->instr, 0xf2, 0x01000f2d);
+    case ASM_CVTTSD2SI:
+      assemblexmmbasicop(&v->instr, 0xf2, 0x01000f2c);
       break;
-    case ASM_CVTSS2SI:
-      assemblexmmbasicop(&v->instr, 0xf3, 0x01000f2d);
+    case ASM_CVTTSS2SI:
+      assemblexmmbasicop(&v->instr, 0xf3, 0x01000f2c);
       break;
     case ASM_RET:
       sb(0xc3);
@@ -893,6 +893,9 @@ static void assemble(void) {
       break;
     case ASM_MULSD:
       assemblexmmbasicop(&v->instr, 0xf2, 0x01000f59);
+      break;
+    case ASM_DIVSD:
+      assemblexmmbasicop(&v->instr, 0xf2, 0x01000f5e);
       break;
     case ASM_MULSS:
       assemblexmmbasicop(&v->instr, 0xf3, 0x01000f59);
