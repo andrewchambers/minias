@@ -1,11 +1,11 @@
 #include <assert.h>
+#include <ctype.h>
 #include <elf.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,6 +76,8 @@ typedef enum {
   ASM_CVTSD2SS,
   ASM_CVTSI2SD,
   ASM_CVTSI2SS,
+  ASM_CVTSD2SI,
+  ASM_CVTSS2SI,
   ASM_DIV,
   ASM_IDIV,
   ASM_LEA,
@@ -107,7 +109,7 @@ typedef enum {
   ASM_XORPS,
   // Registers, order matters.
   ASM_REG_BEGIN,
- 
+
   ASM_AL,
   ASM_CL,
   ASM_DL,
@@ -192,14 +194,13 @@ typedef enum {
   ASM_XMM13,
   ASM_XMM14,
   ASM_XMM15,
-  
+
   /* RIP is in a special class of its own. */
   ASM_RIP,
   ASM_NO_REG,
 
   ASM_REG_END,
 } AsmKind;
-
 
 typedef union Parsev Parsev;
 
@@ -284,7 +285,7 @@ typedef struct Call {
   uint32_t indirect;
   union {
     const Parsev *indirect;
-    Value  direct;
+    Value direct;
   } target;
 } Call;
 

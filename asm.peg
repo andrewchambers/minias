@@ -80,6 +80,8 @@ instr =
   | i:cvtsi2ss { $$ = i; }
   | i:cvtss2sd { $$ = i; }
   | i:cvtsd2ss { $$ = i; }
+  | i:cvtsd2si { $$ = i; }
+  | i:cvtss2si { $$ = i; }
   | i:cmp      { $$ = i; }
   | i:div      { $$ = i; }
   | i:idiv     { $$ = i; }
@@ -224,6 +226,20 @@ cvtsd2ss = "cvtsd2ss" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
   | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_CVTSD2SS; }
+
+cvtss2si = "cvtss2si" (
+    'l'? ws s:xmm ws? ',' ws? d:r32 { $$ = INSTR2(0, s, d); }
+  | 'q'? ws s:xmm ws? ',' ws? d:r64 { $$ = INSTR2(1, s, d); }
+  | 'l'  ws s:mem ws? ',' ws? d:r32 { $$ = INSTR2(2, s, d); }
+  | 'q'  ws s:mem ws? ',' ws? d:r64 { $$ = INSTR2(3, s, d); }
+) { $$.instr.kind = ASM_CVTSS2SI; }
+
+cvtsd2si = "cvtsd2si" (
+    'l'? ws s:xmm ws? ',' ws? d:r32 { $$ = INSTR2(0, s, d); }
+  | 'q'? ws s:xmm ws? ',' ws? d:r64 { $$ = INSTR2(1, s, d); }
+  | 'l'  ws s:mem ws? ',' ws? d:r32 { $$ = INSTR2(2, s, d); }
+  | 'q'  ws s:mem ws? ',' ws? d:r64 { $$ = INSTR2(3, s, d); }
+) { $$.instr.kind = ASM_CVTSD2SI; }
 
 movaps = "movaps" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
@@ -397,8 +413,8 @@ xchg =
     | 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = INSTR2(17, s, d); }
   ) { $$.instr.kind = ASM_XCHG; }
 
-add = "add" a:basic-op-args { a.instr.kind = ASM_CMP; $$ = a; }
-cmp = "cmp" a:basic-op-args { a.instr.kind = ASM_ADD; $$ = a; }
+add = "add" a:basic-op-args { a.instr.kind = ASM_ADD; $$ = a; }
+cmp = "cmp" a:basic-op-args { a.instr.kind = ASM_CMP; $$ = a; }
 and = "and" a:basic-op-args { a.instr.kind = ASM_AND; $$ = a; }
 or  = "or"  a:basic-op-args { a.instr.kind = ASM_OR;  $$ = a; }
 sub = "sub" a:basic-op-args { a.instr.kind = ASM_SUB; $$ = a; }
