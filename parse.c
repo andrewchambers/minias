@@ -2,9 +2,18 @@
 
 /* Maintain a direct mapped cache of Parsev*. */
 static const Parsev *internparsev(Parsev *p) {
-  /* An extremely simple direct mapped cache of *Parsev,
-     It relies on direct pointer comparison, which
-     itself only works because our pointers are interned. */
+  /*
+     A simple direct mapped cache that prevents our parser
+     from allocating duplicate values. Note that it uses memcmp
+     for equality, even on pointer values, this works because the
+     pointers themselves are also interned.
+
+     This simplicity somes with one big cost - Parsev variants with padding
+     can trigger a false positive on valgrind. It should still safe
+     because reading these undefined bytes do not change the behavior of the
+     program. The best fix is still to avoid the padding bytes in the Parsev
+     variant layout using a tool such as 'pahole'.
+  */
   size_t idx;
   const Parsev *interned;
   static const Parsev *cache[4096] = {0};

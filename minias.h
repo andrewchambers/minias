@@ -203,21 +203,21 @@ typedef enum {
 
 typedef union Parsev Parsev;
 
-typedef struct {
+typedef struct Label {
   AsmKind kind;
   const char *name;
 } Label;
 
-typedef struct {
+typedef struct Globl {
   AsmKind kind;
   const char *name;
 } Globl;
 
-typedef struct {
+typedef struct DirSection {
   AsmKind kind;
+  int32_t type;
   const char *name;
   const char *flags;
-  int type;
 } DirSection;
 
 typedef struct {
@@ -225,53 +225,53 @@ typedef struct {
   const char *l;
 } Value;
 
-typedef struct {
+typedef struct Byte {
   AsmKind kind;
   Value value;
 } Byte;
 
-typedef struct {
+typedef struct Short {
   AsmKind kind;
   Value value;
 } Short;
 
-typedef struct {
+typedef struct Int {
   AsmKind kind;
   Value value;
 } Int;
 
-typedef struct {
+typedef struct Quad {
   AsmKind kind;
   Value value;
 } Quad;
 
-typedef struct {
+typedef struct Balign {
   AsmKind kind;
   uint64_t align;
 } Balign;
 
-typedef struct {
+typedef struct Fill {
   AsmKind kind;
   int32_t size;
   int32_t repeat;
   int64_t value;
 } Fill;
 
-typedef struct {
+typedef struct Imm {
   AsmKind kind;
-  uint8_t nbytes;
+  uint32_t nbytes;
   Value v;
 } Imm;
 
-typedef struct {
+typedef struct Memarg {
   AsmKind kind;
   AsmKind base;
   AsmKind index;
-  uint8_t scale;
+  uint32_t scale;
   Value disp;
 } Memarg;
 
-typedef struct {
+typedef struct String {
   AsmKind kind;
   size_t len;
   uint8_t *data;
@@ -279,24 +279,24 @@ typedef struct {
 typedef String Ascii;
 typedef String Asciiz;
 
-typedef struct {
+typedef struct Call {
   AsmKind kind;
-  uint8_t indirect;
+  uint32_t indirect;
   union {
     const Parsev *indirect;
     Value  direct;
   } target;
 } Call;
 
-typedef struct {
+typedef struct Jmp {
   AsmKind kind;
-  uint8_t variant;
+  uint32_t variant;
   const char *target;
 } Jmp;
 
-typedef struct {
+typedef struct Instr {
   AsmKind kind;
-  uint8_t variant;
+  uint32_t variant;
   const Parsev *arg1;
   const Parsev *arg2;
   const Parsev *arg3;
