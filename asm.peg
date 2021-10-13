@@ -78,7 +78,7 @@ instr =
       | i:movsd     { $$ = i; }
       | i:movss     { $$ = i; }
       | i:mulsd     { $$ = i; }
-      | i:mulss     { $$ = i; } ))
+      | i:mulss     { $$ = i; }))
   | i:add       { $$ = i; }
   | i:and       { $$ = i; }
   | i:cmp       { $$ = i; }
@@ -192,12 +192,11 @@ condition-code =
     | "ae"  { $$.i64 = 28; }
     | "a"   { $$.i64 = 29; }
 
-lea = 
-  "lea" (
+lea = "lea" (
       'w'? ws s:mem ws? ',' ws? d:r16 { $$ = INSTR2(0, s, d); }
     | 'l'? ws s:mem ws? ',' ws? d:r32 { $$ = INSTR2(1, s, d); }
     | 'q'? ws s:mem ws? ',' ws? d:r64 { $$ = INSTR2(2, s, d); }
-  ) { $$.instr.kind = ASM_LEA; }
+) { $$.instr.kind = ASM_LEA; }
 
 div = "div" (
       'b'  ws a:mem { $$ = INSTR1(0, a); }
@@ -528,12 +527,12 @@ opt-scale-index-base =
   | {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 0, .index=ASM_NO_REG, .base = ASM_NO_REG, .disp = {0}  }; }
 
 scale-index-base =
-     '(' ws? b:r64 ws? ',' ws? i:r64 ws? ',' ws? s:number ws? ')'
+     '(' ws? b:r64-or-rip ws? ')'
+     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 0, .index=ASM_NO_REG, .base = b.kind, .disp = {0}  }; }
+   | '(' ws? b:r64 ws? ',' ws? i:r64 ws? ',' ws? s:number ws? ')'
      {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = s.i64, .index=i.kind, .base = b.kind, .disp = {0}  }; }
    | '(' ws? b:r64 ws? ',' ws? i:r64 ')'
      {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 1, .index=i.kind, .base = b.kind, .disp = {0}  }; }
-   | '(' ws? b:r64-or-rip ws? ')'
-     {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 0, .index=ASM_NO_REG, .base = b.kind, .disp = {0}  }; }
 
 imm8 = i:imm { i.imm.nbytes = 1; $$ = i; }
 imm16 = i:imm { i.imm.nbytes = 2; $$ = i; }
