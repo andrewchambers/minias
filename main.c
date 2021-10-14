@@ -52,10 +52,6 @@ static Symbol *getsym(const char *name) {
   return s;
 }
 
-static const char *secname(Section *s) {
-  return (const char *)shstrtab->data + s->hdr.sh_name;
-}
-
 static void secaddbytes(Section *s, const void *bytes, size_t n) {
 
   if (s->hdr.sh_type == SHT_NOBITS) {
@@ -92,10 +88,12 @@ static Section *newsection() {
 
 static Section *getsection(const char *name) {
   size_t i;
+  char *secname;
   Section *s;
 
   for (i = 0; i < nsections; i++) {
-    if (strcmp(secname(&sections[i]), name) == 0)
+    secname = (char *)shstrtab->data + sections[i].hdr.sh_name;
+    if (strcmp(secname, name) == 0)
       return &sections[i];
   }
   s = newsection();
@@ -1201,6 +1199,7 @@ static void outelf(void) {
 }
 
 static void usage(char *argv0) {
+  fprintf(stderr, "minias - a mini assembler.");
   fprintf(stderr, "usage: %s [-o out] [input]\n", argv0);
   exit(2);
 }
@@ -1215,6 +1214,7 @@ static void parseargs(int argc, char *argv[]) {
       break;
     for (a = &argv[0][1]; *a; a++) {
       switch (*a) {
+      case '-':
       case 'h':
         usage(argv0);
         break;
