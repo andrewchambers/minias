@@ -16,6 +16,8 @@ Non Goals:
 
 # Building
 
+Install the [peg/leg](https://www.piumarta.com/software/peg/) parser generator, make and a C compiler and run:
+
 ```
 make
 ```
@@ -26,6 +28,23 @@ or
 leg asm.peg > asm.peg.inc
 cc -O2 *.c -o minias
 ```
+
+# Notes
+
+- Minias deliberately does not free data as it all is
+  freed by the OS at the end of execution. In the future
+  we one ould use an arena allocator for minias and still
+  avoid manual calls to free.
+
+- Minias deliberately kept the peg grammar quite repetitive
+  and simple, please keep it this.
+
+- Our performance is quite fast, but with the current design
+  it is limited by the parser, it would be interesting
+  to see if we can improve the parser generator upstream. 
+
+- One day it would be nice to write a 'minipeg' in a single .c
+  file that can be bundled in projects.
 
 # Resources
 
