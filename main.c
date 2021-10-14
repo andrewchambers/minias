@@ -180,16 +180,6 @@ static void sb2(uint8_t b1, uint8_t b2) {
   secaddbytes(cursection, buf, sizeof(buf));
 }
 
-static void sb3(uint8_t b1, uint8_t b2, uint8_t b3) {
-  uint8_t buf[3] = {b1, b2, b3};
-  secaddbytes(cursection, buf, sizeof(buf));
-}
-
-static void sb4(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4) {
-  uint8_t buf[4] = {b1, b2, b3, b4};
-  secaddbytes(cursection, buf, sizeof(buf));
-}
-
 static void sbn(uint8_t *bytes, size_t n) { secaddbytes(cursection, bytes, n); }
 
 static void su16(uint16_t w) {
@@ -224,7 +214,6 @@ static void su64(uint64_t l) {
 /* Convert an AsmKind to register bits in reg/rm style.  */
 static uint8_t regbits(AsmKind k) { return (k - (ASM_REG_BEGIN + 1)) % 16; }
 
-static uint8_t isreg(AsmKind k) { return k > ASM_REG_BEGIN && k < ASM_REG_END; }
 static uint8_t isreg64(AsmKind k) { return k >= ASM_RAX && k <= ASM_R15; }
 
 /* Compose a rex prefix - See intel manual. */
@@ -326,7 +315,7 @@ static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
 static void assemblemem(const Memarg *memarg, uint8_t rexw, VarBytes prefix,
                         VarBytes opcode, uint8_t reg) {
 
-  uint8_t rex, mod, rm, scale, index, base, sib;
+  uint8_t rex, mod, rm, scale, index, base;
 
   /* Direct memory access */
   if (memarg->base == ASM_NO_REG) {
@@ -426,6 +415,7 @@ static void assemblemem(const Memarg *memarg, uint8_t rexw, VarBytes prefix,
     break;
   default:
     lfatal("invalid addressing scale");
+    return;
   }
 
   rex = rexbyte(rexw, reg & (1 << 3), index & (1 << 3), base & (1 << 3));
@@ -461,7 +451,7 @@ static void assemblerrm(const Instr *instr, VarBytes prefix, VarBytes opcode,
   const Parsev *arg1, *arg2;
   const Memarg *memarg;
   AsmKind regarg;
-  uint8_t rexw, rex, reg1, reg2, rm;
+  uint8_t rexw, rex, reg1, reg2;
 
   if (invert) {
     arg1 = instr->arg2;
@@ -563,7 +553,7 @@ static void assemblemov(const Instr *mov) {
     } else {
       /* 64 bit immediate required. */
       reg = regbits(mov->arg2->kind);
-      rex = rexbyte(rexw, 0, 0, rm & (1 << 3));
+      rex = rexbyte(rexw, 0, 0, reg & (1 << 3));
       sb2(rex, 0xb8 | (reg & 7));
       assemblereloc(imm->v.l, imm->v.c, 8, R_X86_64_64);
     }
@@ -577,19 +567,16 @@ static void assemblemov(const Instr *mov) {
 
 static void assemblemovextend(const Instr *mov, VarBytes opcode) {
   VarBytes prefix;
-  uint8_t rexw, rex, reg, rm;
-
   if (mov->variant == 0 || mov->variant == 5)
     prefix = 0x66;
   else
     prefix = -1;
-
   assemblerrm(mov, prefix, opcode, 1);
 }
 
 static void assembledivmulneg(const Instr *instr, uint8_t reg) {
   VarBytes prefix, opcode;
-  uint8_t rexw, rex, mod, rm, opsz;
+  uint8_t rexw, rex, rm;
 
   rexw = (instr->variant % 4) == 3;
   prefix = (instr->variant % 4) == 1 ? 0x66 : -1;
@@ -606,7 +593,7 @@ static void assembledivmulneg(const Instr *instr, uint8_t reg) {
 
 static void assembleshift(const Instr *instr, uint8_t immreg) {
   VarBytes prefix, opcode;
-  uint8_t rexw, rex, mod, rm;
+  uint8_t rexw, rex, rm;
 
   opcode = (instr->variant < 6) ? 0xd3 : 0xc1;
   rexw = (instr->variant % 3) == 2;
@@ -699,7 +686,6 @@ static void assemble(void) {
       sym->global = 1;
       break;
     case ASM_DIR_SECTION: {
-      size_t i;
       const char *fp;
       Section *s;
 
@@ -804,9 +790,6 @@ static void assemble(void) {
       break;
     }
     case ASM_JMP: {
-      Symbol *sym;
-      Relocation *reloc;
-
       static uint8_t variant2op[31] = {
           0xe9, 0x84, 0x88, 0x8b, 0x8a, 0x8a, 0x80, 0x85, 0x89, 0x8b, 0x81,
           0x8f, 0x8d, 0x8c, 0x8e, 0x85, 0x83, 0x83, 0x82, 0x86, 0x8e, 0x8c,
@@ -1103,7 +1086,7 @@ static void fillsymtab(void) {
 static int resolvereloc(Relocation *reloc) {
   Symbol *sym;
   uint8_t *rdata;
-  int64_t addend, value;
+  int64_t value;
 
   sym = reloc->sym;
 
@@ -1141,8 +1124,10 @@ static void appendreloc(Relocation *reloc) {
     relsection = textrel;
   else if (reloc->section == data)
     relsection = datarel;
-  else
+  else {
     fatal("unexpected relocation for symbol '%s'", sym->name);
+    return;
+  }
 
   switch (reloc->type) {
   case R_X86_64_PC32:
@@ -1179,8 +1164,9 @@ static void out(const void *buf, size_t n) {
 static void outelf(void) {
   size_t i;
   uint64_t offset;
-  Elf64_Ehdr ehdr = {0};
+  Elf64_Ehdr ehdr;
 
+  memset(&ehdr, 0, sizeof(ehdr));
   ehdr.e_ident[0] = 0x7f;
   ehdr.e_ident[1] = 'E';
   ehdr.e_ident[2] = 'L';
