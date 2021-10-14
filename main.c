@@ -1,7 +1,6 @@
 #include "minias.h"
+#include <getopt.h>
 
-/* Output file. */
-static FILE *outf = NULL;
 /* Parsed assembly */
 static AsmLine *allasm = NULL;
 
@@ -27,12 +26,12 @@ static Section *data = NULL;
 static Section *textrel = NULL;
 static Section *datarel = NULL;
 
-char *filename = "<stdin>";
-size_t curlineno = 0;
+static char *infilename = "<stdin>";
+static size_t curlineno = 0;
 
 void lfatal(const char *fmt, ...) {
   va_list ap;
-  fprintf(stderr, "%s:%ld: ", filename, curlineno);
+  fprintf(stderr, "%s:%ld: ", infilename, curlineno);
   va_start(ap, fmt);
   vwarn(fmt, ap);
   va_end(ap);
@@ -1156,8 +1155,8 @@ static void handlerelocs(void) {
 }
 
 static void out(const void *buf, size_t n) {
-  fwrite(buf, 1, n, outf);
-  if (ferror(outf))
+  fwrite(buf, 1, n, stdout);
+  if (ferror(stdout))
     fatal("fwrite:");
 }
 
@@ -1197,18 +1196,48 @@ static void outelf(void) {
       continue;
     out(sections[i].data, sections[i].hdr.sh_size);
   }
-  if (fflush(outf) != 0)
+  if (fflush(stdout) != 0)
     fatal("fflush:");
 }
 
-int main(void) {
+static void usage(char *argv0) {
+  fprintf(stderr, "usage: %s [-o OUT] [input]\n", argv0);
+  exit(2);
+}
+
+int main(int argc, char *argv[]) {
+
+  char *argv0, *outfname;
+
+  argv0 = argv[0];
+
+  ARGBEGIN {
+  case 'o':
+    outfname = EARGF(usage(argv0));
+    if (!freopen(outfname, "w", stdout))
+      fatal("unable to open %s:", outfname);
+    break;
+  default:
+    usage(argv[0]);
+  }
+  ARGEND
+
+  if (argc >= 2)
+    usage(argv0);
+
+  if (argc == 1) {
+    infilename = argv[argc - 1];
+    if (!freopen(infilename, "r", stdin))
+      fatal("unable to open %s:", infilename);
+  }
+
   symbols = mkhtab(256);
-  outf = stdout;
   allasm = parse();
   initsections();
   assemble();
   fillsymtab();
   handlerelocs();
   outelf();
+
   return 0;
 }
