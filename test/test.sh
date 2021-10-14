@@ -181,6 +181,7 @@ for cc in $conditioncodes
 do
   t "set${cc} %al"
   t "set${cc} (%rax)"
+  t "j${cc} $0xefffffff"
 done
 
 for op in sal sar shl shr

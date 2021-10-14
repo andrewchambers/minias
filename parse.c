@@ -62,14 +62,14 @@ static String decodestring(char *s) {
       } else if (*s == 'x') {
         s++;
         c = strtoul(s, &end, 16);
-        s = end-1;
+        s = end - 1;
       } else if (*s == 'r') {
         c = '\r';
       } else if (*s == 'n') {
         c = '\n';
       } else if (*s == 't') {
         c = '\t';
-      } else if (*s == '\\'){
+      } else if (*s == '\\') {
         c = '\\';
       } else {
         unreachable();
