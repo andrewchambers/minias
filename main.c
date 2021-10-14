@@ -200,7 +200,7 @@ static void su32(uint32_t l) {
   secaddbytes(cursection, buf, sizeof(buf));
 }
 
-static void su64(uint32_t l) {
+static void su64(uint64_t l) {
   uint8_t buf[8] = {
       l & 0xff,
       (l & 0xff00) >> 8,
@@ -516,19 +516,40 @@ static void assemblemov(const Instr *mov) {
   VarBytes prefix, opcode;
   uint8_t rexw;
 
-  static uint8_t variant2op[20] = {
-      0x88, 0x89, 0x89, 0x89, 0x88, 0x89, 0x89, 0x89, 0x8a, 0x8b, 0x8b, 0x8b,
-
-      0xc6, 0xc7, 0xc7, 0xc7, 0xb0, 0xb8, 0xb8, 0xc7};
+  static uint8_t variant2op[20] = {0x88, 0x89, 0x89, 0x89, 0x88, 0x89, 0x89,
+                                   0x89, 0x8a, 0x8b, 0x8b, 0x8b, 0xc6, 0xc7,
+                                   0xc7, 0xc7, 0xb0, 0xb8, 0xb8, 0xc7};
 
   prefix = ((mov->variant % 4) == 1) ? 0x66 : -1;
   opcode = variant2op[mov->variant];
 
   if (mov->variant < 12) {
     assemblerrm(mov, prefix, opcode);
-  } else if (mov->variant < 16 || mov->variant == 19) {
+  } else if (mov->variant < 16) {
     rexw = ((mov->variant % 4) == 3);
     assembleimmrm(mov, rexw, prefix, opcode, 0x00);
+  } else if (mov->variant == 19) {
+    uint8_t reg, rex, rm;
+    uint64_t mask, maskedc;
+
+    imm = &mov->arg1->imm;
+    rexw = 1;
+    mask = 0xffffffff80000000;
+    maskedc = ((uint64_t)imm->v.c) & mask;
+
+    if ((maskedc == mask || maskedc == 0) && imm->v.l == NULL) {
+      /* Sign extension works for this value, regular mov */
+      rm = regbits(mov->arg2->kind);
+      rex = rexbyte(rexw, 0, 0, rm & (1 << 3));
+      assemblemodregrm(rex, prefix, opcode, 0x03, 0x00, rm);
+      assemblereloc(imm->v.l, imm->v.c, 4, R_X86_64_32);
+    } else {
+      /* 64 bit immediate required. */
+      reg = regbits(mov->arg2->kind);
+      rex = rexbyte(rexw, 0, 0, rm & (1 << 3));
+      sb2(rex, 0xb8 | (reg & 7));
+      assemblereloc(imm->v.l, imm->v.c, 8, R_X86_64_64);
+    }
   } else {
     imm = &mov->arg1->imm;
     assembleplusr(isreg64(mov->arg2->kind), prefix, opcode,

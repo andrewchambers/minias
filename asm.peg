@@ -382,7 +382,7 @@ mov = "mov" (
   | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = INSTR2(16, s, d); }
   | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = INSTR2(17, s, d); }
   | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = INSTR2(18, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = INSTR2(19, s, d); }
+  | 'q'? ws s:imm   ws? ',' ws? d:r64 { $$ = INSTR2(19, s, d); }
 ) { $$.instr.kind = ASM_MOV; }
 
 movsx = "movs" (

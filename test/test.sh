@@ -30,6 +30,8 @@ t () {
   echo -n "."
 }
 
+t "mov \$17293822569102704639, %rax"
+
 t "callq *%rax"
 t "callq *%r10"
 
