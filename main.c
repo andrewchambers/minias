@@ -463,7 +463,7 @@ static void assemblerrm(const Instr *instr, VarBytes prefix, VarBytes opcode) {
     regarg = instr->arg1->kind;
     assemblemem(memarg, isreg64(regarg), prefix, opcode, regbits(regarg));
   } else {
-    rexw = isreg64(instr->arg2->kind);
+    rexw = isreg64(instr->arg1->kind) || isreg64(instr->arg2->kind);
     reg1 = regbits(instr->arg1->kind);
     reg2 = regbits(instr->arg2->kind);
     rex = rexbyte(rexw, reg1 & (1 << 3), 0, reg2 & (1 << 3));
@@ -560,13 +560,28 @@ static void assemblemov(const Instr *mov) {
 
 static void assemblemovextend(const Instr *mov, VarBytes opcode) {
   VarBytes prefix;
+  uint8_t rexw, rex, reg, rm;
 
   if (mov->variant == 0 || mov->variant == 5)
     prefix = 0x66;
   else
     prefix = -1;
 
-  assemblerrm(mov, prefix, opcode);
+  if (mov->arg1->kind == ASM_MEMARG) {
+    rexw = isreg64(mov->arg2->kind);
+    reg = regbits(mov->arg2->kind);
+    assemblemem(&mov->arg1->memarg, rexw, prefix, opcode, reg);
+  } else if (mov->arg2->kind == ASM_MEMARG) {
+    rexw = isreg64(mov->arg1->kind);
+    reg = regbits(mov->arg1->kind);
+    assemblemem(&mov->arg2->memarg, rexw, prefix, opcode, reg);
+  } else {
+    rexw = isreg64(mov->arg1->kind) || isreg64(mov->arg2->kind);
+    reg = regbits(mov->arg2->kind);
+    rm = regbits(mov->arg1->kind);
+    rex = rexbyte(rexw, reg & (1 << 3), 0, rm & (1 << 3));
+    assemblemodregrm(rex, prefix, opcode, 0x03, reg, rm);
+  }
 }
 
 static void assembledivmulneg(const Instr *instr, uint8_t reg) {
@@ -776,7 +791,7 @@ static void assemble(void) {
       assemblereloc(v->dirint.value.l, v->dirint.value.c, 4, R_X86_64_32);
       break;
     case ASM_DIR_QUAD:
-      assemblereloc(v->dirquad.value.l, v->dirquad.value.c, 8, R_X86_64_32);
+      assemblereloc(v->dirquad.value.l, v->dirquad.value.c, 8, R_X86_64_64);
       break;
     case ASM_LABEL:
       sym = getsym(v->label.name);
@@ -1101,23 +1116,20 @@ static void fillsymtab(void) {
   }
 }
 
-static void resolvereloc(Relocation *reloc) {
+static int resolvereloc(Relocation *reloc) {
   Symbol *sym;
   uint8_t *rdata;
   int64_t addend, value;
 
   sym = reloc->sym;
 
+  if (sym->section != reloc->section)
+    return 0;
+
   switch (reloc->type) {
-  case R_X86_64_32: {
-    rdata = &reloc->section->data[reloc->offset];
-    value = sym->offset - reloc->offset + reloc->addend;
-    rdata[0] = ((uint32_t)value & 0xff);
-    rdata[1] = ((uint32_t)value & 0xff00) >> 8;
-    rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
-    rdata[3] = ((uint32_t)value & 0xff000000) >> 24;
-    break;
-  }
+  case R_X86_64_32:
+  case R_X86_64_64:
+    return 0;
   case R_X86_64_PC32: {
     rdata = &reloc->section->data[reloc->offset];
     value = sym->offset - reloc->offset + reloc->addend;
@@ -1125,10 +1137,11 @@ static void resolvereloc(Relocation *reloc) {
     rdata[1] = ((uint32_t)value & 0xff00) >> 8;
     rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
     rdata[3] = ((uint32_t)value & 0xff000000) >> 24;
-    break;
+    return 1;
   }
   default:
     unreachable();
+    return 0;
   }
 }
 
@@ -1150,6 +1163,7 @@ static void appendreloc(Relocation *reloc) {
   switch (reloc->type) {
   case R_X86_64_PC32:
   case R_X86_64_32:
+  case R_X86_64_64:
     elfrel.r_info = ELF64_R_INFO(sym->idx, reloc->type);
     elfrel.r_offset = reloc->offset;
     elfrel.r_addend = reloc->addend;
@@ -1166,10 +1180,8 @@ static void handlerelocs(void) {
   size_t i;
   for (i = 0; i < nrelocs; i++) {
     reloc = &relocs[i];
-    if (reloc->sym->section == reloc->section) {
-      resolvereloc(reloc);
+    if (resolvereloc(reloc))
       continue;
-    }
     appendreloc(reloc);
   }
 }

@@ -30,6 +30,8 @@ t () {
   echo -n "."
 }
 
+t "movsbq (%rax), %rbx"
+
 t "mov \$17293822569102704639, %rax"
 
 t "callq *%rax"
@@ -239,23 +241,23 @@ t "movb \$127, 2147483647(%rbp)"
 
 for x in s z
 do
-  t "mov${x}bw %al, %ax"
-  t "mov${x}bl %al, %eax"
-  t "mov${x}bq %al, %rax"
-  t "mov${x}wl %ax, %eax"
-  t "mov${x}wq %ax, %rax"
+  t "mov${x}bw %al, %bx"
+  t "mov${x}bl %al, %ebx"
+  t "mov${x}bq %al, %rbx"
+  t "mov${x}wl %ax, %ebx"
+  t "mov${x}wq %ax, %rbx"
   if test "$x" = s
   then
-    t "mov${x}lq %eax, %rax"
+    t "mov${x}lq %eax, %rbx"
   fi
-  t "mov${x}bw (%rax), %ax"
-  t "mov${x}bl (%rax), %eax"
-  t "mov${x}bq (%rax), %rax"
-  t "mov${x}wl (%rax), %eax"
-  t "mov${x}wq (%rax), %rax"
+  t "mov${x}bw (%rax), %bx"
+  t "mov${x}bl (%rax), %ebx"
+  t "mov${x}bq (%rax), %rbx"
+  t "mov${x}wl (%rax), %ebx"
+  t "mov${x}wq (%rax), %rbx"
   if test "$x" = s
   then
-    t "mov${x}lq (%rax), %rax"
+    t "mov${x}lq (%rax), %rbx"
   fi
 done
 
