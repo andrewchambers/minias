@@ -1201,43 +1201,53 @@ static void outelf(void) {
 }
 
 static void usage(char *argv0) {
-  fprintf(stderr, "usage: %s [-o OUT] [input]\n", argv0);
+  fprintf(stderr, "usage: %s [-o out] [input]\n", argv0);
   exit(2);
 }
 
-int main(int argc, char *argv[]) {
-
-  char *argv0, *outfname;
+static void parseargs(int argc, char *argv[]) {
+  char *a, *argv0, *outfname;
 
   argv0 = argv[0];
 
-  ARGBEGIN {
-  case 'o':
-    outfname = EARGF(usage(argv0));
-    if (!freopen(outfname, "w", stdout))
-      fatal("unable to open %s:", outfname);
-    break;
-  default:
-    usage(argv[0]);
+  for (++argv; *argv; argv++) {
+    if (argv[0][0] != '-')
+      break;
+    for (a = &argv[0][1]; *a; a++) {
+      switch (*a) {
+      case 'h':
+        usage(argv0);
+        break;
+      case 'o':
+        if (argv[1] == NULL)
+          usage(argv0);
+        outfname = *++argv;
+        if (!freopen(outfname, "w", stdout))
+          fatal("unable to open %s:", outfname);
+        break;
+      default:
+        usage(argv0);
+      }
+    }
   }
-  ARGEND
 
-  if (argc >= 2)
-    usage(argv0);
-
-  if (argc == 1) {
-    infilename = argv[argc - 1];
+  if (argv[0]) {
+    if (argv[1])
+      usage(argv0);
+    infilename = argv[0];
     if (!freopen(infilename, "r", stdin))
       fatal("unable to open %s:", infilename);
   }
+}
 
+int main(int argc, char *argv[]) {
   symbols = mkhtab(256);
-  allasm = parse();
+  parseargs(argc, argv);
+  allasm = parseasm();
   initsections();
   assemble();
   fillsymtab();
   handlerelocs();
   outelf();
-
   return 0;
 }

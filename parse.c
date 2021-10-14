@@ -117,7 +117,7 @@ static String decodestring(char *s) {
 #define YY_CTX_MEMBERS Parsev v;
 #include "asm.peg.inc"
 
-AsmLine *parse(void) {
+AsmLine *parseasm(void) {
   AsmLine *result, *l, *prevl;
   yycontext ctx;
 
