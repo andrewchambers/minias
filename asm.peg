@@ -8,7 +8,9 @@ ws = ([ \t]+ | comment)+
 
 comment = "/*" ( ! "\n" ! "*/" . )* "*/"   # No support for multiline comments for now as they break our line numbers.
 
-eol = ws? "\n"
+eolcomment = '#' (! "\n" .)+ 
+eol = ws? eolcomment? "\n"
+
 
 stmt =
     '.' d:directive eol {$$ = d;}
