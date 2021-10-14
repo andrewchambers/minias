@@ -136,7 +136,7 @@ static void initsections(void) {
   data->hdr.sh_type = SHT_PROGBITS;
   data->hdr.sh_flags = SHF_ALLOC | SHF_WRITE;
   data->hdr.sh_entsize = 1;
-  data->hdr.sh_addralign = 8; // XXX right value?
+  data->hdr.sh_addralign = 16; // XXX right value?
 
   text = newsection();
   text->hdr.sh_name = elfstr(shstrtab, ".text");

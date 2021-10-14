@@ -30,6 +30,8 @@ t () {
   echo -n "."
 }
 
+t "movb %sil, (%rdi)"
+
 t "movsbq (%rax), %rbx"
 
 t "movq $-4132994306676758123, %rcx"
