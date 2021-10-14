@@ -372,11 +372,11 @@ static void assemblemem(const Memarg *memarg, uint8_t rexw, VarBytes prefix,
   base = rm;
   rm = 4;
 
-  // TODO: if our disp fits in a +disp8, use that instead.
   if (memarg->disp.c == 0 && memarg->disp.l == 0 && ((base & 7) != 5)) {
     mod = 0; /* +0 */
   } else {
-    if (memarg->disp.c == 0 && memarg->disp.l == 0) {
+    if (memarg->disp.l == NULL && memarg->disp.c >= -128 &&
+        memarg->disp.c <= 127) {
       mod = 1; /* +disp8 */
     } else {
       mod = 2; /* +disp32 */

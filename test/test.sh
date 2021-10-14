@@ -144,6 +144,11 @@ do
   t "lea (%rsp), %r${r}x"
   t "lea (%rbp), %r${r}x"
   t "lea (%r${r}x), %r${r}x"
+  t "lea 1(%rsp), %r${r}x"
+  t "lea 127(%rsp), %r${r}x"
+  t "lea 128(%rsp), %r${r}x"
+  t "lea -129(%rsp), %r${r}x"
+  t "lea -127(%rsp), %r${r}x"
   t "lea 2147483647(%rsp), %r${r}x"
   t "lea 2147483647(%rbp), %r${r}x"
   t "lea 2147483647(%r${r}x), %r${r}x"
@@ -152,6 +157,11 @@ do
   t "lea (%rsp, %r${r}x), %r${r}x"
   t "lea (%rbp, %r${r}x), %r${r}x"
   t "lea (%r${r}x, %r${r}x), %r${r}x"
+  t "lea 1(%rsp, %r${r}x), %r${r}x"
+  t "lea 127(%rbp, %r${r}x), %r${r}x"
+  t "lea 128(%rbp, %r${r}x), %r${r}x"
+  t "lea -129(%rbp, %r${r}x), %r${r}x"
+  t "lea -127(%r${r}x, %r${r}x), %r${r}x"
   t "lea 2147483647(%rsp, %r${r}x), %r${r}x"
   t "lea 2147483647(%rbp, %r${r}x), %r${r}x"
   t "lea 2147483647(%r${r}x, %r${r}x), %r${r}x"
@@ -159,6 +169,11 @@ do
   t "lea (%rsp, %r${r}x, 4), %r${r}x"
   t "lea (%rbp, %r${r}x, 4), %r${r}x"
   t "lea (%r${r}x, %r${r}x, 4), %r${r}x"
+  t "lea 1(%rsp, %r${r}x, 4), %r${r}x"
+  t "lea 127(%rbp, %r${r}x, 4), %r${r}x"
+  t "lea 128(%r${r}x, %r${r}x, 4), %r${r}x"
+  t "lea -129(%r${r}x, %r${r}x, 4), %r${r}x"
+  t "lea -127(%r${r}x, %r${r}x, 4), %r${r}x"
   t "lea 2147483647(%rsp, %r${r}x, 4), %r${r}x"
   t "lea 2147483647(%rbp, %r${r}x, 4), %r${r}x"
   t "lea 2147483647(%r${r}x, %r${r}x, 4), %r${r}x"
@@ -181,7 +196,6 @@ for cc in $conditioncodes
 do
   t "set${cc} %al"
   t "set${cc} (%rax)"
-  t "j${cc} $0xefffffff"
 done
 
 for op in sal sar shl shr
