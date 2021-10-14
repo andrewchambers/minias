@@ -32,6 +32,7 @@ t () {
 
 t "movsbq (%rax), %rbx"
 
+t "movq $-4132994306676758123, %rcx"
 t "mov \$17293822569102704639, %rax"
 
 t "callq *%rax"
@@ -220,12 +221,12 @@ t "imulq (%rax), %rax"
 t "imul %eax, %eax"
 t "imull (%rax), %eax"
 
-t "imul \$2147483647, %rax, %rax"
-t "imul \$2147483647, (%rax), %rax"
-t "imul \$2147483647, %eax, %eax"
-t "imul \$2147483647, (%rax), %eax"
-t "imul \$32767, %ax, %ax"
-t "imul \$32767, (%rax), %ax"
+t "imul \$2147483647, %rax, %rbx"
+t "imul \$2147483647, (%rax), %rbx"
+t "imul \$2147483647, %eax, %ebx"
+t "imul \$2147483647, (%rax), %ebx"
+t "imul \$32767, %ax, %bx"
+t "imul \$32767, (%rax), %bx"
 
 t "pushq (%r9)"
 t "pushq %r9"

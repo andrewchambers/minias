@@ -950,7 +950,7 @@ static void assemble(void) {
         imm = &v->instr.arg3->imm;
         opcode = 0x69;
         prefix = ((v->instr.variant - 14) % 3) == 0 ? 0x66 : -1;
-        assemblerrm(&v->instr, prefix, opcode, 0);
+        assemblerrm(&v->instr, prefix, opcode, 1);
         assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
       }
       break;
