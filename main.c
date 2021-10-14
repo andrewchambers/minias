@@ -58,11 +58,18 @@ static const char *secname(Section *s) {
 }
 
 static void secaddbytes(Section *s, const void *bytes, size_t n) {
+
+  if (s->hdr.sh_type == SHT_NOBITS) {
+    s->hdr.sh_size += n;
+    return;
+  }
+
   while (s->capacity < s->hdr.sh_size + n) {
-    s->capacity = s->capacity ? (s->capacity * 2) : 64;
+    s->capacity = s->capacity ? (s->capacity * 2) : 512;
     s->data = xrealloc(s->data, s->capacity);
   }
   memcpy(s->data + s->hdr.sh_size, bytes, n);
+
   s->hdr.sh_size += n;
 }
 
