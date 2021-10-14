@@ -941,7 +941,7 @@ static void assemble(void) {
       } else if (v->instr.variant < 14) {
         opcode = 0x01000faf;
         prefix = ((v->instr.variant - 8) % 3) == 0 ? 0x66 : -1;
-        assemblerrm(&v->instr, prefix, opcode, 0);
+        assemblerrm(&v->instr, prefix, opcode, 1);
       } else {
         const Imm *imm;
         imm = &v->instr.arg3->imm;
