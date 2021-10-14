@@ -58,24 +58,26 @@ static String decodestring(char *s) {
       s++;
       if (*s >= '0' && *s <= '7') {
         c = strtoul(s, &end, 8);
-        s += 3;
+        s += 2;
       } else if (*s == 'x') {
         s++;
         c = strtoul(s, &end, 16);
-        s = end;
+        s = end-1;
       } else if (*s == 'r') {
         c = '\r';
       } else if (*s == 'n') {
         c = '\n';
       } else if (*s == 't') {
         c = '\t';
+      } else if (*s == '\\'){
+        c = '\\';
       } else {
         unreachable();
       }
     } else {
       c = *s;
-      s++;
     }
+    s++;
     if (len == cap) {
       cap = cap ? len * 2 : 8;
       data = realloc(data, cap);
