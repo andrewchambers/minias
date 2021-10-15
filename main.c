@@ -1,5 +1,4 @@
 #include "minias.h"
-#include <getopt.h>
 
 /* Parsed assembly */
 static AsmLine *allasm = NULL;
@@ -29,7 +28,7 @@ static Section *datarel = NULL;
 static char *infilename = "<stdin>";
 static size_t curlineno = 0;
 
-void lfatal(const char *fmt, ...) {
+static void lfatal(const char *fmt, ...) {
   va_list ap;
   fprintf(stderr, "%s:%ld: ", infilename, curlineno);
   va_start(ap, fmt);
@@ -155,7 +154,7 @@ static void initsections(void) {
   datarel->hdr.sh_entsize = sizeof(Elf64_Rela);
 }
 
-Relocation *newreloc() {
+static Relocation *newreloc() {
   if (nrelocs == reloccap) {
     reloccap = nrelocs ? nrelocs * 2 : 64;
     relocs = xreallocarray(relocs, reloccap, sizeof(Relocation));
@@ -559,7 +558,7 @@ static void assemblexchg(const Instr *xchg) {
     rex = (Rex){
         .required = isrexreg(xchg->arg1->kind) || isrexreg(xchg->arg2->kind),
         .w = isreg64(xchg->arg1->kind) || isreg64(xchg->arg2->kind),
-        .r = !!(regbits(reg) & (1 << 3)),
+        .b = !!(regbits(reg) & (1 << 3)),
     };
     assembleplusr(rex, prefix, opcode, regbits(reg));
   } else {

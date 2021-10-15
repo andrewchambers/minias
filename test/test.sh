@@ -30,6 +30,18 @@ t () {
   echo -n "."
 }
 
+# Various regression tests first.
+t "xchgq %r13, %rax"
+t "movl \$1000, %r8d"
+t "movb %sil, (%rdi)"
+t "movsbq (%rax), %rbx"
+t "movq $-4132994306676758123, %rcx"
+t "mov \$17293822569102704639, %rax"
+t "callq *%rax"
+t "callq *%r10"
+t "movb %r11b, (%rsi, %r12, 1)"
+
+
 for r in rax r10
 do
   for x in xmm0 xmm13
@@ -41,19 +53,6 @@ do
   done
 done
 
-t "movl \$1000, %r8d"
-
-t "movb %sil, (%rdi)"
-
-t "movsbq (%rax), %rbx"
-
-t "movq $-4132994306676758123, %rcx"
-t "mov \$17293822569102704639, %rax"
-
-t "callq *%rax"
-t "callq *%r10"
-
-t "movb %r11b, (%rsi, %r12, 1)"
 
 t "cvttsd2si %xmm1, %rax"
 t "cvttsd2si %xmm10, %rax"
