@@ -799,9 +799,10 @@ static void assemble(void) {
       sb(0x00);
       break;
     case ASM_DIR_BALIGN: {
-      int64_t i, rem, amnt;
+      int64_t offset, i, rem, amnt;
       amnt = 0;
-      rem = cursection->hdr.sh_size % v->balign.align;
+      offset = cursection->hdr.sh_addralign + cursection->hdr.sh_size;
+      rem = offset % v->balign.align;
       if (rem)
         amnt = v->balign.align - rem;
       for (i = 0; i < amnt; i++) {
