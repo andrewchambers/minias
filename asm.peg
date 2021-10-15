@@ -113,10 +113,14 @@ instr =
   | i:cqto      { $$ = i; }
   | i:nop       { $$ = i; }
   # Floating point is less common, so check last.
+  | i:addss     { $$ = i; }
+  | i:addsd     { $$ = i; }
   | i:divsd     { $$ = i; }
   | i:pxor      { $$ = i; }
   | i:xorpd     { $$ = i; }
   | i:xorps     { $$ = i; }
+  | i:subsd     { $$ = i; }
+  | i:subss     { $$ = i; }
   | i:ucomisd   { $$ = i; }
   | i:ucomiss   { $$ = i; }
   | (& 'c' 
@@ -421,6 +425,26 @@ test = "test" (
 ) { $$.instr.kind = ASM_TEST; }
 
 # Floating point instructions.
+
+addsd = "addsd" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_ADDSD; }
+
+addss = "addss" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_ADDSS; }
+
+subsd = "subsd" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_SUBSD; }
+
+subss = "subss" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_SUBSS; }
 
 cvtsi2sd = "cvtsi2sd" (
      ws s:r32 ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }

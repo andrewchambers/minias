@@ -108,13 +108,11 @@ static void initsections(void) {
   secaddbyte(shstrtab, 0);
   shstrtab->hdr.sh_name = elfstr(shstrtab, ".shstrtab");
   shstrtab->hdr.sh_type = SHT_STRTAB;
-  shstrtab->hdr.sh_entsize = 1;
 
   strtab = newsection();
   secaddbyte(strtab, 0);
   strtab->hdr.sh_name = elfstr(shstrtab, ".strtab");
   strtab->hdr.sh_type = SHT_STRTAB;
-  strtab->hdr.sh_entsize = 1;
 
   symtab = newsection();
   symtab->hdr.sh_name = elfstr(shstrtab, ".symtab");
@@ -128,21 +126,18 @@ static void initsections(void) {
   bss->hdr.sh_name = elfstr(shstrtab, ".bss");
   bss->hdr.sh_type = SHT_NOBITS;
   bss->hdr.sh_flags = SHF_ALLOC | SHF_WRITE;
-  bss->hdr.sh_entsize = 1;
   bss->hdr.sh_addralign = 16; // XXX right value?
 
   data = newsection();
   data->hdr.sh_name = elfstr(shstrtab, ".data");
   data->hdr.sh_type = SHT_PROGBITS;
   data->hdr.sh_flags = SHF_ALLOC | SHF_WRITE;
-  data->hdr.sh_entsize = 1;
   data->hdr.sh_addralign = 16; // XXX right value?
 
   text = newsection();
   text->hdr.sh_name = elfstr(shstrtab, ".text");
   text->hdr.sh_type = SHT_PROGBITS;
   text->hdr.sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-  text->hdr.sh_entsize = 1;
   text->hdr.sh_addralign = 4;
 
   textrel = newsection();
@@ -547,7 +542,7 @@ static void assemblexchg(const Instr *xchg) {
     rex = (Rex){
         .required = isrexreg(xchg->arg1->kind) || isrexreg(xchg->arg2->kind),
         .w = isreg64(xchg->arg1->kind) || isreg64(xchg->arg2->kind),
-        .r = !!(reg & (1 << 3)),
+        .r = !!(regbits(reg) & (1 << 3)),
     };
     assembleplusr(rex, prefix, opcode, regbits(reg));
   } else {
@@ -1014,6 +1009,12 @@ static void assemble(void) {
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x07);
       break;
     }
+    case ASM_ADDSS:
+      assemblerrm(&v->instr, 0xf3, 0x01000f58, 1);
+      break;
+    case ASM_ADDSD:
+      assemblerrm(&v->instr, 0xf2, 0x01000f58, 1);
+      break;
     case ASM_DIV:
       assembledivmulneg(&v->instr, 0x06);
       break;
@@ -1090,6 +1091,12 @@ static void assemble(void) {
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x05);
       break;
     }
+     case ASM_SUBSS:
+      assemblerrm(&v->instr, 0xf3, 0x01000f5c, 1);
+      break;
+    case ASM_SUBSD:
+      assemblerrm(&v->instr, 0xf2, 0x01000f5c, 1);
+      break;
     case ASM_TEST:
       assembletest(&v->instr);
       break;
@@ -1129,12 +1136,10 @@ static void addtosymtab(Symbol *sym) {
   int stype;
   int sbind;
 
+  stype = 0;
   if (sym->defined) {
-    stype =
-        (sym->section->hdr.sh_flags & SHF_EXECINSTR) ? STT_FUNC : STT_OBJECT;
     sbind = sym->global ? STB_GLOBAL : STB_LOCAL;
   } else {
-    stype = 0;
     sbind = STB_GLOBAL;
   }
 

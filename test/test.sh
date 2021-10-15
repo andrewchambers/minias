@@ -128,6 +128,32 @@ t "movss %xmm0, %xmm1"
 t "movss %xmm10, (%rax)"
 t "movss (%rax), %xmm10"
 
+t "addsd %xmm0, %xmm1"
+t "addsd (%rax), %xmm1"
+t "addsd %xmm10, %xmm1"
+t "addsd %xmm1, %xmm10"
+t "addsd %xmm10, %xmm11"
+t "addsd (%rax), %xmm11"
+t "addss %xmm0, %xmm1"
+t "addss (%rax), %xmm1"
+t "addss %xmm10, %xmm1"
+t "addss %xmm1, %xmm10"
+t "addss %xmm10, %xmm11"
+t "addss (%rax), %xmm11"
+
+t "subsd %xmm0, %xmm1"
+t "subsd (%rax), %xmm1"
+t "subsd %xmm10, %xmm1"
+t "subsd %xmm1, %xmm10"
+t "subsd %xmm10, %xmm11"
+t "subsd (%rax), %xmm11"
+t "subss %xmm0, %xmm1"
+t "subss (%rax), %xmm1"
+t "subss %xmm10, %xmm1"
+t "subss %xmm1, %xmm10"
+t "subss %xmm10, %xmm11"
+t "subss (%rax), %xmm11"
+
 t "mulsd %xmm0, %xmm1"
 t "mulsd (%rax), %xmm1"
 t "mulsd %xmm10, %xmm1"
@@ -269,8 +295,6 @@ t "movb \$127, (%rsp)"
 t "movb \$127, (%rbp)"
 t "movb \$127, 2147483647(%rsp)"
 t "movb \$127, 2147483647(%rbp)"
-
-
 
 for x in s z
 do
