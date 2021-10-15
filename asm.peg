@@ -77,6 +77,7 @@ instr =
       | i:mul       { $$ = i; }
       # Less common, but we have already checked for 'm'
       | i:movaps    { $$ = i; }
+      | i:movq      { $$ = i; }
       | i:movsd     { $$ = i; }
       | i:movss     { $$ = i; }
       | i:mulsd     { $$ = i; }
@@ -491,6 +492,13 @@ movsd = "movsd" (
   | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
   | ws s:xmm ws? ',' ws? d:mem { $$ = INSTR2(2, s, d); }
 )  { $$.instr.kind = ASM_MOVSD; }
+
+movq = "mov" (
+    'q'? ws s:xmm ws? ',' ws? d:r64 { $$ = INSTR2(0, s, d); }
+  | 'q'? ws s:r64 ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | 'q'  ws s:xmm ws? ',' ws? d:mem { $$ = INSTR2(2, s, d); }
+  | 'q'  ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(3, s, d); }
+)  { $$.instr.kind = ASM_MOVQ; }
 
 ucomiss = "ucomiss" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }

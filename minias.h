@@ -88,6 +88,7 @@ typedef enum {
   ASM_IMUL,
   ASM_MOV,
   ASM_MOVAPS,
+  ASM_MOVQ,
   ASM_MOVSD,
   ASM_MOVSS,
   ASM_MOVSX,

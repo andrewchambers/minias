@@ -30,6 +30,17 @@ t () {
   echo -n "."
 }
 
+for r in rax r10
+do
+  for x in xmm0 xmm13
+  do
+    t "movq %${x}, %${r}"
+    t "movq %${r}, %${x}"
+    t "movq %${x}, (%${r})"
+    t "movq (%${r}), %${x}"
+  done
+done
+
 t "movl \$1000, %r8d"
 
 t "movb %sil, (%rdi)"
@@ -258,6 +269,8 @@ t "movb \$127, (%rsp)"
 t "movb \$127, (%rbp)"
 t "movb \$127, 2147483647(%rsp)"
 t "movb \$127, 2147483647(%rbp)"
+
+
 
 for x in s z
 do

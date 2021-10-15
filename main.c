@@ -943,6 +943,24 @@ static void assemble(void) {
     case ASM_MOV:
       assemblemov(&v->instr);
       break;
+    case ASM_MOVQ:
+      switch (v->instr.variant) {
+      case 0:
+        assemblerrm(&v->instr, 0x66, 0x01000f7e, 0);
+        break;
+      case 1:
+        assemblerrm(&v->instr, 0x66, 0x01000f6e, 1);
+        break;
+      case 2:
+        assemblerrm(&v->instr, 0x66, 0x01000fd6, 0);
+        break;
+      case 3:
+        assemblerrm(&v->instr, 0xf3, 0x01000f7e, 1);
+        break;
+      default:
+        unreachable();
+      }
+      break;
     case ASM_MOVSD:
       assemblemovsmmx(&v->instr, 0xf2);
       break;
