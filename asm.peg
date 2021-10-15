@@ -667,24 +667,24 @@ r64 = "%r" (
   | "15" ![lwb] { $$ = REG(R15); }
 )
 
-xmm = "%x" (
+xmm = "%xmm" (
   # Reverse order due to peg ordering.
-    "mm15" { $$ = REG(XMM15); }
-  | "mm14" { $$ = REG(XMM14); }
-  | "mm13" { $$ = REG(XMM13); }
-  | "mm12" { $$ = REG(XMM12); }
-  | "mm11" { $$ = REG(XMM11); }
-  | "mm10" { $$ = REG(XMM10); }
-  | "mm9"  { $$ = REG(XMM7); }
-  | "mm8"  { $$ = REG(XMM7); }
-  | "mm7"  { $$ = REG(XMM7); }
-  | "mm6"  { $$ = REG(XMM6); }
-  | "mm5"  { $$ = REG(XMM5); }
-  | "mm4"  { $$ = REG(XMM4); }
-  | "mm3"  { $$ = REG(XMM3); }
-  | "mm2"  { $$ = REG(XMM2); }
-  | "mm1"  { $$ = REG(XMM1); }
-  | "mm0"  { $$ = REG(XMM0); }
+    "15" { $$ = REG(XMM15); }
+  | "14" { $$ = REG(XMM14); }
+  | "13" { $$ = REG(XMM13); }
+  | "12" { $$ = REG(XMM12); }
+  | "11" { $$ = REG(XMM11); }
+  | "10" { $$ = REG(XMM10); }
+  | "9"  { $$ = REG(XMM7); }
+  | "8"  { $$ = REG(XMM7); }
+  | "7"  { $$ = REG(XMM7); }
+  | "6"  { $$ = REG(XMM6); }
+  | "5"  { $$ = REG(XMM5); }
+  | "4"  { $$ = REG(XMM4); }
+  | "3"  { $$ = REG(XMM3); }
+  | "2"  { $$ = REG(XMM2); }
+  | "1"  { $$ = REG(XMM1); }
+  | "0"  { $$ = REG(XMM0); }
 )
 
 # We disallow newlines in our strings, it is simpler for lineno tracking.
