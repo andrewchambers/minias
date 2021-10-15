@@ -371,7 +371,7 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
     assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
 
     if (mod == 1) {
-      assemblereloc(memarg->disp.l, memarg->disp.c, 1, R_X86_64_32);
+      assemblereloc(memarg->disp.l, memarg->disp.c, 1, R_X86_64_8);
     } else if (mod == 2) {
       assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
     }
@@ -430,9 +430,11 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
   assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
   sb(sibbyte(scale, index, base));
 
-  if (mod)
-    assemblereloc(memarg->disp.l, memarg->disp.c, (mod == 2) ? 4 : 1,
-                  R_X86_64_32);
+  if (mod == 2) {
+    assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
+  } else if (mod == 1) {
+    assemblereloc(memarg->disp.l, memarg->disp.c, 1, R_X86_64_8);
+  }
 }
 
 /* Assemble op + imm -> r/m. */
@@ -724,7 +726,7 @@ static void assembleset(const Instr *instr) {
   opcode = 0x01000f00 | variant2op[instr->variant % 31];
   prefix = -1;
   if (instr->arg1->kind == ASM_MEMARG) {
-    rex = (Rex){};
+    rex = (Rex){0};
     assemblemem(&instr->arg1->memarg, rex, prefix, opcode, 0);
   } else {
     rm = regbits(instr->arg1->kind);
@@ -849,7 +851,7 @@ static void assemble(void) {
 
       if (v->call.indirect) {
         if (v->call.target.indirect->kind == ASM_MEMARG) {
-          rex = (Rex){};
+          rex = (Rex){0};
           assemblemem(&v->call.target.indirect->memarg, rex, -1, 0xff, 0x02);
         } else {
           rm = regbits(v->call.target.indirect->kind);
@@ -880,7 +882,7 @@ static void assemble(void) {
       uint8_t reg;
 
       if (v->instr.arg1->kind == ASM_MEMARG) {
-        rex = (Rex){};
+        rex = (Rex){0};
         assemblemem(&v->instr.arg1->memarg, rex, -1, 0xff, 0x06);
       } else {
         reg = regbits(v->instr.arg1->kind);
@@ -894,7 +896,7 @@ static void assemble(void) {
       uint8_t reg;
 
       if (v->instr.arg1->kind == ASM_MEMARG) {
-        rex = (Rex){};
+        rex = (Rex){0};
         assemblemem(&v->instr.arg1->memarg, rex, -1, 0x8f, 0x00);
       } else {
         reg = regbits(v->instr.arg1->kind);
@@ -1209,10 +1211,11 @@ static int resolvereloc(Relocation *reloc) {
     return 0;
 
   switch (reloc->type) {
+  case R_X86_64_8:
   case R_X86_64_32:
   case R_X86_64_64:
     return 0;
-  case R_X86_64_PC32: {
+  case R_X86_64_PC32:
     rdata = &reloc->section->data[reloc->offset];
     value = sym->offset - reloc->offset + reloc->addend;
     rdata[0] = ((uint32_t)value & 0xff);
@@ -1220,7 +1223,6 @@ static int resolvereloc(Relocation *reloc) {
     rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
     rdata[3] = ((uint32_t)value & 0xff000000) >> 24;
     return 1;
-  }
   default:
     unreachable();
     return 0;
@@ -1248,6 +1250,7 @@ static void appendreloc(Relocation *reloc) {
   case R_X86_64_PC32:
   case R_X86_64_32:
   case R_X86_64_64:
+  case R_X86_64_8:
     elfrel.r_info = ELF64_R_INFO(sym->idx, reloc->type);
     elfrel.r_offset = reloc->offset;
     elfrel.r_addend = reloc->addend;
