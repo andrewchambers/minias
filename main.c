@@ -325,6 +325,18 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
 
   uint8_t mod, rm, scale, index, base;
 
+  /* rip relative addressing. */
+  if (memarg->base == ASM_RIP) {
+    rm = 0x05;
+    assemblemodregrm(rex, prefix, opcode, 0x00, reg, rm);
+    if (memarg->disp.l) {
+      assemblereloc(memarg->disp.l, memarg->disp.c - 4, 4, R_X86_64_PC32);
+    } else {
+      assembleconstant(memarg->disp.c, 4);
+    }
+    return;
+  }
+
   /* Direct memory access */
   if (memarg->base == ASM_NO_REG) {
     mod = 0;
@@ -333,20 +345,7 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
     assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
     sb(sibbyte(0, 4, 5));
     if (memarg->disp.l) {
-      assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_PC32);
-    } else {
-      assembleconstant(memarg->disp.c, 4);
-    }
-    return;
-  }
-
-  /* rip relative addressing. */
-  if (memarg->base == ASM_RIP) {
-    rm = 0x05;
-    rex.b = !!(rm & (1 << 3));
-    assemblemodregrm(rex, prefix, opcode, 0x00, reg, rm);
-    if (memarg->disp.l) {
-      assemblereloc(memarg->disp.l, memarg->disp.c - 4, 4, R_X86_64_PC32);
+      assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
     } else {
       assembleconstant(memarg->disp.c, 4);
     }
@@ -440,12 +439,27 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
 static void assembleimmrm(const Instr *instr, Rex rex, VarBytes prefix,
                           VarBytes opcode, uint8_t immreg) {
   uint8_t rm;
+  const Memarg *memarg;
   const Imm *imm;
 
   imm = &instr->arg1->imm;
 
   if (instr->arg2->kind == ASM_MEMARG) {
-    assemblemem(&instr->arg2->memarg, rex, prefix, opcode, immreg);
+    memarg = &instr->arg2->memarg;
+
+    if (memarg->base == ASM_RIP) {
+      rm = 0x05;
+      assemblemodregrm(rex, prefix, opcode, 0x00, immreg, rm);
+      if (memarg->disp.l) {
+        assemblereloc(memarg->disp.l, memarg->disp.c - 4 - imm->nbytes, 4,
+                      R_X86_64_PC32);
+      } else {
+        assembleconstant(memarg->disp.c, 4);
+      }
+    } else {
+      assemblemem(memarg, rex, prefix, opcode, immreg);
+    }
+
   } else {
     rm = regbits(instr->arg2->kind);
     rex.required = isrexreg(instr->arg2->kind);
@@ -1091,7 +1105,7 @@ static void assemble(void) {
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x05);
       break;
     }
-     case ASM_SUBSS:
+    case ASM_SUBSS:
       assemblerrm(&v->instr, 0xf3, 0x01000f5c, 1);
       break;
     case ASM_SUBSD:
