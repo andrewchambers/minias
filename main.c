@@ -430,10 +430,10 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
   assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
   sb(sibbyte(scale, index, base));
 
-  if (mod == 2) {
-    assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
-  } else if (mod == 1) {
+  if (mod == 1) {
     assemblereloc(memarg->disp.l, memarg->disp.c, 1, R_X86_64_8);
+  } else if (mod == 2) {
+    assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
   }
 }
 
