@@ -319,21 +319,29 @@ static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
   assembleconstant(c, nbytes);
 }
 
+/* Rip relative addressing. */
+static void assembleriprel(const Memarg *memarg, Rex rex, VarBytes prefix,
+                           VarBytes opcode, uint8_t reg, int32_t adjust) {
+  uint8_t rm;
+
+  rm = 0x05;
+  assemblemodregrm(rex, prefix, opcode, 0x00, reg, rm);
+  if (memarg->disp.l) {
+    assemblereloc(memarg->disp.l, memarg->disp.c - 4 + adjust, 4,
+                  R_X86_64_PC32);
+  } else {
+    assembleconstant(memarg->disp.c, 4);
+  }
+}
+
 /* Assemble a r <-> mem operation.  */
 static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
                         VarBytes opcode, uint8_t reg) {
 
   uint8_t mod, rm, scale, index, base;
 
-  /* rip relative addressing. */
   if (memarg->base == ASM_RIP) {
-    rm = 0x05;
-    assemblemodregrm(rex, prefix, opcode, 0x00, reg, rm);
-    if (memarg->disp.l) {
-      assemblereloc(memarg->disp.l, memarg->disp.c - 4, 4, R_X86_64_PC32);
-    } else {
-      assembleconstant(memarg->disp.c, 4);
-    }
+    assembleriprel(memarg, rex, prefix, opcode, reg, 0);
     return;
   }
 
@@ -450,14 +458,7 @@ static void assembleimmrm(const Instr *instr, Rex rex, VarBytes prefix,
     memarg = &instr->arg2->memarg;
 
     if (memarg->base == ASM_RIP) {
-      rm = 0x05;
-      assemblemodregrm(rex, prefix, opcode, 0x00, immreg, rm);
-      if (memarg->disp.l) {
-        assemblereloc(memarg->disp.l, memarg->disp.c - 4 - imm->nbytes, 4,
-                      R_X86_64_PC32);
-      } else {
-        assembleconstant(memarg->disp.c, 4);
-      }
+      assembleriprel(memarg, rex, prefix, opcode, immreg, -imm->nbytes);
     } else {
       assemblemem(memarg, rex, prefix, opcode, immreg);
     }
@@ -1037,14 +1038,17 @@ static void assemble(void) {
     case ASM_IDIV:
       assembledivmulneg(&v->instr, 0x07);
       break;
+    case ASM_DIVSD:
+      assemblerrm(&v->instr, 0xf2, 0x01000f5e, 1);
+      break;
+    case ASM_DIVSS:
+      assemblerrm(&v->instr, 0xf3, 0x01000f5e, 1);
+      break;
     case ASM_MUL:
       assembledivmulneg(&v->instr, 0x04);
       break;
     case ASM_MULSD:
       assemblerrm(&v->instr, 0xf2, 0x01000f59, 1);
-      break;
-    case ASM_DIVSD:
-      assemblerrm(&v->instr, 0xf2, 0x01000f5e, 1);
       break;
     case ASM_MULSS:
       assemblerrm(&v->instr, 0xf3, 0x01000f59, 1);

@@ -81,6 +81,7 @@ typedef enum {
   ASM_CVTTSD2SI,
   ASM_CVTTSS2SI,
   ASM_DIV,
+  ASM_DIVSS,
   ASM_DIVSD,
   ASM_IDIV,
   ASM_LEA,

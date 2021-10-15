@@ -31,7 +31,7 @@ directive =
   | "byte" ws v:value
     { $$.dirbyte = (Byte){.kind = ASM_DIR_BYTE, .value = v.value }; }
   | "short" ws v:value
-    { $$.dirshort = (Short){.kind = ASM_DIR_BYTE, .value = v.value }; }
+    { $$.dirshort = (Short){.kind = ASM_DIR_SHORT, .value = v.value }; }
   | "int" ws v:value
     { $$.dirint = (Int){.kind = ASM_DIR_INT,  .value = v.value }; }
   | "quad" ws v:value
@@ -115,6 +115,7 @@ instr =
   # Floating point is less common, so check last.
   | i:addss     { $$ = i; }
   | i:addsd     { $$ = i; }
+  | i:divss     { $$ = i; }
   | i:divsd     { $$ = i; }
   | i:pxor      { $$ = i; }
   | i:xorpd     { $$ = i; }
@@ -488,6 +489,11 @@ divsd = "divsd" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
   | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_DIVSD; }
+
+divss = "divss" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
+  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+)  { $$.instr.kind = ASM_DIVSS; }
 
 movaps = "movaps" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
