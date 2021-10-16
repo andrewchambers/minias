@@ -37,11 +37,12 @@ Essential features:
 
 - [x] Self host with cproc.
 - [ ] Self host with chibicc.
-- [ ] Two pass jump relaxing.
-- [ ] Immediate relaxing.
+
 
 Bonus features:
 
+- Two pass jump relaxing.
+- Immediate relaxing.
 - Test every opcode with all variants in our test suite.
 - Keep simplifying while keeping the code tidy.
 - Parser that doesn't depend on peg/leg.
