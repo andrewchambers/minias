@@ -207,15 +207,7 @@ static uint8_t regbits(AsmKind k) { return (k - (ASM_REG_BEGIN + 1)) % 16; }
 
 static uint8_t isreg64(AsmKind k) { return k >= ASM_RAX && k <= ASM_R15; }
 
-/* Register that requires the use of a rex prefix. */
-static uint8_t isrexreg(AsmKind k) {
-  return k > ASM_REG_BEGIN && k < ASM_REG_END &&
-         (regbits(k) & (1 << 3) || k == ASM_SPL || k == ASM_BPL ||
-          k == ASM_SIL || k == ASM_DIL);
-}
-
-/* Compose a rex prefix - See intel manual. */
-
+/* Rex opcode prefix. */
 typedef struct Rex {
   uint8_t required : 1;
   uint8_t w : 1;
@@ -223,6 +215,13 @@ typedef struct Rex {
   uint8_t x : 1;
   uint8_t b : 1;
 } Rex;
+
+/* Register that requires the use of a rex prefix. */
+static uint8_t isrexreg(AsmKind k) {
+  return k > ASM_REG_BEGIN && k < ASM_REG_END &&
+         (regbits(k) & (1 << 3) || k == ASM_SPL || k == ASM_BPL ||
+          k == ASM_SIL || k == ASM_DIL);
+}
 
 static uint8_t rexbyte(Rex rex) {
   return ((1 << 6) | (rex.w << 3) | (rex.r << 2) | (rex.x << 1) | rex.b);

@@ -68,5 +68,6 @@ Bonus features:
 
 - [intel reference](https://software.intel.com/content/dam/develop/external/us/en/documents-tps/325383-sdm-vol-2abcd.pdf) - Specifically chapter 2.1 and chapter 3.1.
 - [elf spec](https://refspecs.linuxfoundation.org/elf/elf.pdf)
+- [osdev wiki](https://wiki.osdev.org/X86-64_Instruction_Encoding)
 - [goas](https://github.com/DQNEO/goas)
 - [neatas](https://repo.or.cz/neatas.git)
