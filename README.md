@@ -54,7 +54,7 @@ Bonus features:
   quite light as it uses string and value interning. In the future
   we could use an arena allocator for minias and still avoid manual calls to free.
 
-- Minias deliberately kept the peg grammar quite repetitive
+- Minias deliberately keps the peg grammar quite repetitive
   and simple, please keep it this way.
 
 - Our performance is quite fast, but with the current design
