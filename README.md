@@ -2,7 +2,7 @@
 
 A mini assembler for x86_64, written for fun and learning.
 
-Although mini, minias can assemble itself and most things compiled with the [cproc](https://github.com/michaelforney/cproc) C compiler.
+Minias can assemble itself and most things compiled with the [cproc](https://github.com/michaelforney/cproc) C compiler, which includes large amounts of real world software.
 
 Project Goals:
 
