@@ -57,9 +57,9 @@ Bonus features:
 - Minias deliberately keps the peg grammar quite repetitive
   and simple, please keep it this way.
 
-- Performance is often better than gnu as and much better than clang as,
-  but with the current design it is limited by the parser, it would be interesting
-  to see if we can improve the parser generator upstream. 
+- With the current performance is limited by the parser, it would be interesting
+  to see if we can improve the parser generator upstream. That being said,
+  performance is often better than gnu as and much better than the clang assembler,
 
 - One day it would be nice to write a 'minipeg' in a single .c
   file that can be bundled in projects.
