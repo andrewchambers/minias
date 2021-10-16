@@ -64,9 +64,10 @@ Bonus features:
 - One day it would be nice to write a 'minipeg' in a single .c
   file that can be bundled in projects.
 
-# Bug reports
+# Contact
 
-Submit bugs to https://todo.sr.ht/~ach/minias
+Ask questions on the [mailing list](https://lists.sr.ht/~ach/minias).
+Submit bugs to the [ticket system](https://todo.sr.ht/~ach/minias).
 
 # Resources
 
