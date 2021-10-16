@@ -66,25 +66,50 @@ label =
   { $$.label = (Label){.kind = ASM_LABEL, .name = i.charptr}; }
 
 instr = 
-  # Ordered by relative frequency for performance.
-  
-  # Movs are very common, so they come first.
+  # Ordered by instruction frequency for performance.
+  # e.g. movs are very common, so they come first.
+  # The & operator means check without consuming input.
   (& 'm'
     (
-        i:mov       { $$ = i; }
-      | i:movsx     { $$ = i; }
-      | i:movzx     { $$ = i; }
-      | i:mul       { $$ = i; }
-      # Less common, but we have already checked for 'm'
-      | i:movaps    { $$ = i; }
-      | i:movq      { $$ = i; }
-      | i:movsd     { $$ = i; }
-      | i:movss     { $$ = i; }
-      | i:mulsd     { $$ = i; }
-      | i:mulss     { $$ = i; }))
-  | i:add       { $$ = i; }
-  | i:and       { $$ = i; }
-  | i:cmp       { $$ = i; }
+        i:mov    { $$ = i; }
+      | i:movsx  { $$ = i; }
+      | i:movzx  { $$ = i; }
+      | i:mul    { $$ = i; }
+      | i:movaps { $$ = i; }
+      | i:movq   { $$ = i; }
+      | i:movsd  { $$ = i; }
+      | i:movss  { $$ = i; }
+      | i:mulsd  { $$ = i; }
+      | i:mulss  { $$ = i; }))
+  | (& 'a'
+      (
+          i:add   { $$ = i; }
+        | i:and   { $$ = i; }
+        | i:addss { $$ = i; }
+        | i:addsd { $$ = i; } ))
+  | (& 'c'
+      (
+          i:cmp       { $$ = i; }
+        | i:call      { $$ = i; }
+        | i:cvtsi2sd  { $$ = i; }
+        | i:cvtsi2ss  { $$ = i; }
+        | i:cvtss2sd  { $$ = i; }
+        | i:cvtsd2ss  { $$ = i; }
+        | i:cvttsd2si { $$ = i; }
+        | i:cvttss2si { $$ = i; }
+        | i:cltd      { $$ = i; }
+        | i:cqto      { $$ = i; }))
+  | (& 's'
+      (
+          i:set   { $$ = i; }
+        | i:sub   { $$ = i; }
+        | i:sal   { $$ = i; }
+        | i:sar   { $$ = i; }
+        | i:shl   { $$ = i; }
+        | i:shr   { $$ = i; }
+        | i:subsd { $$ = i; }
+        | i:subss { $$ = i; }))
+  | i:or        { $$ = i; }
   | i:leave     { $$ = i; } 
   | i:ret       { $$ = i; }
   | i:push      { $$ = i; }
@@ -95,44 +120,18 @@ instr =
   | i:lea       { $$ = i; }
   | i:imul      { $$ = i; }
   | i:neg       { $$ = i; }
-  | i:or        { $$ = i; }
-  | (& 's'
-      (
-          i:set       { $$ = i; }
-        | i:sub       { $$ = i; }
-        | i:sal       { $$ = i; }
-        | i:sar       { $$ = i; }
-        | i:shl       { $$ = i; }
-        | i:shr       { $$ = i; }))
   | i:test      { $$ = i; }
   | i:xchg      { $$ = i; }
   | i:xor       { $$ = i; }
-  | i:call      { $$ = i; }
-  # Misc
-  | i:cltd      { $$ = i; }
-  | i:cqto      { $$ = i; }
-  | i:nop       { $$ = i; }
   # Floating point is less common, so check last.
-  | i:addss     { $$ = i; }
-  | i:addsd     { $$ = i; }
   | i:divss     { $$ = i; }
   | i:divsd     { $$ = i; }
   | i:pxor      { $$ = i; }
   | i:xorpd     { $$ = i; }
   | i:xorps     { $$ = i; }
-  | i:subsd     { $$ = i; }
-  | i:subss     { $$ = i; }
   | i:ucomisd   { $$ = i; }
   | i:ucomiss   { $$ = i; }
-  | (& 'c' 
-      (
-          i:cvtsi2sd  { $$ = i; }
-        | i:cvtsi2ss  { $$ = i; }
-        | i:cvtss2sd  { $$ = i; }
-        | i:cvtsd2ss  { $$ = i; }
-        | i:cvttsd2si { $$ = i; }
-        | i:cvttss2si { $$ = i; }))
-
+  | i:nop       { $$ = i; }
 
 cltd =  "cltd"  { $$ = (Parsev){ .kind=ASM_CLTD  }; }
 cqto =  "cqto"  { $$ = (Parsev){ .kind=ASM_CQTO  }; }
@@ -140,17 +139,15 @@ leave = "leave" { $$ = (Parsev){ .kind=ASM_LEAVE }; }
 nop =   "nop"   { $$ = (Parsev){ .kind=ASM_NOP   }; }
 ret  =  "ret"   { $$ = (Parsev){ .kind=ASM_RET   }; }
 
-push = 
-  "push" (
-      'q'? ws  s:r64 { $$ = INSTR1(0, s); }
-    | 'q'  ws  s:mem { $$ = INSTR1(1, s); }
-  ) { $$.instr.kind = ASM_PUSH; }
+push = "push" (
+    'q'? ws  s:r64 { $$ = INSTR1(0, s); }
+  | 'q'  ws  s:mem { $$ = INSTR1(1, s); }
+) { $$.instr.kind = ASM_PUSH; }
 
-pop = 
-  "pop" (
-      'q'? ws d:r64 { $$ = INSTR1(0, d); }
-    | 'q'  ws d:mem { $$ = INSTR1(1, d); }
-  ) { $$.instr.kind = ASM_POP; }
+pop = "pop" (
+    'q'? ws d:r64 { $$ = INSTR1(0, d); }
+  | 'q'  ws d:mem { $$ = INSTR1(1, d); }
+) { $$.instr.kind = ASM_POP; }
 
 call = "call" 'q'? ws (
     '*' t:mem
@@ -429,22 +426,22 @@ test = "test" (
 
 addsd = "addsd" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
-  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_ADDSD; }
 
 addss = "addss" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
-  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_ADDSS; }
 
 subsd = "subsd" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
-  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_SUBSD; }
 
 subss = "subss" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
-  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_SUBSS; }
 
 cvtsi2sd = "cvtsi2sd" (
@@ -463,12 +460,12 @@ cvtsi2ss = "cvtsi2ss" (
 
 cvtss2sd = "cvtss2sd" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
-  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_CVTSS2SD; }
 
 cvtsd2ss = "cvtsd2ss" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
-  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_CVTSD2SS; }
 
 cvttss2si = "cvttss2si" (
@@ -492,7 +489,7 @@ divsd = "divsd" (
 
 divss = "divss" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
-  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_DIVSS; }
 
 movaps = "movaps" (
@@ -503,12 +500,12 @@ movaps = "movaps" (
 
 mulsd = "mulsd" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
-  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_MULSD; }
 
 mulss = "mulss" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = INSTR2(0, s, d); }
-  | ws s:mem   ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = INSTR2(1, s, d); }
 )  { $$.instr.kind = ASM_MULSS; }
 
 movss = "movss" (
