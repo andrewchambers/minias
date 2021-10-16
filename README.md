@@ -45,7 +45,7 @@ Bonus features:
 - [ ] Simple immediate expressions.
 - [ ] Assemble a libc.
 - [ ] Test every opcode with all variants in our test suite.
-- [ ]Parser that doesn't depend on peg/leg.
+- [ ] Parser that doesn't depend on peg/leg.
 
 # Notes
 
