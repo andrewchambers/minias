@@ -7,7 +7,7 @@ Minias can assemble itself and many/most things compiled with the [cproc](https:
 Project Goals:
 
 - A simple, tiny, fast implementation (in that order).
-- Assemble the output of [cproc](https://github.com/michaelforney/cproc)/[qbe](https://c9x.me/compile/) and [chibicc](https://github.com/rui314/chibicc).
+- Assemble the output of [cproc](https://sr.ht/~mcf/cproc/)/[qbe](https://c9x.me/compile/) and [chibicc](https://github.com/rui314/chibicc).
 - Relocatable elf output.
 
 Non Goals:
