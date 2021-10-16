@@ -49,7 +49,7 @@ Bonus features:
 
 # Notes
 
-- Minias deliberately does not free data as it all is
+- Minias deliberately does not free allocated memory as it all is
   freed by the OS at the end of execution. Memory usage is still
   quite light as it uses string and value interning. In the future
   we could use an arena allocator for minias and still avoid manual calls to free.
