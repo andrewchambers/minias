@@ -57,7 +57,7 @@ Bonus features:
 - Minias deliberately keps the peg grammar quite repetitive
   and simple, please keep it this way.
 
-- With the current performance is limited by the parser, it would be interesting
+- Performance is limited by the parser, it would be interesting
   to see if we can improve the parser generator upstream. That being said,
   performance is often better than gnu as and much better than the clang assembler,
 
