@@ -1,6 +1,6 @@
 # minias
 
-A mini assembler for x86_64, written for fun and learning.
+A mini assembler for x86-64, written for fun and learning.
 
 Minias can assemble itself and many/most things compiled with the [cproc](https://github.com/michaelforney/cproc) C compiler i.e., large amounts of real world software.
 
