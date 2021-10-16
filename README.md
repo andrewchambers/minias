@@ -40,6 +40,7 @@ Essential features:
 
 Bonus features:
 
+- [ ] A man page explaining what is supported.
 - [ ] Two pass jump relaxing.
 - [ ] Immediate relaxing.
 - [ ] Simple immediate expressions.
