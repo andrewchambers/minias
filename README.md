@@ -33,10 +33,17 @@ cc -O2 *.c -o minias
 
 # Roadmap
 
+Essential features:
+
 - [x] Self host, feature complete for goals.
 - [ ] Two pass jump relaxing.
 - [ ] Immediate relaxing.
-- [ ] Bonus features.
+
+Bonus features:
+
+- Test every opcode with all variants in our test suite.
+- Keep simplifying while keeping the code tidy.
+- Parser that doesn't depend on peg/leg.
 
 # Notes
 
