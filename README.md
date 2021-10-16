@@ -35,7 +35,8 @@ cc -O2 *.c -o minias
 
 Essential features:
 
-- [x] Self host, feature complete for goals.
+- [x] Self host with cproc.
+- [ ] Self host with chibicc.
 - [ ] Two pass jump relaxing.
 - [ ] Immediate relaxing.
 
