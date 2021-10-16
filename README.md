@@ -16,10 +16,6 @@ Non Goals:
 - Assemble other architectures.
 - Work as a library.
 
-# Issues and Bug reports
-
-Submit bugs and issues to https://todo.sr.ht/~ach/minias
-
 # Building
 
 Install the [peg/leg](https://www.piumarta.com/software/peg/) parser generator, make and a C compiler and run:
@@ -67,6 +63,10 @@ Bonus features:
 
 - One day it would be nice to write a 'minipeg' in a single .c
   file that can be bundled in projects.
+
+# Bug reports
+
+Submit bugs to https://todo.sr.ht/~ach/minias
 
 # Resources
 
