@@ -739,6 +739,45 @@ static void assembleset(const Instr *instr) {
   }
 }
 
+static void assemblecall(const Call *call) {
+  Rex rex;
+  uint8_t rm;
+
+  if (call->indirect) {
+    if (call->target.indirect->kind == ASM_MEMARG) {
+      rex = (Rex){0};
+      assemblemem(&call->target.indirect->memarg, rex, -1, 0xff, 0x02);
+    } else {
+      rm = regbits(call->target.indirect->kind);
+      rex = (Rex){.b = !!(rm & (1 << 3))};
+      assemblemodregrm(rex, -1, 0xff, 0x03, 0x02, rm);
+    }
+  } else {
+    sb(0xe8);
+    assemblereloc(call->target.direct.l, call->target.direct.c - 4, 4,
+                  R_X86_64_PC32);
+  }
+}
+
+static void assembleimul(const Instr *instr) {
+  VarBytes prefix, opcode;
+
+  if (instr->variant < 8) {
+    assembledivmulneg(instr, 0x05);
+  } else if (instr->variant < 14) {
+    opcode = 0x01000faf;
+    prefix = ((instr->variant - 8) % 3) == 0 ? 0x66 : -1;
+    assemblerrm(instr, prefix, opcode, 1);
+  } else {
+    const Imm *imm;
+    imm = &instr->arg3->imm;
+    opcode = 0x69;
+    prefix = ((instr->variant - 14) % 3) == 0 ? 0x66 : -1;
+    assemblerrm(instr, prefix, opcode, 1);
+    assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
+  }
+}
+
 static void assemble(void) {
   Symbol *sym;
   AsmLine *l;
@@ -845,26 +884,9 @@ static void assemble(void) {
         lfatal("%s already defined", sym->name);
       sym->defined = 1;
       break;
-    case ASM_CALL: {
-      Rex rex;
-      uint8_t rm;
-
-      if (v->call.indirect) {
-        if (v->call.target.indirect->kind == ASM_MEMARG) {
-          rex = (Rex){0};
-          assemblemem(&v->call.target.indirect->memarg, rex, -1, 0xff, 0x02);
-        } else {
-          rm = regbits(v->call.target.indirect->kind);
-          rex = (Rex){.b = !!(rm & (1 << 3))};
-          assemblemodregrm(rex, -1, 0xff, 0x03, 0x02, rm);
-        }
-      } else {
-        sb(0xe8);
-        assemblereloc(v->call.target.direct.l, v->call.target.direct.c - 4, 4,
-                      R_X86_64_PC32);
-      }
+    case ASM_CALL:
+      assemblecall(&v->call);
       break;
-    }
     case ASM_JMP: {
       static uint8_t variant2op[31] = {
           0xe9, 0x84, 0x88, 0x8b, 0x8a, 0x8a, 0x80, 0x85, 0x89, 0x8b, 0x81,
@@ -1052,25 +1074,9 @@ static void assemble(void) {
     case ASM_MULSS:
       assemblerrm(&v->instr, 0xf3, 0x01000f59, 1);
       break;
-    case ASM_IMUL: {
-      VarBytes prefix, opcode;
-
-      if (v->instr.variant < 8) {
-        assembledivmulneg(&v->instr, 0x05);
-      } else if (v->instr.variant < 14) {
-        opcode = 0x01000faf;
-        prefix = ((v->instr.variant - 8) % 3) == 0 ? 0x66 : -1;
-        assemblerrm(&v->instr, prefix, opcode, 1);
-      } else {
-        const Imm *imm;
-        imm = &v->instr.arg3->imm;
-        opcode = 0x69;
-        prefix = ((v->instr.variant - 14) % 3) == 0 ? 0x66 : -1;
-        assemblerrm(&v->instr, prefix, opcode, 1);
-        assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
-      }
+    case ASM_IMUL:
+      assembleimul(&v->instr);
       break;
-    }
     case ASM_NEG:
       assembledivmulneg(&v->instr, 0x03);
       break;

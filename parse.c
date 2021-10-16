@@ -10,7 +10,8 @@ static const Parsev *internparsev(Parsev *p) {
 
      This simplicity comes with one big cost - Parsev variants with padding
      can trigger a false positive on valgrind. It should still be safe,
-     but the best fix is still to avoid the padding bytes in the Parsev variants.
+     but the best fix is still to avoid the padding bytes in the Parsev
+     variants.
   */
   size_t idx;
   const Parsev *interned;
