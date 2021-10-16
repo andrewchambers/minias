@@ -16,6 +16,10 @@ Non Goals:
 - Assemble other architectures.
 - Work as a library.
 
+# Issues and Bug reports
+
+Submit bugs and issues to https://todo.sr.ht/~ach/minias
+
 # Building
 
 Install the [peg/leg](https://www.piumarta.com/software/peg/) parser generator, make and a C compiler and run:
