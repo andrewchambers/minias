@@ -24,6 +24,7 @@ typedef struct {
   const char *name;
   int32_t idx;
   int64_t offset;
+  int64_t wco; /* worst case offset */
   int64_t size;
   int global;
   int defined;

@@ -3,6 +3,9 @@
 /* Parsed assembly */
 static AsmLine *allasm = NULL;
 
+/* Number of assembly the relaxation passes. */
+static int nrelax = 1;
+
 /* Symbol table. */
 static struct hashtable *symbols = NULL;
 
@@ -44,8 +47,11 @@ static Symbol *getsym(const char *name) {
   htabkey(&htk, name, strlen(name));
   ps = (Symbol **)htabput(symbols, &htk);
   if (!*ps) {
-    *ps = zalloc(sizeof(Symbol));
-    (*ps)->name = name;
+    *ps = xmalloc(sizeof(Symbol));
+    **ps = (Symbol){
+        .name = name,
+        .wco = -1,
+    };
   }
   s = *ps;
   return s;
@@ -377,7 +383,7 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
     assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
 
     if (mod == 1) {
-      assemblereloc(memarg->disp.l, memarg->disp.c, 1, R_X86_64_8);
+      assembleconstant(memarg->disp.c, 1);
     } else if (mod == 2) {
       assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
     }
@@ -437,7 +443,7 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
   sb(sibbyte(scale, index, base));
 
   if (mod == 1) {
-    assemblereloc(memarg->disp.l, memarg->disp.c, 1, R_X86_64_8);
+    assembleconstant(memarg->disp.c, 1);
   } else if (mod == 2) {
     assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
   }
@@ -777,6 +783,43 @@ static void assembleimul(const Instr *instr) {
   }
 }
 
+static void assemblejmp(const Jmp *j) {
+  int jmpsize;
+  int64_t distance;
+  Symbol *target;
+
+  static uint8_t variant2op[31] = {
+      0xe9, 0x84, 0x88, 0x8b, 0x8a, 0x8a, 0x80, 0x85, 0x89, 0x8b, 0x81,
+      0x8f, 0x8d, 0x8c, 0x8e, 0x85, 0x83, 0x87, 0x83, 0x82, 0x86, 0x8e,
+      0x8c, 0x8d, 0x8f, 0x84, 0x82, 0x86, 0x82, 0x83, 0x87,
+  };
+
+  jmpsize = 4;
+  target = getsym(j->target);
+  if (cursection == target->section && (target->defined || target->wco != -1)) {
+    if (target->defined) {
+      distance = target->offset - cursection->hdr.sh_size;
+    } else {
+      distance = target->wco - cursection->hdr.sh_size;
+    }
+    if ((distance - 1) >= -128 && (distance - 1) <= 127) {
+      jmpsize = 1;
+    } else {
+      jmpsize = 4;
+    }
+  }
+
+  if (jmpsize == 4) {
+    if (j->variant)
+      sb(0x0f);
+    sb(variant2op[j->variant]);
+    assemblereloc(j->target, -4, 4, R_X86_64_PC32);
+  } else {
+    sb(variant2op[j->variant] + (j->variant ? -16 : 2));
+    assemblereloc(j->target, -1, 1, R_X86_64_PC8);
+  }
+}
+
 static void assemble(void) {
   Symbol *sym;
   AsmLine *l;
@@ -886,18 +929,9 @@ static void assemble(void) {
     case ASM_CALL:
       assemblecall(&v->call);
       break;
-    case ASM_JMP: {
-      static uint8_t variant2op[31] = {
-          0xe9, 0x84, 0x88, 0x8b, 0x8a, 0x8a, 0x80, 0x85, 0x89, 0x8b, 0x81,
-          0x8f, 0x8d, 0x8c, 0x8e, 0x85, 0x83, 0x87, 0x83, 0x82, 0x86, 0x8e,
-          0x8c, 0x8d, 0x8f, 0x84, 0x82, 0x86, 0x82, 0x83, 0x87,
-      };
-      if (v->jmp.variant)
-        sb(0x0f);
-      sb(variant2op[v->jmp.variant]);
-      assemblereloc(v->jmp.target, -4, 4, R_X86_64_PC32);
+    case ASM_JMP:
+      assemblejmp(&v->jmp);
       break;
-    }
     case ASM_PUSH: {
       Rex rex;
       uint8_t reg;
@@ -1088,10 +1122,9 @@ static void assemble(void) {
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x01);
       break;
     }
-    case ASM_PXOR: {
+    case ASM_PXOR:
       assemblerrm(&v->instr, 0x66, 0x01000fef, 1);
       break;
-    }
     case ASM_SET:
       assembleset(&v->instr);
       break;
@@ -1152,6 +1185,32 @@ static void assemble(void) {
     default:
       lfatal("assemble: unexpected kind: %d", v->kind);
     }
+  }
+}
+
+/* Reset while remembering symbol offsets so we can size jumps. */
+static void relaxreset(void) {
+  Symbol *sym;
+  Section *sec;
+  size_t i;
+
+  /* Reset relocations and section data but retain capacity. */
+  nrelocs = 0;
+
+  for (i = 0; i < nsections; i++) {
+    sec = &sections[i];
+    if (sec == shstrtab)
+      continue;
+    sec->hdr.sh_size = 0;
+  }
+
+  /* Reset symbols, saving the worst case offset for the second pass. */
+  for (i = 0; i < symbols->cap; i++) {
+    if (!symbols->keys[i].str)
+      continue;
+    sym = symbols->vals[i];
+    *sym = (Symbol){
+        .name = sym->name, .section = sym->section, .wco = sym->offset};
   }
 }
 
@@ -1219,10 +1278,14 @@ static int resolvereloc(Relocation *reloc) {
     return 0;
 
   switch (reloc->type) {
-  case R_X86_64_8:
   case R_X86_64_32:
   case R_X86_64_64:
     return 0;
+  case R_X86_64_PC8:
+    rdata = &reloc->section->data[reloc->offset];
+    value = sym->offset - reloc->offset + reloc->addend;
+    rdata[0] = ((uint8_t)value & 0xff);
+    return 1;
   case R_X86_64_PC32:
     rdata = &reloc->section->data[reloc->offset];
     value = sym->offset - reloc->offset + reloc->addend;
@@ -1258,7 +1321,6 @@ static void appendreloc(Relocation *reloc) {
   case R_X86_64_PC32:
   case R_X86_64_32:
   case R_X86_64_64:
-  case R_X86_64_8:
     elfrel.r_info = ELF64_R_INFO(sym->idx, reloc->type);
     elfrel.r_offset = reloc->offset;
     elfrel.r_addend = reloc->addend;
@@ -1328,8 +1390,11 @@ static void outelf(void) {
 }
 
 static void usage(char *argv0) {
-  fprintf(stderr, "minias - a mini assembler.");
-  fprintf(stderr, "usage: %s [-o out] [input]\n", argv0);
+  fprintf(stderr, "minias - a mini x86-64 assembler.\n\n");
+  fprintf(stderr, "usage: %s [-r passes] [-o out] [input]\n", argv0);
+  fprintf(stderr, "\n");
+  fprintf(stderr, "  -r passes  Jump relaxation iterations (default 1).\n");
+  fprintf(stderr, "  -o out     Output file to write (default stdout).\n");
   exit(2);
 }
 
@@ -1346,6 +1411,9 @@ static void parseargs(int argc, char *argv[]) {
       case '-':
       case 'h':
         usage(argv0);
+        break;
+      case 'r':
+        nrelax = atoi(*++argv);
         break;
       case 'o':
         if (argv[1] == NULL)
@@ -1375,6 +1443,10 @@ int main(int argc, char *argv[]) {
   allasm = parseasm();
   initsections();
   assemble();
+  while (nrelax-- > 0) {
+    relaxreset();
+    assemble();
+  }
   fillsymtab();
   handlerelocs();
   outelf();

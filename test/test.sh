@@ -8,7 +8,7 @@ tmpb="$(mktemp)"
 trap "rm -f \"$tmps\" \"$tmpo\" \"$tmpb\"" EXIT
 
 t () {
-  echo "$1" > "$tmps"
+  echo -e "$1" > "$tmps"
   clang -Wno-everything -c -x assembler "$tmps" -o "$tmpo"
   objcopy -j ".text" -O binary "$tmpo" "$tmpb"
   want="$(xxd -ps "$tmpb" | head -n 1 | cut  -d ' ' -f 2-)"
@@ -151,6 +151,17 @@ conditioncodes="
   nle no np ns nz
   o p pe po s z
 "
+
+for fill in 0 1 129
+do
+  t "l:\n .fill $fill, 1, 0x00 \njmp l"
+  t "jmp l\n .fill $fill, 1, 0x00 \nl:"
+  for cc in $conditioncodes
+  do
+    t "l:\n .fill $fill, 1, 0x00 \nj${cc} l"
+    t "j${cc} l\n .fill $fill, 1, 0x00 \nl:"
+  done
+done
 
 for cc in $conditioncodes
 do
