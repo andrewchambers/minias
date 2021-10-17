@@ -262,6 +262,8 @@ typedef struct Rex {
 } Rex;
 
 typedef enum Ecoder {
+  ENCODER_R,
+  ENCODER_RIMM,
   ENCODER_IMM,
   ENCODER_IMMMEM,
   ENCODER_IMMREG,

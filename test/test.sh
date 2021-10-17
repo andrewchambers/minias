@@ -30,6 +30,27 @@ t () {
   echo -n "."
 }
 
+for r in a b
+do
+  t "xchg %${r}l, %${r}l"
+  t "xchg %${r}x, %${r}x"
+  t "xchg %${r}x, %bx"
+  t "xchg %bx, %${r}x"
+  # t "xchg %e${r}x, %e${r}x" # clang disagrees
+  t "xchg %e${r}x, %ebx"
+  t "xchg %ebx, %e${r}x"
+  t "xchg %r${r}x, %rbx"
+  t "xchg %rbx, %r${r}x"
+  t "xchg %r${r}x, (%r${r}x)"
+  t "xchg %e${r}x, (%r${r}x)"
+  t "xchg %${r}x, (%r${r}x)"
+  t "xchg %${r}l, (%r${r}x)"
+  t "xchg (%r${r}x), %r${r}x"
+  t "xchg (%r${r}x), %e${r}x"
+  t "xchg (%r${r}x), %${r}x"
+  t "xchg (%r${r}x), %${r}l"
+done
+
 # Various regression tests first.
 t "xchgq %r13, %rax"
 t "movl \$1000, %r8d"
@@ -246,27 +267,6 @@ do
   then
     t "mov${x}lq (%rax), %rbx"
   fi
-done
-
-for r in a b
-do
-  t "xchg %${r}l, %${r}l"
-  t "xchg %${r}x, %${r}x"
-  t "xchg %${r}x, %bx"
-  t "xchg %bx, %${r}x"
-  # t "xchg %e${r}x, %e${r}x" # clang disagrees
-  t "xchg %e${r}x, %ebx"
-  t "xchg %ebx, %e${r}x"
-  t "xchg %r${r}x, %rbx"
-  t "xchg %rbx, %r${r}x"
-  t "xchg %r${r}x, (%r${r}x)"
-  t "xchg %e${r}x, (%r${r}x)"
-  t "xchg %${r}x, (%r${r}x)"
-  t "xchg %${r}l, (%r${r}x)"
-  t "xchg (%r${r}x), %r${r}x"
-  t "xchg (%r${r}x), %e${r}x"
-  t "xchg (%r${r}x), %${r}x"
-  t "xchg (%r${r}x), %${r}l"
 done
 
 for op in mov add and cmp or sub xor test

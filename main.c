@@ -930,6 +930,33 @@ static void assemble(void) {
       instr = &v->instr;
 
       switch (instr->encoder) {
+      case ENCODER_R:
+        reg = regbits(instr->arg1->kind);
+        rex = instr->rex;
+        rex.required = isrexreg(instr->arg1->kind);
+        rex.b = !!(reg & (1 << 3));
+        assemblevbytes(instr->prefix);
+        assemblerex(rex);
+        assemblevbytes(instr->opcode | (reg & 7));
+        break;
+      case ENCODER_RIMM:
+        imm = &instr->arg1->imm;
+        reg = regbits(instr->arg2->kind);
+        rex = instr->rex;
+        rex.required = isrexreg(instr->arg2->kind);
+        rex.b = !!(reg & (1 << 3));
+        assemblevbytes(instr->prefix);
+        assemblerex(rex);
+        assemblevbytes(instr->opcode | (reg & 7));
+        if (imm->nbytes == 1)
+          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_8);
+        else if (imm->nbytes == 2)
+          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_16);
+        else if (imm->nbytes == 4)
+          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
+        else
+          unreachable();
+        break;
       case ENCODER_IMM:
         imm = &instr->arg1->imm;
         rex = instr->rex;
@@ -996,7 +1023,7 @@ static void assemble(void) {
           reg = regbits(instr->arg1->kind);
         }
         rex = instr->rex;
-        rex.required = isrexreg(instr->arg2->kind);
+        rex.required = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
         rex.r = !!(reg & (1 << 3));
         assemblemem(memarg, rex, instr->prefix, instr->opcode, reg);
         break;

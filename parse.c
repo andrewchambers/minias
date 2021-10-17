@@ -86,10 +86,27 @@ static String decodestring(char *s) {
   return (String){.kind = ASM_STRING, .len = len, .data = data};
 }
 
+#define R(PREFIX, REX, OPCODE, A1)                                             \
+  (Parsev) {                                                                   \
+    .instr = (Instr) {                                                         \
+      .kind = ASM_INSTR, .encoder = ENCODER_R, .prefix = PREFIX,               \
+      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+    }                                                                          \
+  }
+
 #define IMM(PREFIX, REX, OPCODE, A1, A2)                                       \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_IMM, .prefix = PREFIX,             \
+      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .arg2 = internparsev(&A2)                                                \
+    }                                                                          \
+  }
+
+#define RIMM(PREFIX, REX, OPCODE, A1, A2)                                       \
+  (Parsev) {                                                                   \
+    .instr = (Instr) {                                                         \
+      .kind = ASM_INSTR, .encoder = ENCODER_RIMM, .prefix = PREFIX,             \
       .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
       .arg2 = internparsev(&A2)                                                \
     }                                                                          \
