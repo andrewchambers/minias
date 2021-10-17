@@ -8,11 +8,10 @@ static const Parsev *internparsev(Parsev *p) {
      for equality, even on pointer values, this works because the
      pointers themselves are also interned.
 
-     This simplicity somes with one big cost - Parsev variants with padding
-     can trigger a false positive on valgrind. It should still safe
-     because reading these undefined bytes do not change the behavior of the
-     program. The best fix is still to avoid the padding bytes in the Parsev
-     variant layout using a tool such as 'pahole'.
+     This simplicity comes with one big cost - Parsev variants with padding
+     can trigger a false positive on valgrind. It should still be safe,
+     but the best fix is still to avoid the padding bytes in the Parsev
+     variants.
   */
   size_t idx;
   const Parsev *interned;

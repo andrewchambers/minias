@@ -8,7 +8,7 @@ tmpb="$(mktemp)"
 trap "rm -f \"$tmps\" \"$tmpo\" \"$tmpb\"" EXIT
 
 t () {
-  echo "$1" > "$tmps"
+  echo -e "$1" > "$tmps"
   clang -Wno-everything -c -x assembler "$tmps" -o "$tmpo"
   objcopy -j ".text" -O binary "$tmpo" "$tmpb"
   want="$(xxd -ps "$tmpb" | head -n 1 | cut  -d ' ' -f 2-)"
@@ -30,6 +30,18 @@ t () {
   echo -n "."
 }
 
+# Various regression tests first.
+t "xchgq %r13, %rax"
+t "movl \$1000, %r8d"
+t "movb %sil, (%rdi)"
+t "movsbq (%rax), %rbx"
+t "movq $-4132994306676758123, %rcx"
+t "mov \$17293822569102704639, %rax"
+t "callq *%rax"
+t "callq *%r10"
+t "movb %r11b, (%rsi, %r12, 1)"
+
+
 for r in rax r10
 do
   for x in xmm0 xmm13
@@ -41,19 +53,6 @@ do
   done
 done
 
-t "movl \$1000, %r8d"
-
-t "movb %sil, (%rdi)"
-
-t "movsbq (%rax), %rbx"
-
-t "movq $-4132994306676758123, %rcx"
-t "mov \$17293822569102704639, %rax"
-
-t "callq *%rax"
-t "callq *%r10"
-
-t "movb %r11b, (%rsi, %r12, 1)"
 
 t "cvttsd2si %xmm1, %rax"
 t "cvttsd2si %xmm10, %rax"
@@ -152,6 +151,17 @@ conditioncodes="
   nle no np ns nz
   o p pe po s z
 "
+
+for fill in 0 1 129
+do
+  t "l:\n .fill $fill, 1, 0x00 \njmp l"
+  t "jmp l\n .fill $fill, 1, 0x00 \nl:"
+  for cc in $conditioncodes
+  do
+    t "l:\n .fill $fill, 1, 0x00 \nj${cc} l"
+    t "j${cc} l\n .fill $fill, 1, 0x00 \nl:"
+  done
+done
 
 for cc in $conditioncodes
 do
