@@ -55,6 +55,10 @@ Bonus features:
   quite light as it uses string and value interning. In the future
   we could use an arena allocator for minias and still avoid manual calls to free.
 
+- Minias deliberately uses global variables in a style similar class members in C++.
+  This is a more traditional unix style where the unit of data encapsulation is a
+  small program. This choice makes sense given we don't aim to build a library.
+
 - Minias deliberately keeps the peg grammar quite repetitive
   and simple, please keep it this way.
 
