@@ -269,6 +269,7 @@ typedef enum Ecoder {
   ENCODER_IMMREG,
   ENCODER_MEMREG,
   ENCODER_REGMEM,
+  ENCODER_REGMEM2,
   ENCODER_REGREG,
 } Encoder;
 

@@ -75,6 +75,9 @@ instr =
   | i:xor   { $$ = i; }
   | i:xchg  { $$ = i; }
   | i:mov   { $$ = i; }
+  | i:movsx { $$ = i; }
+  | i:movzx { $$ = i; }
+  | i:call  { $$ = i; }
 
 #  (& 'm'
 #    (
@@ -309,34 +312,34 @@ mov = "mov" (
   | 'q'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM(-1, (Rex){.w=1}, 0xc7, 0x00, s, d); }
 )
 
-#movsx = "movs" (
-#    'bw' ws s:mem ws? ',' ws? d:r16 { $$ = INSTR2(0, s, d); }
-#  | 'bl' ws s:mem ws? ',' ws? d:r32 { $$ = INSTR2(1, s, d); }
-#  | 'bq' ws s:mem ws? ',' ws? d:r64 { $$ = INSTR2(2, s, d); }
-#  | 'wl' ws s:mem ws? ',' ws? d:r32 { $$ = INSTR2(3, s, d); }
-#  | 'wq' ws s:mem ws? ',' ws? d:r64 { $$ = INSTR2(4, s, d); }
-#  | 'bw' ws s:r8  ws? ',' ws? d:r16 { $$ = INSTR2(5, s, d); }
-#  | 'bl' ws s:r8  ws? ',' ws? d:r32 { $$ = INSTR2(6, s, d); }
-#  | 'bq' ws s:r8  ws? ',' ws? d:r64 { $$ = INSTR2(7, s, d); }
-#  | 'wl' ws s:r16 ws? ',' ws? d:r32 { $$ = INSTR2(8, s, d); }
-#  | 'wq' ws s:r16 ws? ',' ws? d:r64 { $$ = INSTR2(9, s, d); }
-#  | 'lq' ws s:mem ws? ',' ws? d:r64 { $$ = INSTR2(10, s, d); }
-#  | 'lq' ws s:r32 ws? ',' ws? d:r64 { $$ = INSTR2(11, s, d); }
-#) { $$.instr.kind = ASM_MOVSX; }
-#
-#movzx = "movz" (
-#    'bw' ws s:mem ws? ',' ws? d:r16 { $$ = INSTR2(0, s, d); }
-#  | 'bl' ws s:mem ws? ',' ws? d:r32 { $$ = INSTR2(1, s, d); }
-#  | 'bq' ws s:mem ws? ',' ws? d:r64 { $$ = INSTR2(2, s, d); }
-#  | 'wl' ws s:mem ws? ',' ws? d:r32 { $$ = INSTR2(3, s, d); }
-#  | 'wq' ws s:mem ws? ',' ws? d:r64 { $$ = INSTR2(4, s, d); }
-#  | 'bw' ws s:r8  ws? ',' ws? d:r16 { $$ = INSTR2(5, s, d); }
-#  | 'bl' ws s:r8  ws? ',' ws? d:r32 { $$ = INSTR2(6, s, d); }
-#  | 'bq' ws s:r8  ws? ',' ws? d:r64 { $$ = INSTR2(7, s, d); }
-#  | 'wl' ws s:r16 ws? ',' ws? d:r32 { $$ = INSTR2(8, s, d); }
-#  | 'wq' ws s:r16 ws? ',' ws? d:r64 { $$ = INSTR2(9, s, d); }
-#) { $$.instr.kind = ASM_MOVZX; }
-#
+movsx = "movs" (
+    'bw' ws s:r8  ws? ',' ws? d:r16 { $$ = REGREG(-1, (Rex){0}, 0xbe, s, d); }
+  | 'bl' ws s:r8  ws? ',' ws? d:r32 { $$ = REGREG(-1, (Rex){0}, 0xbe, s, d); }
+  | 'bq' ws s:r8  ws? ',' ws? d:r64 { $$ = REGREG(-1, (Rex){.w=1}, 0x01000fbe, s, d); }
+  | 'wl' ws s:r16 ws? ',' ws? d:r32 { $$ = REGREG(0x66, (Rex){0}, 0x01000fbf, s, d); }
+  | 'wq' ws s:r16 ws? ',' ws? d:r64 { $$ = REGREG(0x66, (Rex){.w=1}, 0x01000fbf, s, d); }
+  | 'lq' ws s:r32 ws? ',' ws? d:r64 { $$ = REGREG(-1, (Rex){.w=1}, 0x63, s, d); }
+  | 'bw' ws s:mem ws? ',' ws? d:r16 { $$ = MEMREG(-1, (Rex){0}, 0x01000fbe, s, d); }
+  | 'bl' ws s:mem ws? ',' ws? d:r32 { $$ = MEMREG(-1, (Rex){0}, 0x01000fbe, s, d); }
+  | 'bq' ws s:mem ws? ',' ws? d:r64 { $$ = MEMREG(-1, (Rex){.w=1}, 0x01000fbe, s, d); }
+  | 'wl' ws s:mem ws? ',' ws? d:r32 { $$ = MEMREG(-1, (Rex){0}, 0x01000fbe, s, d); }
+  | 'wq' ws s:mem ws? ',' ws? d:r64 { $$ = MEMREG(-1, (Rex){.w=1}, 0x01000fbe, s, d); }
+  | 'lq' ws s:mem ws? ',' ws? d:r64 { $$ = MEMREG(-1, (Rex){.w=1}, 0x63, s, d); }
+)
+
+movzx = "movz" (
+    'bw' ws s:r8  ws? ',' ws? d:r16 { $$ = REGREG(-1, (Rex){0}, 0xb6, s, d); }
+  | 'bl' ws s:r8  ws? ',' ws? d:r32 { $$ = REGREG(-1, (Rex){0}, 0xb6, s, d); }
+  | 'bq' ws s:r8  ws? ',' ws? d:r64 { $$ = REGREG(-1, (Rex){.w=1}, 0x01000fb6, s, d); }
+  | 'wl' ws s:r16 ws? ',' ws? d:r32 { $$ = REGREG(0x66, (Rex){0}, 0x01000fb7, s, d); }
+  | 'wq' ws s:r16 ws? ',' ws? d:r64 { $$ = REGREG(0x66, (Rex){.w=1}, 0x01000fb7, s, d); }
+  | 'bw' ws s:mem ws? ',' ws? d:r16 { $$ = MEMREG(-1, (Rex){0}, 0x01000fb6, s, d); }
+  | 'bl' ws s:mem ws? ',' ws? d:r32 { $$ = MEMREG(-1, (Rex){0}, 0x01000fb6, s, d); }
+  | 'bq' ws s:mem ws? ',' ws? d:r64 { $$ = MEMREG(-1, (Rex){.w=1}, 0x01000fb6, s, d); }
+  | 'wl' ws s:mem ws? ',' ws? d:r32 { $$ = MEMREG(-1, (Rex){0}, 0x01000fb6, s, d); }
+  | 'wq' ws s:mem ws? ',' ws? d:r64 { $$ = MEMREG(-1, (Rex){.w=1}, 0x01000fb6, s, d); }
+)
+
 
 add = "add" (
     'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = IMM(-1, (Rex){0}, 0x04, s, d); }

@@ -1046,13 +1046,13 @@ static void assemble(void) {
 
       break;
     }
-    /*
     case ASM_CALL:
       assemblecall(&v->call);
       break;
     case ASM_JMP:
       assemblejmp(&v->jmp);
       break;
+    /*
     case ASM_PUSH: {
       Rex rex;
       uint8_t reg;
