@@ -86,25 +86,57 @@ static String decodestring(char *s) {
   return (String){.kind = ASM_STRING, .len = len, .data = data};
 }
 
-#define INSTR1(V, A1)                                                          \
+#define IMM(PREFIX, REX, OPCODE, A1, A2)                                       \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .arg1 = internparsev(&A1), .arg2 = NULL,        \
-      .arg3 = NULL                                                             \
+      .kind = ASM_INSTR, .encoder = ENCODER_IMM, .prefix = PREFIX,             \
+      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .arg2 = internparsev(&A2)                                                \
     }                                                                          \
   }
-#define INSTR2(V, A1, A2)                                                      \
+
+#define IMMREG(PREFIX, REX, OPCODE, IMMREG, A1, A2)                            \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .arg1 = internparsev(&A1),                      \
-      .arg2 = internparsev(&A2), .arg3 = NULL                                  \
+      .kind = ASM_INSTR, .encoder = ENCODER_IMMREG, .prefix = PREFIX,          \
+      .opcode = OPCODE, .rex = REX, .immreg = IMMREG,                          \
+      .arg1 = internparsev(&A1), .arg2 = internparsev(&A2)                     \
     }                                                                          \
   }
-#define INSTR3(V, A1, A2, A3)                                                  \
+
+#define IMMMEM(PREFIX, REX, OPCODE, IMMREG, A1, A2)                            \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
-      .kind = 0, .variant = V, .arg1 = internparsev(&A1),                      \
-      .arg2 = internparsev(&A2), .arg3 = internparsev(&A3)                     \
+      .kind = ASM_INSTR, .encoder = ENCODER_IMMMEM, .prefix = PREFIX,          \
+      .opcode = OPCODE, .rex = REX, .immreg = IMMREG,                          \
+      .arg1 = internparsev(&A1), .arg2 = internparsev(&A2)                     \
+    }                                                                          \
+  }
+
+#define REGMEM(PREFIX, REX, OPCODE, A1, A2)                                    \
+  (Parsev) {                                                                   \
+    .instr = (Instr) {                                                         \
+      .kind = ASM_INSTR, .encoder = ENCODER_REGMEM, .prefix = PREFIX,          \
+      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .arg2 = internparsev(&A2)                                                \
+    }                                                                          \
+  }
+
+#define MEMREG(PREFIX, REX, OPCODE, A1, A2)                                    \
+  (Parsev) {                                                                   \
+    .instr = (Instr) {                                                         \
+      .kind = ASM_INSTR, .encoder = ENCODER_MEMREG, .prefix = PREFIX,          \
+      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .arg2 = internparsev(&A2)                                                \
+    }                                                                          \
+  }
+
+#define REGREG(PREFIX, REX, OPCODE, A1, A2)                                    \
+  (Parsev) {                                                                   \
+    .instr = (Instr) {                                                         \
+      .kind = ASM_INSTR, .encoder = ENCODER_REGREG, .prefix = PREFIX,          \
+      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .arg2 = internparsev(&A2)                                                \
     }                                                                          \
   }
 

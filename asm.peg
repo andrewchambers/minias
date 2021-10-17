@@ -346,39 +346,47 @@ condition-code =
 #  | 'l'? ws s:r32 ws? ',' ws? d:r32 { $$ = INSTR2(16, s, d); }
 #  | 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = INSTR2(17, s, d); }
 #) { $$.instr.kind = ASM_XCHG; }
-#
-#add = "add" a:basic-op-args # { a.instr.kind = ASM_ADD; $$ = a; }
+
+
+#add = "add" a:basic-op-args { $$ = a; }
 #cmp = "cmp" a:basic-op-args { a.instr.kind = ASM_CMP; $$ = a; }
 #and = "and" a:basic-op-args { a.instr.kind = ASM_AND; $$ = a; }
 #or  = "or"  a:basic-op-args { a.instr.kind = ASM_OR;  $$ = a; }
 #sub = "sub" a:basic-op-args { a.instr.kind = ASM_SUB; $$ = a; }
 #xor = "xor" a:basic-op-args { a.instr.kind = ASM_XOR; $$ = a; }
-basic-op-args =
-    'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = INSTR2(0, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = INSTR2(1, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = INSTR2(2, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = INSTR2(3, s, d); }
-  | 'b'  ws s:imm8  ws? ',' ws? d:mem { $$ = INSTR2(4, s, d); }
-  | 'w'  ws s:imm16 ws? ',' ws? d:mem { $$ = INSTR2(5, s, d); }
-  | 'l'  ws s:imm32 ws? ',' ws? d:mem { $$ = INSTR2(6, s, d); }
-  | 'q'  ws s:imm32 ws? ',' ws? d:mem { $$ = INSTR2(7, s, d); }
-  | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = INSTR2(8, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = INSTR2(9, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = INSTR2(10, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = INSTR2(11, s, d); }
-  | 'b'? ws s:mem   ws? ',' ws? d:r8  { $$ = INSTR2(12, s, d); }
-  | 'w'? ws s:mem   ws? ',' ws? d:r16 { $$ = INSTR2(13, s, d); }
-  | 'l'? ws s:mem   ws? ',' ws? d:r32 { $$ = INSTR2(14, s, d); }
-  | 'q'? ws s:mem   ws? ',' ws? d:r64 { $$ = INSTR2(15, s, d); }
-  | 'b'? ws s:r8    ws? ',' ws? d:mem { $$ = INSTR2(16, s, d); }
-  | 'w'? ws s:r16   ws? ',' ws? d:mem { $$ = INSTR2(17, s, d); }
-  | 'l'? ws s:r32   ws? ',' ws? d:mem { $$ = INSTR2(18, s, d); }
-  | 'q'? ws s:r64   ws? ',' ws? d:mem { $$ = INSTR2(19, s, d); }
-  | 'b'? ws s:r8    ws? ',' ws? d:r8  { $$ = INSTR2(20, s, d); }
-  | 'w'? ws s:r16   ws? ',' ws? d:r16 { $$ = INSTR2(21, s, d); }
-  | 'l'? ws s:r32   ws? ',' ws? d:r32 { $$ = INSTR2(22, s, d); }
-  | 'q'? ws s:r64   ws? ',' ws? d:r64 { $$ = INSTR2(23, s, d); }
-#
+
+add = "add" (
+    'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = IMM(-1, (Rex){0}, 0x04, s, d); }
+  | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = IMM(0x66, (Rex){0}, 0x05, s, d); }
+  | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = IMM(-1, (Rex){0}, 0x05, s, d); }
+  | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = IMM(-1, (Rex){.w=1}, 0x05, s, d); }
+
+  | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = IMMREG(-1, (Rex){0}, 0x80, 0x00, s, d); }
+  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = IMMREG(0x66, (Rex){0}, 0x81, 0x00, s, d); }
+  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = IMMREG(-1, (Rex){0}, 0x81, 0x00, s, d); }
+  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = IMMREG(-1, (Rex){.w=1}, 0x81, 0x00, s, d); }
+
+  | 'b'  ws s:imm8  ws? ',' ws? d:mem { $$ = IMMMEM(-1, (Rex){0}, 0x80, 0x00, s, d); }
+  | 'w'  ws s:imm16 ws? ',' ws? d:mem { $$ = IMMMEM(0x66, (Rex){0}, 0x81, 0x00, s, d); }
+  | 'l'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM(-1, (Rex){0}, 0x81, 0x00, s, d); }
+  | 'q'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM(-1, (Rex){.w=1}, 0x81, 0x00, s, d); }
+  
+  | 'b'? ws s:r8    ws? ',' ws? d:r8  { $$ = REGREG(-1, (Rex){0}, 0x00, s, d); }
+  | 'w'? ws s:r16   ws? ',' ws? d:r16 { $$ = REGREG(0x66, (Rex){0}, 0x01, s, d); }
+  | 'l'? ws s:r32   ws? ',' ws? d:r32 { $$ = REGREG(-1, (Rex){0}, 0x01, s, d); }
+  | 'q'? ws s:r64   ws? ',' ws? d:r64 { $$ = REGREG(-1, (Rex){.w=1}, 0x01, s, d); }
+  
+  | 'b'? ws s:r8    ws? ',' ws? d:mem { $$ = REGMEM(-1, (Rex){0}, 0x00, s, d); }
+  | 'w'? ws s:r16   ws? ',' ws? d:mem { $$ = REGMEM(0x66, (Rex){0}, 0x01, s, d); }
+  | 'l'? ws s:r32   ws? ',' ws? d:mem { $$ = REGMEM(-1, (Rex){0}, 0x01, s, d); }
+  | 'q'? ws s:r64   ws? ',' ws? d:mem { $$ = REGMEM(-1, (Rex){.w=1}, 0x01, s, d); }
+
+  | 'b'? ws s:mem   ws? ',' ws? d:r8  { $$ = MEMREG(-1, (Rex){0}, 0x02, s, d); }
+  | 'w'? ws s:mem   ws? ',' ws? d:r16 { $$ = MEMREG(0x66, (Rex){0}, 0x03, s, d); }
+  | 'l'? ws s:mem   ws? ',' ws? d:r32 { $$ = MEMREG(-1, (Rex){0}, 0x03, s, d); }
+  | 'q'? ws s:mem   ws? ',' ws? d:r64 { $$ = MEMREG(-1, (Rex){.w=1}, 0x03, s, d); }
+)
+  
 #set = "set" cc:condition-code (
 #    'b'? ws a:mem{ $$ = INSTR1(0, a); $$.instr.variant = cc.i64; }
 #  | 'b'? ws a:r8 { $$ = INSTR1(0, a); $$.instr.variant = 31 + cc.i64; }
@@ -423,8 +431,7 @@ basic-op-args =
 #  | 'w'? ws s:r16   ws? ',' ws? d:r16 { $$ = INSTR2(17, s, d); }
 #  | 'l'? ws s:r32   ws? ',' ws? d:r32 { $$ = INSTR2(18, s, d); }
 #  | 'q'? ws s:r64   ws? ',' ws? d:r64 { $$ = INSTR2(19, s, d); }
-
-) { $$.instr.kind = ASM_TEST; }
+#) { $$.instr.kind = ASM_TEST; }
 
 # Floating point instructions.
 
