@@ -303,9 +303,21 @@ typedef struct Jmp {
   const char *target;
 } Jmp;
 
+/* Rex opcode prefix. */
+typedef struct Rex {
+  uint8_t required : 1;
+  uint8_t w : 1;
+  uint8_t r : 1;
+  uint8_t x : 1;
+  uint8_t b : 1;
+} Rex;
+
 typedef struct Instr {
   AsmKind kind;
-  uint32_t variant;
+  uint32_t encoder;
+  Rex rex;
+  int32_t opcode;
+  int32_t prefix;
   const Parsev *arg1;
   const Parsev *arg2;
   const Parsev *arg3;

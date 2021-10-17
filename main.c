@@ -3,10 +3,10 @@
 /* Parsed assembly */
 static AsmLine *allasm = NULL;
 
-/* Number of assembly the relaxation passes. */
+/* Number of assembly relaxation passes. */
 static int nrelax = 1;
 
-/* Symbol table. */
+/* Symbols before writing to symtab section. */
 static struct hashtable *symbols = NULL;
 
 /* Array of all relocations before adding to the rel section. */
@@ -212,15 +212,6 @@ static void su64(uint64_t l) {
 static uint8_t regbits(AsmKind k) { return (k - (ASM_REG_BEGIN + 1)) % 16; }
 
 static uint8_t isreg64(AsmKind k) { return k >= ASM_RAX && k <= ASM_R15; }
-
-/* Rex opcode prefix. */
-typedef struct Rex {
-  uint8_t required : 1;
-  uint8_t w : 1;
-  uint8_t r : 1;
-  uint8_t x : 1;
-  uint8_t b : 1;
-} Rex;
 
 /* Register that requires the use of a rex prefix. */
 static uint8_t isrexreg(AsmKind k) {
@@ -927,6 +918,7 @@ static void assemble(void) {
         lfatal("%s already defined", sym->name);
       sym->defined = 1;
       break;
+    /*
     case ASM_CALL:
       assemblecall(&v->call);
       break;
@@ -1130,7 +1122,7 @@ static void assemble(void) {
       assembleset(&v->instr);
       break;
     case ASM_SAL:
-      /* fallthrough */
+      assembleshift(&v->instr, 0x04);
     case ASM_SHL:
       assembleshift(&v->instr, 0x04);
       break;
@@ -1179,10 +1171,10 @@ static void assemble(void) {
       assemblebasicop(&v->instr, variant2op[v->instr.variant], 0x06);
       break;
     }
-    case ASM_XCHG: {
+    case ASM_XCHG:
       assemblexchg(&v->instr);
       break;
-    }
+    */
     default:
       lfatal("assemble: unexpected kind: %d", v->kind);
     }
