@@ -183,7 +183,7 @@ condition-code =
 
 cltd =  "cltd"  { $$ = OP(0x99); }
 cqto =  "cqto"  { $$ = OP(0x01004899); }
-leave = "leave" { $$ = OP(0x90); } 
+leave = "leave" { $$ = OP(0xc9); }
 nop =   "nop"   { $$ = OP(0x90); }
 ret  =  "ret"   { $$ = OP(0xc3); }
 
