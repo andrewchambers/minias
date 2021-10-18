@@ -201,6 +201,24 @@ static int needsmovabs(Imm *imm) {
     }                                                                          \
   }
 
+#define IMMREGREG2(PREFIX, REX, OPCODE, A1, A2, A3)                            \
+  (Parsev) {                                                                   \
+    .instr = (Instr) {                                                         \
+      .kind = ASM_INSTR, .encoder = ENCODER_IMMREGREG2, .prefix = PREFIX,      \
+      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .arg2 = internparsev(&A2), .arg3 = internparsev(&A3)                     \
+    }                                                                          \
+  }
+
+#define IMMMEMREG(PREFIX, REX, OPCODE, A1, A2, A3)                             \
+  (Parsev) {                                                                   \
+    .instr = (Instr) {                                                         \
+      .kind = ASM_INSTR, .encoder = ENCODER_IMMMEMREG, .prefix = PREFIX,       \
+      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .arg2 = internparsev(&A2), .arg3 = internparsev(&A3)                     \
+    }                                                                          \
+  }
+
 #define REG(K)                                                                 \
   (Parsev) { .kind = ASM_##K }
 

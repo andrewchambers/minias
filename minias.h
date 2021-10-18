@@ -261,6 +261,8 @@ typedef struct Rex {
   uint8_t b : 1;
 } Rex;
 
+/* Various classes of instruction encoding.
+   The *2 variants just have operands swapped. */
 typedef enum Encoder {
   ENCODER_OP,
   ENCODER_OPREG,
@@ -276,6 +278,8 @@ typedef enum Encoder {
   ENCODER_REGMEM2,
   ENCODER_REGREG,
   ENCODER_REGREG2,
+  ENCODER_IMMREGREG2,
+  ENCODER_IMMMEMREG,
 } Encoder;
 
 typedef struct Instr {
