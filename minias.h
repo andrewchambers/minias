@@ -261,23 +261,28 @@ typedef struct Rex {
   uint8_t b : 1;
 } Rex;
 
-typedef enum Ecoder {
+typedef enum Encoder {
+  ENCODER_OP,
+  ENCODER_OPREG,
+  ENCODER_OPMEM,
   ENCODER_R,
   ENCODER_RIMM,
   ENCODER_IMM,
   ENCODER_IMMMEM,
   ENCODER_IMMREG,
   ENCODER_MEMREG,
+  ENCODER_MEMREG2,
   ENCODER_REGMEM,
   ENCODER_REGMEM2,
   ENCODER_REGREG,
+  ENCODER_REGREG2,
 } Encoder;
 
 typedef struct Instr {
   AsmKind kind;
   Encoder encoder;
   Rex rex;
-  int32_t immreg;
+  uint32_t fixedreg;
   int32_t opcode;
   int32_t prefix;
   const Parsev *arg1;
