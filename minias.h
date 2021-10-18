@@ -47,7 +47,7 @@ typedef enum {
   ASM_IMM,
   ASM_STRING,
   ASM_MEMARG,
-  // Directives
+  // Directives.
   ASM_DIR_GLOBL,
   ASM_DIR_SECTION,
   ASM_DIR_ASCII,
@@ -60,61 +60,10 @@ typedef enum {
   ASM_DIR_INT,
   ASM_DIR_QUAD,
   ASM_DIR_BALIGN,
-  // Instructions
-  ASM_NOP,
-  ASM_RET,
-  ASM_PUSH,
-  ASM_POP,
+  // Instructions.
   ASM_CALL,
-  ASM_CLTD,
-  ASM_CQTO,
   ASM_JMP,
-  ASM_LEAVE,
-  ASM_ADD,
-  ASM_ADDSS,
-  ASM_ADDSD,
-  ASM_AND,
-  ASM_CMP,
-  ASM_CVTSS2SD,
-  ASM_CVTSD2SS,
-  ASM_CVTSI2SD,
-  ASM_CVTSI2SS,
-  ASM_CVTTSD2SI,
-  ASM_CVTTSS2SI,
-  ASM_DIV,
-  ASM_DIVSS,
-  ASM_DIVSD,
-  ASM_IDIV,
-  ASM_LEA,
-  ASM_MUL,
-  ASM_MULSD,
-  ASM_MULSS,
-  ASM_IMUL,
-  ASM_MOV,
-  ASM_MOVAPS,
-  ASM_MOVQ,
-  ASM_MOVSD,
-  ASM_MOVSS,
-  ASM_MOVSX,
-  ASM_MOVZX,
-  ASM_NEG,
-  ASM_OR,
-  ASM_PXOR,
-  ASM_SAL,
-  ASM_SAR,
-  ASM_SET,
-  ASM_SHL,
-  ASM_SHR,
-  ASM_SUB,
-  ASM_SUBSS,
-  ASM_SUBSD,
-  ASM_TEST,
-  ASM_UCOMISD,
-  ASM_UCOMISS,
-  ASM_XCHG,
-  ASM_XOR,
-  ASM_XORPD,
-  ASM_XORPS,
+  ASM_INSTR,
   // Registers, order matters.
   ASM_REG_BEGIN,
 
@@ -303,9 +252,43 @@ typedef struct Jmp {
   const char *target;
 } Jmp;
 
+/* Rex opcode prefix. */
+typedef struct Rex {
+  uint8_t required : 1;
+  uint8_t w : 1;
+  uint8_t r : 1;
+  uint8_t x : 1;
+  uint8_t b : 1;
+} Rex;
+
+/* Various classes of instruction encoding.
+   The *2 variants just have operands swapped. */
+typedef enum Encoder {
+  ENCODER_OP,
+  ENCODER_OPREG,
+  ENCODER_OPMEM,
+  ENCODER_R,
+  ENCODER_RIMM,
+  ENCODER_IMM,
+  ENCODER_IMMMEM,
+  ENCODER_IMMREG,
+  ENCODER_MEMREG,
+  ENCODER_MEMREG2,
+  ENCODER_REGMEM,
+  ENCODER_REGMEM2,
+  ENCODER_REGREG,
+  ENCODER_REGREG2,
+  ENCODER_IMMREGREG2,
+  ENCODER_IMMMEMREG,
+} Encoder;
+
 typedef struct Instr {
   AsmKind kind;
-  uint32_t variant;
+  Encoder encoder;
+  Rex rex;
+  uint32_t fixedreg;
+  int32_t opcode;
+  int32_t prefix;
   const Parsev *arg1;
   const Parsev *arg2;
   const Parsev *arg3;
