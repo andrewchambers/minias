@@ -9,7 +9,7 @@ trap "rm -f \"$tmps\" \"$tmpo\" \"$tmpb\"" EXIT
 
 t () {
   echo -e "$1" > "$tmps"
-  clang -Wno-everything -c -x assembler "$tmps" -o "$tmpo"
+  ./minias-master < "$tmps" > "$tmpo"
   objcopy -j ".text" -O binary "$tmpo" "$tmpb"
   want="$(xxd -ps "$tmpb" | head -n 1 | cut  -d ' ' -f 2-)"
   if ! ./minias < "$tmps" > "$tmpo"
@@ -29,6 +29,21 @@ t () {
   fi
   echo -n "."
 }
+
+# Various regression tests first.
+t "movss  %xmm15,-0x128(%rbp)"
+t "movaps -0x38(%rbp),%xmm15"
+t "movsd  -0x38(%rbp),%xmm15"
+t "xchgq %r13, %rax"
+t "movl \$1000, %r8d"
+t "movb %sil, (%rdi)"
+t "movsbq (%rax), %rbx"
+t "movq $-4132994306676758123, %rcx"
+t "mov \$17293822569102704639, %rax"
+t "callq *%rax"
+t "callq *%r10"
+t "movb %r11b, (%rsi, %r12, 1)"
+
 
 for r in a b
 do
@@ -50,18 +65,6 @@ do
   t "xchg (%r${r}x), %${r}x"
   t "xchg (%r${r}x), %${r}l"
 done
-
-# Various regression tests first.
-t "xchgq %r13, %rax"
-t "movl \$1000, %r8d"
-t "movb %sil, (%rdi)"
-t "movsbq (%rax), %rbx"
-t "movq $-4132994306676758123, %rcx"
-t "mov \$17293822569102704639, %rax"
-t "callq *%rax"
-t "callq *%r10"
-t "movb %r11b, (%rsi, %r12, 1)"
-
 
 for r in rax r10
 do

@@ -732,13 +732,13 @@ mulss = "mulss" (
 movss = "movss" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = REGREG2(0xf3, (Rex){0}, 0x01000f10, s, d); }
   | ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG(0xf3, (Rex){0},  0x01000f10, s, d); }
-  | ws s:xmm ws? ',' ws? d:mem { $$ = REGMEM(0xf3, (Rex){0},  0x01000f10, s, d); }
+  | ws s:xmm ws? ',' ws? d:mem { $$ = REGMEM(0xf3, (Rex){0},  0x01000f11, s, d); }
 )
 
 movsd = "movsd" (
-    ws s:xmm ws? ',' ws? d:xmm { $$ = REGREG2(-1, (Rex){0}, 0x01000f28, s, d); }
-  | ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG(-1, (Rex){0},  0x01000f28, s, d); }
-  | ws s:xmm ws? ',' ws? d:mem { $$ = REGMEM(-1, (Rex){0},  0x01000f29, s, d); }
+    ws s:xmm ws? ',' ws? d:xmm { $$ = REGREG2(0xf2, (Rex){0}, 0x01000f10, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG(0xf2, (Rex){0},  0x01000f10, s, d); }
+  | ws s:xmm ws? ',' ws? d:mem { $$ = REGMEM(0xf2, (Rex){0},  0x01000f11, s, d); }
 )
 
 movq = "mov" (
