@@ -286,7 +286,7 @@ typedef struct Instr {
   AsmKind kind;
   Encoder encoder;
   Rex rex;
-  uint8_t pad[3]; /* Avoid undefined padding. */
+  uint8_t pad[3]; /* Avoid undefined padding - see internparsev. */
   uint32_t fixedreg;
   int32_t opcode;
   int32_t prefix;
