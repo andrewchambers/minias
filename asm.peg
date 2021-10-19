@@ -353,20 +353,23 @@ movzx = "movz" (
 )
 
 add = "add" (
-    'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = IMM({.w=0},   -1, 0x04, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = IMM({.w=0}, 0x66, 0x05, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = IMM({.w=0},   -1, 0x05, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = IMM({.w=1},   -1, 0x05, s, d); }
+    'b'? ws s:imm8    ws? ',' ws? d:r8  { $$ = (d.kind == ASM_AL) ? 
+                                               IMM   ({.w=0}, -1, 0x04, s, d) :
+                                               IMMREG({.w=0}, -1, 0x80, 0x00, s, d); }
+  | 'w'? ws s:imm16-8 ws? ',' ws? d:r16 { $$ = (d.kind == ASM_AX && s.imm.nbytes == 2) ?
+                                               IMM   ({.w=0}, 0x66, 0x05, s, d) :
+                                               IMMREG({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x00, s, d); }
+  | 'l'? ws s:imm32-8 ws? ',' ws? d:r32 { $$ = (d.kind == ASM_EAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=0}, -1, 0x05, s, d) :
+                                               IMMREG({.w=0}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x00, s, d); }
+  | 'q'? ws s:imm32-8 ws? ',' ws? d:r64 { $$ = (d.kind == ASM_RAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=1}, -1, 0x05, s, d) :
+                                               IMMREG({.w=1}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x00, s, d); }
 
-  | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = IMMREG({.w=0},   -1, 0x80, 0x00, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = IMMREG({.w=0}, 0x66, 0x81, 0x00, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = IMMREG({.w=0},   -1, 0x81, 0x00, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = IMMREG({.w=1},   -1, 0x81, 0x00, s, d); }
-
-  | 'b'  ws s:imm8  ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x00, s, d); }
-  | 'w'  ws s:imm16 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, 0x81, 0x00, s, d); }
-  | 'l'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x81, 0x00, s, d); }
-  | 'q'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, 0x81, 0x00, s, d); }
+  | 'b'  ws s:imm8    ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x00, s, d); }
+  | 'w'  ws s:imm16-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x00, s, d); }
+  | 'l'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x00, s, d); }
+  | 'q'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x00, s, d); }
   
   | 'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = REGREG({.w=0},   -1, 0x00, s, d); }
   | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = REGREG({.w=0}, 0x66, 0x01, s, d); }
@@ -384,22 +387,24 @@ add = "add" (
   | 'q'? ws s:mem ws? ',' ws? d:r64 { $$ = MEMREG({.w=1},   -1, 0x03, s, d); }
 )
 
-
 and = "and" (
-    'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = IMM({.w=0},   -1, 0x24, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = IMM({.w=0}, 0x66, 0x25, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = IMM({.w=0},   -1, 0x25, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = IMM({.w=1},   -1, 0x25, s, d); }
+    'b'? ws s:imm8    ws? ',' ws? d:r8  { $$ = (d.kind == ASM_AL) ? 
+                                               IMM   ({.w=0}, -1, 0x24, s, d) :
+                                               IMMREG({.w=0}, -1, 0x80, 0x04, s, d); }
+  | 'w'? ws s:imm16-8 ws? ',' ws? d:r16 { $$ = (d.kind == ASM_AX && s.imm.nbytes == 2) ?
+                                               IMM   ({.w=0}, 0x66, 0x25, s, d) :
+                                               IMMREG({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x04, s, d); }
+  | 'l'? ws s:imm32-8 ws? ',' ws? d:r32 { $$ = (d.kind == ASM_EAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=0}, -1, 0x25, s, d) :
+                                               IMMREG({.w=0}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x04, s, d); }
+  | 'q'? ws s:imm32-8 ws? ',' ws? d:r64 { $$ = (d.kind == ASM_RAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=1}, -1, 0x25, s, d) :
+                                               IMMREG({.w=1}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x04, s, d); }
 
-  | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = IMMREG({.w=0},   -1, 0x80, 0x04, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = IMMREG({.w=0}, 0x66, 0x81, 0x04, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = IMMREG({.w=0},   -1, 0x81, 0x04, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = IMMREG({.w=1},   -1, 0x81, 0x04, s, d); }
-
-  | 'b'  ws s:imm8  ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x04, s, d); }
-  | 'w'  ws s:imm16 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, 0x81, 0x04, s, d); }
-  | 'l'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x81, 0x04, s, d); }
-  | 'q'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, 0x81, 0x04, s, d); }
+  | 'b'  ws s:imm8    ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x04, s, d); }
+  | 'w'  ws s:imm16-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x04, s, d); }
+  | 'l'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x04, s, d); }
+  | 'q'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x04, s, d); }
   
   | 'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = REGREG({.w=0},   -1, 0x20, s, d); }
   | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = REGREG({.w=0}, 0x66, 0x21, s, d); }
@@ -418,20 +423,23 @@ and = "and" (
 )
 
 cmp = "cmp" (
-    'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = IMM({.w=0},   -1, 0x3c, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = IMM({.w=0}, 0x66, 0x3d, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = IMM({.w=0},   -1, 0x3d, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = IMM({.w=1},   -1, 0x3d, s, d); }
+    'b'? ws s:imm8    ws? ',' ws? d:r8  { $$ = (d.kind == ASM_AL) ? 
+                                               IMM   ({.w=0}, -1, 0x3c, s, d) :
+                                               IMMREG({.w=0}, -1, 0x80, 0x07, s, d); }
+  | 'w'? ws s:imm16-8 ws? ',' ws? d:r16 { $$ = (d.kind == ASM_AX && s.imm.nbytes == 2) ?
+                                               IMM   ({.w=0}, 0x66, 0x3d, s, d) :
+                                               IMMREG({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x07, s, d); }
+  | 'l'? ws s:imm32-8 ws? ',' ws? d:r32 { $$ = (d.kind == ASM_EAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=0}, -1, 0x3d, s, d) :
+                                               IMMREG({.w=0}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x07, s, d); }
+  | 'q'? ws s:imm32-8 ws? ',' ws? d:r64 { $$ = (d.kind == ASM_RAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=1}, -1, 0x3d, s, d) :
+                                               IMMREG({.w=1}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x07, s, d); }
 
-  | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = IMMREG({.w=0},   -1, 0x80, 0x07, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = IMMREG({.w=0}, 0x66, 0x81, 0x07, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = IMMREG({.w=0},   -1, 0x81, 0x07, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = IMMREG({.w=1},   -1, 0x81, 0x07, s, d); }
-
-  | 'b'  ws s:imm8  ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x07, s, d); }
-  | 'w'  ws s:imm16 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, 0x81, 0x07, s, d); }
-  | 'l'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x81, 0x07, s, d); }
-  | 'q'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, 0x81, 0x07, s, d); }
+  | 'b'  ws s:imm8    ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x07, s, d); }
+  | 'w'  ws s:imm16-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x07, s, d); }
+  | 'l'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x07, s, d); }
+  | 'q'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x07, s, d); }
   
   | 'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = REGREG({.w=0},   -1, 0x38, s, d); }
   | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = REGREG({.w=0}, 0x66, 0x39, s, d); }
@@ -450,20 +458,23 @@ cmp = "cmp" (
 )
 
 or = "or" (
-    'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = IMM({.w=0},   -1, 0x0c, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = IMM({.w=0}, 0x66, 0x0d, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = IMM({.w=0},   -1, 0x0d, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = IMM({.w=1},   -1, 0x0d, s, d); }
+    'b'? ws s:imm8    ws? ',' ws? d:r8  { $$ = (d.kind == ASM_AL) ? 
+                                               IMM   ({.w=0}, -1, 0x0c, s, d) :
+                                               IMMREG({.w=0}, -1, 0x80, 0x01, s, d); }
+  | 'w'? ws s:imm16-8 ws? ',' ws? d:r16 { $$ = (d.kind == ASM_AX && s.imm.nbytes == 2) ?
+                                               IMM   ({.w=0}, 0x66, 0x0d, s, d) :
+                                               IMMREG({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x01, s, d); }
+  | 'l'? ws s:imm32-8 ws? ',' ws? d:r32 { $$ = (d.kind == ASM_EAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=0}, -1, 0x0d, s, d) :
+                                               IMMREG({.w=0}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x01, s, d); }
+  | 'q'? ws s:imm32-8 ws? ',' ws? d:r64 { $$ = (d.kind == ASM_RAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=1}, -1, 0x0d, s, d) :
+                                               IMMREG({.w=1}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x01, s, d); }
 
-  | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = IMMREG({.w=0},   -1, 0x80, 0x01, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = IMMREG({.w=0}, 0x66, 0x81, 0x01, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = IMMREG({.w=0},   -1, 0x81, 0x01, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = IMMREG({.w=1},   -1, 0x81, 0x01, s, d); }
-
-  | 'b'  ws s:imm8  ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x01, s, d); }
-  | 'w'  ws s:imm16 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, 0x81, 0x01, s, d); }
-  | 'l'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x81, 0x01, s, d); }
-  | 'q'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, 0x81, 0x01, s, d); }
+  | 'b'  ws s:imm8    ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x01, s, d); }
+  | 'w'  ws s:imm16-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x01, s, d); }
+  | 'l'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x01, s, d); }
+  | 'q'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x01, s, d); }
   
   | 'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = REGREG({.w=0},   -1, 0x08, s, d); }
   | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = REGREG({.w=0}, 0x66, 0x09, s, d); }
@@ -482,20 +493,23 @@ or = "or" (
 )
 
 sub = "sub" (
-    'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = IMM({.w=0},   -1, 0x2c, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = IMM({.w=0}, 0x66, 0x2d, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = IMM({.w=0},   -1, 0x2d, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = IMM({.w=1},   -1, 0x2d, s, d); }
+    'b'? ws s:imm8    ws? ',' ws? d:r8  { $$ = (d.kind == ASM_AL) ? 
+                                               IMM   ({.w=0}, -1, 0x2c, s, d) :
+                                               IMMREG({.w=0}, -1, 0x80, 0x05, s, d); }
+  | 'w'? ws s:imm16-8 ws? ',' ws? d:r16 { $$ = (d.kind == ASM_AX && s.imm.nbytes == 2) ?
+                                               IMM   ({.w=0}, 0x66, 0x2d, s, d) :
+                                               IMMREG({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x05, s, d); }
+  | 'l'? ws s:imm32-8 ws? ',' ws? d:r32 { $$ = (d.kind == ASM_EAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=0}, -1, 0x2d, s, d) :
+                                               IMMREG({.w=0}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x05, s, d); }
+  | 'q'? ws s:imm32-8 ws? ',' ws? d:r64 { $$ = (d.kind == ASM_RAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=1}, -1, 0x2d, s, d) :
+                                               IMMREG({.w=1}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x05, s, d); }
 
-  | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = IMMREG({.w=0},   -1, 0x80, 0x05, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = IMMREG({.w=0}, 0x66, 0x81, 0x05, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = IMMREG({.w=0},   -1, 0x81, 0x05, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = IMMREG({.w=1},   -1, 0x81, 0x05, s, d); }
-
-  | 'b'  ws s:imm8  ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x05, s, d); }
-  | 'w'  ws s:imm16 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, 0x81, 0x05, s, d); }
-  | 'l'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x81, 0x05, s, d); }
-  | 'q'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, 0x81, 0x05, s, d); }
+  | 'b'  ws s:imm8    ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x05, s, d); }
+  | 'w'  ws s:imm16-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x05, s, d); }
+  | 'l'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x05, s, d); }
+  | 'q'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x05, s, d); }
   
   | 'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = REGREG({.w=0},   -1, 0x28, s, d); }
   | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = REGREG({.w=0}, 0x66, 0x29, s, d); }
@@ -514,20 +528,23 @@ sub = "sub" (
 )
 
 xor = "xor" (
-    'b'? ws s:imm8  ws? ',' ws? d:al  { $$ = IMM({.w=0},   -1, 0x34, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:ax  { $$ = IMM({.w=0}, 0x66, 0x35, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:eax { $$ = IMM({.w=0},   -1, 0x35, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:rax { $$ = IMM({.w=1},   -1, 0x35, s, d); }
+    'b'? ws s:imm8    ws? ',' ws? d:r8  { $$ = (d.kind == ASM_AL) ? 
+                                               IMM   ({.w=0}, -1, 0x34, s, d) :
+                                               IMMREG({.w=0}, -1, 0x80, 0x06, s, d); }
+  | 'w'? ws s:imm16-8 ws? ',' ws? d:r16 { $$ = (d.kind == ASM_AX && s.imm.nbytes == 2) ?
+                                               IMM   ({.w=0}, 0x66, 0x35, s, d) :
+                                               IMMREG({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x06, s, d); }
+  | 'l'? ws s:imm32-8 ws? ',' ws? d:r32 { $$ = (d.kind == ASM_EAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=0}, -1, 0x35, s, d) :
+                                               IMMREG({.w=0}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x06, s, d); }
+  | 'q'? ws s:imm32-8 ws? ',' ws? d:r64 { $$ = (d.kind == ASM_RAX && s.imm.nbytes == 4) ?
+                                               IMM   ({.w=1}, -1, 0x35, s, d) :
+                                               IMMREG({.w=1}, -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x06, s, d); }
 
-  | 'b'? ws s:imm8  ws? ',' ws? d:r8  { $$ = IMMREG({.w=0},   -1, 0x80, 0x06, s, d); }
-  | 'w'? ws s:imm16 ws? ',' ws? d:r16 { $$ = IMMREG({.w=0}, 0x66, 0x81, 0x06, s, d); }
-  | 'l'? ws s:imm32 ws? ',' ws? d:r32 { $$ = IMMREG({.w=0},   -1, 0x81, 0x06, s, d); }
-  | 'q'? ws s:imm32 ws? ',' ws? d:r64 { $$ = IMMREG({.w=1},   -1, 0x81, 0x06, s, d); }
-
-  | 'b'  ws s:imm8  ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x06, s, d); }
-  | 'w'  ws s:imm16 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, 0x81, 0x06, s, d); }
-  | 'l'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x81, 0x06, s, d); }
-  | 'q'  ws s:imm32 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, 0x81, 0x06, s, d); }
+  | 'b'  ws s:imm8    ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x80, 0x06, s, d); }
+  | 'w'  ws s:imm16-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x06, s, d); }
+  | 'l'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x06, s, d); }
+  | 'q'  ws s:imm32-8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, s.imm.nbytes == 1 ? 0x83 : 0x81, 0x06, s, d); }
   
   | 'b'? ws s:r8  ws? ',' ws? d:r8  { $$ = REGREG({.w=0},   -1, 0x30, s, d); }
   | 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = REGREG({.w=0}, 0x66, 0x31, s, d); }
@@ -835,13 +852,33 @@ scale-index-base =
    | '(' ws? b:r64 ws? ',' ws? i:r64 ')'
      {  $$.memarg = (Memarg){.kind=ASM_MEMARG, .scale = 1, .index=i.kind, .base = b.kind, .disp = {0}  }; }
 
-imm8 = i:imm { i.imm.nbytes = 1; $$ = i; }
-imm16 = i:imm { i.imm.nbytes = 2; $$ = i; }
-imm32 = i:imm { i.imm.nbytes = 4; $$ = i; }
 
 imm = 
     '$' ws? val:value
     { $$ = (Parsev) { .imm = (Imm){ .kind = ASM_IMM, .v = val.value, .nbytes = 0} }; }
+
+imm8 = i:imm { i.imm.nbytes = 1; $$ = i; }
+imm16 = i:imm { i.imm.nbytes = 2; $$ = i; }
+imm32 = i:imm { i.imm.nbytes = 4; $$ = i; }
+
+imm16-8 = i:imm {
+  i.imm.nbytes = 2;
+  if (i.imm.v.l == NULL) {
+    if ((int64_t)(int8_t)i.imm.v.c == i.imm.v.c)  {
+      i.imm.nbytes = 1;
+    }
+  }
+  $$ = i; 
+}
+imm32-8 = i:imm {
+  i.imm.nbytes = 4;
+  if (i.imm.v.l == NULL) {
+    if ((int64_t)(int8_t)i.imm.v.c == i.imm.v.c) {
+      i.imm.nbytes = 1;
+    }
+  }
+  $$ = i;
+}
 
 al = "%al" { $$ = REG(AL); }
 cl = "%cl" { $$ = REG(CL); }
