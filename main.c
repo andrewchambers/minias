@@ -395,14 +395,12 @@ assemblemem(const Memarg* memarg, Rex rex, VarBytes prefix, VarBytes opcode,
     /* Case when we don't need sib */
     if (memarg->index == ASM_NO_REG && memarg->scale == 0 && ((rm & 7) != 4)) {
 
-        if (memarg->disp.l == 0 && memarg->disp.c == 0) {
-            if ((rm & 7) == 5) {
-                mod = 1;
-            } else {
-                mod = 0;
-            }
-        } else {
+        if (memarg->disp.l != NULL || memarg->disp.c > INT8_MAX || memarg->disp.c < INT8_MIN) {
             mod = 2;
+        } else if (memarg->disp.c != 0 || (rm & 7) == 5) {
+            mod = 1;
+        } else {
+            mod = 0;
         }
 
         assemblevbytes(prefix);
