@@ -31,6 +31,7 @@ t () {
 }
 
 # Various regression tests first.
+t "testl -740(%rbp), %r11d"
 t "movss  %xmm15,-0x128(%rbp)"
 t "xchgq %r13, %rax"
 t "movl \$1000, %r8d"
@@ -305,11 +306,6 @@ do
     t "${op}w %${r}x, %ax"
     t "${op}l %e${r}x, %eax"
     t "${op}q %r${r}x, %rax"
-
-    if test "$op" = "test" # m -> r variants are not supported by test
-    then
-      continue
-    fi
 
     # m -> r variants    
     t "${op}b (%rip), %${r}l"
