@@ -44,7 +44,6 @@ const char *internstring(const char *s) {
 }
 
 static String decodestring(char *s) {
-  int i;
   char *end;
   size_t len = 0;
   size_t cap = 0;

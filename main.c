@@ -172,11 +172,6 @@ static Relocation *newreloc() {
 
 static void sb(uint8_t b) { secaddbyte(cursection, b); }
 
-static void sb2(uint8_t b1, uint8_t b2) {
-  uint8_t buf[2] = {b1, b2};
-  secaddbytes(cursection, buf, sizeof(buf));
-}
-
 static void sbn(uint8_t *bytes, size_t n) { secaddbytes(cursection, bytes, n); }
 
 static void su16(uint16_t w) {
@@ -210,8 +205,6 @@ static void su64(uint64_t l) {
 
 /* Convert an AsmKind to register bits in reg/rm style.  */
 static uint8_t regbits(AsmKind k) { return (k - (ASM_REG_BEGIN + 1)) % 16; }
-
-static uint8_t isreg64(AsmKind k) { return k >= ASM_RAX && k <= ASM_R15; }
 
 /* Register that requires the use of a rex prefix. */
 static uint8_t isrexreg(AsmKind k) {
@@ -508,7 +501,7 @@ static void assembleinstr(const Instr *instr) {
   Rex rex;
   const Memarg *memarg;
   const Imm *imm;
-  uint8_t mod, reg, rm;
+  uint8_t reg, rm;
 
   switch (instr->encoder) {
   case ENCODER_OP:
