@@ -280,14 +280,6 @@ static void assemblerex(Rex rex) {
     sb(rexbyte(rex));
 }
 
-static void assemblemodregrm(Rex rex, VarBytes prefix, VarBytes opcode,
-                             uint8_t mod, uint8_t reg, uint8_t rm) {
-  assemblevbytes(prefix);
-  assemblerex(rex);
-  assemblevbytes(opcode);
-  sb(modregrmbyte(mod, reg, rm));
-}
-
 /* Assemble a symbolic value. */
 static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
   Relocation *reloc;
@@ -315,7 +307,11 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
   /* Rip relative addressing. */
   if (memarg->base == ASM_RIP) {
     rm = 0x05;
-    assemblemodregrm(rex, prefix, opcode, 0x00, reg, rm);
+    assemblevbytes(prefix);
+    assemblerex(rex);
+    assemblevbytes(opcode);
+    sb(modregrmbyte(0x00, reg, rm));
+
     if (memarg->disp.l) {
       assemblereloc(memarg->disp.l, memarg->disp.c - 4 + nexti, 4,
                     R_X86_64_PC32);
@@ -330,7 +326,11 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
     mod = 0;
     rm = 4;
 
-    assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
+    assemblevbytes(prefix);
+    assemblerex(rex);
+    assemblevbytes(opcode);
+    sb(modregrmbyte(mod, reg, rm));
+
     sb(sibbyte(0, 4, 5));
     if (memarg->disp.l) {
       assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
@@ -356,7 +356,10 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
       mod = 2;
     }
 
-    assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
+    assemblevbytes(prefix);
+    assemblerex(rex);
+    assemblevbytes(opcode);
+    sb(modregrmbyte(mod, reg, rm));
 
     if (mod == 1) {
       assembleconstant(memarg->disp.c, 1);
@@ -415,7 +418,10 @@ static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
     return;
   }
 
-  assemblemodregrm(rex, prefix, opcode, mod, reg, rm);
+  assemblevbytes(prefix);
+  assemblerex(rex);
+  assemblevbytes(opcode);
+  sb(modregrmbyte(mod, reg, rm));
   sb(sibbyte(scale, index, base));
 
   if (mod == 1) {
@@ -437,7 +443,9 @@ static void assemblecall(const Call *call) {
     } else {
       rm = regbits(call->target.indirect->kind);
       rex = (Rex){.b = !!(rm & (1 << 3))};
-      assemblemodregrm(rex, -1, 0xff, 0x03, 0x02, rm);
+      assemblerex(rex);
+      assemblevbytes(0xff);
+      sb(modregrmbyte(0x03, 0x02, rm));
     }
   } else {
     sb(0xe8);
@@ -957,9 +965,9 @@ static void outelf(void) {
 
 static void usage(char *argv0) {
   fprintf(stderr, "minias - a mini x86-64 assembler.\n\n");
-  fprintf(stderr, "usage: %s [-r passes] [-o out] [input]\n", argv0);
+  fprintf(stderr, "usage: %s [-r iter] [-o out] [input]\n", argv0);
   fprintf(stderr, "\n");
-  fprintf(stderr, "  -r passes  Jump relaxation iterations (default 1).\n");
+  fprintf(stderr, "  -r iter    Jump relaxation iterations (default 1).\n");
   fprintf(stderr, "  -o out     Output file to write (default stdout).\n");
   exit(2);
 }
