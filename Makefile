@@ -1,6 +1,8 @@
 .POSIX:
 .PHONY: all clean
 
+PREFIX=/usr/local
+BINDIR=$(PREFIX)/bin
 CFLAGS+=-D _GNU_SOURCE
 
 -include config.mk
@@ -29,3 +31,8 @@ check:
 
 clean:
 	rm -f $(OBJ) minias asm.peg.inc
+
+install: minias
+	mkdir -p $(DESTDIR)$(BINDIR)
+	cp minias $(DESTDIR)$(BINDIR)/
+	ln -s ./minias $(DESTDIR)$(BINDIR)/minias-x86-64
