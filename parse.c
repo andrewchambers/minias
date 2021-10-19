@@ -104,116 +104,118 @@ static int needsmovabs(Imm *imm) {
     }                                                                          \
   }
 
-#define OPREG(PREFIX, REX, OPCODE, REG, A1)                                    \
+#define OPREG(REX, PREFIX, OPCODE, REG, A1)                                    \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_OPREG, .prefix = PREFIX,           \
-      .rex = REX, .fixedreg = REG, .opcode = OPCODE, .arg1 = internparsev(&A1) \
+      .rex = (Rex)REX, .fixedreg = REG, .opcode = OPCODE,                      \
+      .arg1 = internparsev(&A1)                                                \
     }                                                                          \
   }
 
-#define OPMEM(PREFIX, REX, OPCODE, REG, A1)                                    \
+#define OPMEM(REX, PREFIX, OPCODE, REG, A1)                                    \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_OPMEM, .prefix = PREFIX,           \
-      .rex = REX, .fixedreg = REG, .opcode = OPCODE, .arg1 = internparsev(&A1) \
+      .rex = (Rex)REX, .fixedreg = REG, .opcode = OPCODE,                      \
+      .arg1 = internparsev(&A1)                                                \
     }                                                                          \
   }
 
-#define R(PREFIX, REX, OPCODE, A1)                                             \
+#define R(REX, PREFIX, OPCODE, A1)                                             \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_R, .prefix = PREFIX,               \
-      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),            \
     }                                                                          \
   }
 
-#define IMM(PREFIX, REX, OPCODE, A1, A2)                                       \
+#define IMM(REX, PREFIX, OPCODE, A1, A2)                                       \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_IMM, .prefix = PREFIX,             \
-      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),            \
       .arg2 = internparsev(&A2)                                                \
     }                                                                          \
   }
 
-#define RIMM(PREFIX, REX, OPCODE, A1, A2)                                      \
+#define RIMM(REX, PREFIX, OPCODE, A1, A2)                                      \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_RIMM, .prefix = PREFIX,            \
-      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),            \
       .arg2 = internparsev(&A2)                                                \
     }                                                                          \
   }
 
-#define IMMREG(PREFIX, REX, OPCODE, IMMREG, A1, A2)                            \
+#define IMMREG(REX, PREFIX, OPCODE, IMMREG, A1, A2)                            \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_IMMREG, .prefix = PREFIX,          \
-      .opcode = OPCODE, .rex = REX, .fixedreg = IMMREG,                        \
+      .opcode = OPCODE, .rex = (Rex)REX, .fixedreg = IMMREG,                   \
       .arg1 = internparsev(&A1), .arg2 = internparsev(&A2)                     \
     }                                                                          \
   }
 
-#define IMMMEM(PREFIX, REX, OPCODE, IMMREG, A1, A2)                            \
+#define IMMMEM(REX, PREFIX, OPCODE, IMMREG, A1, A2)                            \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_IMMMEM, .prefix = PREFIX,          \
-      .opcode = OPCODE, .rex = REX, .fixedreg = IMMREG,                        \
+      .opcode = OPCODE, .rex = (Rex)REX, .fixedreg = IMMREG,                   \
       .arg1 = internparsev(&A1), .arg2 = internparsev(&A2)                     \
     }                                                                          \
   }
 
-#define REGMEM(PREFIX, REX, OPCODE, A1, A2)                                    \
+#define REGMEM(REX, PREFIX, OPCODE, A1, A2)                                    \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_REGMEM, .prefix = PREFIX,          \
-      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),            \
       .arg2 = internparsev(&A2)                                                \
     }                                                                          \
   }
 
-#define MEMREG(PREFIX, REX, OPCODE, A1, A2)                                    \
+#define MEMREG(REX, PREFIX, OPCODE, A1, A2)                                    \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_MEMREG, .prefix = PREFIX,          \
-      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),            \
       .arg2 = internparsev(&A2)                                                \
     }                                                                          \
   }
 
-#define REGREG(PREFIX, REX, OPCODE, A1, A2)                                    \
+#define REGREG(REX, PREFIX, OPCODE, A1, A2)                                    \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_REGREG, .prefix = PREFIX,          \
-      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),            \
       .arg2 = internparsev(&A2)                                                \
     }                                                                          \
   }
 
-#define REGREG2(PREFIX, REX, OPCODE, A1, A2)                                   \
+#define REGREG2(REX, PREFIX, OPCODE, A1, A2)                                   \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_REGREG2, .prefix = PREFIX,         \
-      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),            \
       .arg2 = internparsev(&A2)                                                \
     }                                                                          \
   }
 
-#define IMMREGREG2(PREFIX, REX, OPCODE, A1, A2, A3)                            \
+#define IMMREGREG2(REX, PREFIX, OPCODE, A1, A2, A3)                            \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_IMMREGREG2, .prefix = PREFIX,      \
-      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),            \
       .arg2 = internparsev(&A2), .arg3 = internparsev(&A3)                     \
     }                                                                          \
   }
 
-#define IMMMEMREG(PREFIX, REX, OPCODE, A1, A2, A3)                             \
+#define IMMMEMREG(REX, PREFIX, OPCODE, A1, A2, A3)                             \
   (Parsev) {                                                                   \
     .instr = (Instr) {                                                         \
       .kind = ASM_INSTR, .encoder = ENCODER_IMMMEMREG, .prefix = PREFIX,       \
-      .opcode = OPCODE, .rex = REX, .arg1 = internparsev(&A1),                 \
+      .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),            \
       .arg2 = internparsev(&A2), .arg3 = internparsev(&A3)                     \
     }                                                                          \
   }
