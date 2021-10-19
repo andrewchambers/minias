@@ -134,11 +134,12 @@ instr =
 
 call = "call" 'q'? ws (
     '*' t:mem
-      { $$.call = (Call){ .kind = ASM_CALL, .target.indirect=internparsev(&t), .indirect=1 } ; }
+      { $$ = OPMEM({.w=0}, -1, 0xff, 0x02, t); }
   | '*' t:r64 
-      { $$.call = (Call){ .kind = ASM_CALL, .target.indirect=internparsev(&t), .indirect=1 } ; }
+      { $$ = OPREG({.w=0}, -1, 0xff, 0x02, t); }
   | t:value 
-      { $$.call = (Call){ .kind = ASM_CALL, .target.direct=t.value, .indirect=0 } ; }
+      { Parsev ma = (Parsev){.memarg = (Memarg) {.kind=ASM_MEMARG, .disp = t.value }};
+        $$ = RELCALL({.w=0}, -1, 0xe8, ma); }
 )
 
 jmp = 'j' v:jmp-variant ws t:ident

@@ -61,7 +61,6 @@ typedef enum {
     ASM_DIR_QUAD,
     ASM_DIR_BALIGN,
     // Instructions.
-    ASM_CALL,
     ASM_JMP,
     ASM_INSTR,
     // Registers, order matters.
@@ -237,15 +236,6 @@ typedef struct String {
 typedef String Ascii;
 typedef String Asciiz;
 
-typedef struct Call {
-    AsmKind kind;
-    uint32_t indirect;
-    union {
-        const Parsev* indirect;
-        Value direct;
-    } target;
-} Call;
-
 typedef struct Jmp {
     AsmKind kind;
     uint32_t cc; /* 0 means unconditional. */
@@ -267,6 +257,7 @@ typedef enum Encoder {
     ENCODER_OP,
     ENCODER_OPREG,
     ENCODER_OPMEM,
+    ENCODER_RELCALL,
     ENCODER_R,
     ENCODER_RIMM,
     ENCODER_IMM,
@@ -305,7 +296,6 @@ union Parsev {
     Asciiz asciiz;
     Memarg memarg;
     Instr instr;
-    Call call;
     Jmp jmp;
     Fill fill;
     Byte dirbyte;

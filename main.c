@@ -481,30 +481,6 @@ assemblemem(const Memarg* memarg, Rex rex, VarBytes prefix, VarBytes opcode,
 }
 
 static void
-assemblecall(const Call* call)
-{
-    Rex rex;
-    uint8_t rm;
-
-    if (call->indirect) {
-        if (call->target.indirect->kind == ASM_MEMARG) {
-            rex = (Rex){0};
-            assemblemem(&call->target.indirect->memarg, rex, -1, 0xff, 0x02, 0);
-        } else {
-            rm = regbits(call->target.indirect->kind);
-            rex = (Rex){ .b = !!(rm & (1 << 3)) };
-            assemblerex(rex);
-            assemblevbytes(0xff);
-            sb(modregrmbyte(0x03, 0x02, rm));
-        }
-    } else {
-        sb(0xe8);
-        assemblereloc(
-            call->target.direct.l, call->target.direct.c - 4, 4, R_X86_64_PC32);
-    }
-}
-
-static void
 assemblejmp(const Jmp* j)
 {
     int jmpsize;
@@ -550,16 +526,20 @@ assemblejmp(const Jmp* j)
 static void
 assembleabsimm(const Imm* imm)
 {
+    int reltype;
+
     if (imm->nbytes == 1)
-        assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_8);
+        reltype = R_X86_64_8;
     else if (imm->nbytes == 2)
-        assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_16);
+        reltype = R_X86_64_16;
     else if (imm->nbytes == 4)
-        assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
+        reltype = R_X86_64_32;
     else if (imm->nbytes == 8)
-        assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_64);
+        reltype = R_X86_64_64;
     else
         unreachable();
+
+    assemblereloc(imm->v.l, imm->v.c, imm->nbytes, reltype);
 }
 
 static void
@@ -617,6 +597,14 @@ assembleinstr(const Instr* instr)
         assemblerex(rex);
         assemblevbytes(instr->opcode);
         assembleabsimm(imm);
+        break;
+    case ENCODER_RELCALL:
+        memarg = &instr->arg1->memarg;
+        rex = instr->rex;
+        assemblevbytes(instr->prefix);
+        assemblerex(rex);
+        assemblevbytes(instr->opcode);
+        assemblereloc(memarg->disp.l, memarg->disp.c - 4, 4, R_X86_64_PC32);
         break;
     case ENCODER_IMMREG:
         imm = &instr->arg1->imm;
@@ -820,9 +808,6 @@ assemble(void)
             break;
         case ASM_INSTR:
             assembleinstr(&v->instr);
-            break;
-        case ASM_CALL:
-            assemblecall(&v->call);
             break;
         case ASM_JMP:
             assemblejmp(&v->jmp);

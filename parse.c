@@ -168,6 +168,16 @@ needsmovabs(Imm* imm)
         }                                                                      \
     }
 
+#define RELCALL(REX, PREFIX, OPCODE, A1)                                       \
+    (Parsev)                                                                   \
+    {                                                                          \
+        .instr = (Instr)                                                       \
+        {                                                                      \
+            .kind = ASM_INSTR, .encoder = ENCODER_RELCALL, .prefix = PREFIX,   \
+            .opcode = OPCODE, .rex = (Rex)REX, .arg1 = internparsev(&A1),      \
+        }                                                                      \
+    }
+
 #define IMMREG(REX, PREFIX, OPCODE, IMMREG, A1, A2)                            \
     (Parsev)                                                                   \
     {                                                                          \
