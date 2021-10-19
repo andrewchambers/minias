@@ -66,18 +66,18 @@ instr =
   # Ordered by instruction frequency for performance.
   # e.g. movs are very common, so they come first.
   # The & operator means check without consuming input.
-  (& 'm'
-    (
-        i:mov    { $$ = i; }
-      | i:movsx  { $$ = i; }
-      | i:movzx  { $$ = i; }
-      | i:mul    { $$ = i; }
-      | i:movaps { $$ = i; }
-      | i:movq   { $$ = i; }
-      | i:movsd  { $$ = i; }
-      | i:movss  { $$ = i; }
-      | i:mulsd  { $$ = i; }
-      | i:mulss  { $$ = i; }))
+    (& 'm'
+      (
+          i:mov    { $$ = i; }
+        | i:movsx  { $$ = i; }
+        | i:movzx  { $$ = i; }
+        | i:mul    { $$ = i; }
+        | i:movaps { $$ = i; }
+        | i:movq   { $$ = i; }
+        | i:movsd  { $$ = i; }
+        | i:movss  { $$ = i; }
+        | i:mulsd  { $$ = i; }
+        | i:mulss  { $$ = i; }))
   | (& 'a'
       (
           i:add   { $$ = i; }
@@ -201,47 +201,50 @@ pop = "pop" (
 )
 
 div = "div" (
-    'b'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf6, 0x06, a); }
-  | 'w'  ws a:mem { $$ = OPMEM({.w=0}, 0x66, 0xf7, 0x06, a); }
-  | 'l'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf7, 0x06, a); }
-  | 'q'  ws a:mem { $$ = OPMEM({.w=1},   -1, 0xf7, 0x06, a); }
-  | 'b'? ws a:r8  { $$ = OPREG({.w=0},   -1, 0xf6, 0x06, a); }
+    'b'? ws a:r8  { $$ = OPREG({.w=0},   -1, 0xf6, 0x06, a); }
   | 'w'? ws a:r16 { $$ = OPREG({.w=0}, 0x66, 0xf7, 0x06, a); }
   | 'l'? ws a:r32 { $$ = OPREG({.w=0},   -1, 0xf7, 0x06, a); }
   | 'q'? ws a:r64 { $$ = OPREG({.w=1},   -1, 0xf7, 0x06, a); }
+  | 'b'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf6, 0x06, a); }
+  | 'w'  ws a:mem { $$ = OPMEM({.w=0}, 0x66, 0xf7, 0x06, a); }
+  | 'l'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf7, 0x06, a); }
+  | 'q'  ws a:mem { $$ = OPMEM({.w=1},   -1, 0xf7, 0x06, a); }
 )
 
 idiv = "idiv" (
-    'b'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf6, 0x07, a); }
-  | 'w'  ws a:mem { $$ = OPMEM({.w=0}, 0x66, 0xf7, 0x07, a); }
-  | 'l'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf7, 0x07, a); }
-  | 'q'  ws a:mem { $$ = OPMEM({.w=1},   -1, 0xf7, 0x07, a); }
-  | 'b'? ws a:r8  { $$ = OPREG({.w=0},   -1, 0xf6, 0x07, a); }
+    'b'? ws a:r8  { $$ = OPREG({.w=0},   -1, 0xf6, 0x07, a); }
   | 'w'? ws a:r16 { $$ = OPREG({.w=0}, 0x66, 0xf7, 0x07, a); }
   | 'l'? ws a:r32 { $$ = OPREG({.w=0},   -1, 0xf7, 0x07, a); }
   | 'q'? ws a:r64 { $$ = OPREG({.w=1},   -1, 0xf7, 0x07, a); }
+
+  | 'b'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf6, 0x07, a); }
+  | 'w'  ws a:mem { $$ = OPMEM({.w=0}, 0x66, 0xf7, 0x07, a); }
+  | 'l'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf7, 0x07, a); }
+  | 'q'  ws a:mem { $$ = OPMEM({.w=1},   -1, 0xf7, 0x07, a); }
 )
 
 mul = "mul" (
-    'b'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf6, 0x04, a); }
-  | 'w'  ws a:mem { $$ = OPMEM({.w=0}, 0x66, 0xf7, 0x04, a); }
-  | 'l'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf7, 0x04, a); }
-  | 'q'  ws a:mem { $$ = OPMEM({.w=1},   -1, 0xf7, 0x04, a); }
-  | 'b'? ws a:r8  { $$ = OPREG({.w=0},   -1, 0xf6, 0x04, a); }
+    'b'? ws a:r8  { $$ = OPREG({.w=0},   -1, 0xf6, 0x04, a); }
   | 'w'? ws a:r16 { $$ = OPREG({.w=0}, 0x66, 0xf7, 0x04, a); }
   | 'l'? ws a:r32 { $$ = OPREG({.w=0},   -1, 0xf7, 0x04, a); }
   | 'q'? ws a:r64 { $$ = OPREG({.w=1},   -1, 0xf7, 0x04, a); }
+
+  | 'b'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf6, 0x04, a); }
+  | 'w'  ws a:mem { $$ = OPMEM({.w=0}, 0x66, 0xf7, 0x04, a); }
+  | 'l'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf7, 0x04, a); }
+  | 'q'  ws a:mem { $$ = OPMEM({.w=1},   -1, 0xf7, 0x04, a); }
 )
 
 neg = "neg" (
-    'b'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf6, 0x03, a); }
-  | 'w'  ws a:mem { $$ = OPMEM({.w=0}, 0x66, 0xf7, 0x03, a); }
-  | 'l'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf7, 0x03, a); }
-  | 'q'  ws a:mem { $$ = OPMEM({.w=1},   -1, 0xf7, 0x03, a); }
-  | 'b'? ws a:r8  { $$ = OPREG({.w=0},   -1, 0xf6, 0x03, a); }
+    'b'? ws a:r8  { $$ = OPREG({.w=0},   -1, 0xf6, 0x03, a); }
   | 'w'? ws a:r16 { $$ = OPREG({.w=0}, 0x66, 0xf7, 0x03, a); }
   | 'l'? ws a:r32 { $$ = OPREG({.w=0},   -1, 0xf7, 0x03, a); }
   | 'q'? ws a:r64 { $$ = OPREG({.w=1},   -1, 0xf7, 0x03, a); }
+  
+  | 'b'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf6, 0x03, a); }
+  | 'w'  ws a:mem { $$ = OPMEM({.w=0}, 0x66, 0xf7, 0x03, a); }
+  | 'l'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf7, 0x03, a); }
+  | 'q'  ws a:mem { $$ = OPMEM({.w=1},   -1, 0xf7, 0x03, a); }
 )
 
 imul = "imul" (
@@ -709,16 +712,12 @@ cvtsi2sd = "cvtsi2sd" (
      ws s:r32 ws? ',' ws? d:xmm { $$ = REGREG2({.w=0}, 0xf2, 0x01000f2a, s, d); }
   |  ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG ({.w=0}, 0xf2, 0x01000f2a, s, d); }
   |  ws s:r64 ws? ',' ws? d:xmm { $$ = REGREG2({.w=1}, 0xf2, 0x01000f2a, s, d); }
-  
-  # XXX |  ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG({.w=1},0xf2,   0x01000f2a, s, d); }
 )
 
 cvtsi2ss = "cvtsi2ss" (
      ws s:r32 ws? ',' ws? d:xmm { $$ = REGREG2({.w=0}, 0xf3, 0x01000f2a, s, d); }
   |  ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG ({.w=0}, 0xf3, 0x01000f2a, s, d); }
   |  ws s:r64 ws? ',' ws? d:xmm { $$ = REGREG2({.w=1}, 0xf3, 0x01000f2a, s, d); }
-  
-  # XXX |  ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG({.w=1}, 0xf3, 0x01000f2a, s, d); }
 )
 
 cvtss2sd = "cvtss2sd" (
