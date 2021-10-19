@@ -284,13 +284,27 @@ do
   for r in a b
   do
     # immediate variants
+    t "${op}b \$1, (%r${r}x)"
     t "${op}b \$127, (%r${r}x)"
+    t "${op}w \$1, (%r${r}x)"
     t "${op}w \$32767, (%r${r}x)"
+    t "${op}l \$1, (%r${r}x)"
     t "${op}l \$2147483647, (%r${r}x)"
+    t "${op}q \$1, (%r${r}x)"
     t "${op}q \$2147483647, (%r${r}x)"
     t "${op}b \$127, %${r}l"
     t "${op}w \$32767, %${r}x"
+    
+    t "${op}w \$1, %${r}x"
+
+    t "${op}l \$1, %e${r}x"
+    t "${op}l \$1000, %e${r}x"
+    t "${op}l \$1000000, %e${r}x"
     t "${op}l \$2147483647, %e${r}x"
+
+    t "${op}q \$1, %r${r}x"
+    t "${op}q \$1000, %r${r}x"
+    t "${op}q \$1000000, %r${r}x"
     t "${op}q \$2147483647, %r${r}x"
 
     # r -> m variants
