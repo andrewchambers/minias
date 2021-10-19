@@ -61,7 +61,8 @@ Bonus features:
   small program. This choice makes sense given we don't aim to build a library.
 
 - Minias deliberately keeps the peg grammar quite repetitive
-  and simple, please keep it this way.
+  and simple, please keep it this way as it is easy to understand and
+  it leaves the door open for code generation.
 
 - Performance is limited by the parser, it would be interesting
   to see if we can improve the parser generator upstream. That being said,
