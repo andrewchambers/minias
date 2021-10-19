@@ -86,7 +86,7 @@ instr =
         | i:addsd { $$ = i; }))
   | (& 'c'
       (
-          i:cmp      { $$ = i; }
+          i:cmp       { $$ = i; }
         | i:call      { $$ = i; }
         | i:cvtsi2sd  { $$ = i; }
         | i:cvtsi2ss  { $$ = i; }
@@ -108,29 +108,29 @@ instr =
         | i:subss { $$ = i; }))
   | (& 'x'
       (
-          i:xchg      { $$ = i; }
-        | i:xor       { $$ = i; }
-        | i:xorpd     { $$ = i; }
-        | i:xorps     { $$ = i; } ))
-  | i:or        { $$ = i; }
-  | i:leave     { $$ = i; } 
-  | i:ret       { $$ = i; }
-  | i:push      { $$ = i; }
-  | i:pop       { $$ = i; }
-  | i:jmp       { $$ = i; }
-  | i:div       { $$ = i; }
-  | i:idiv      { $$ = i; }
-  | i:lea       { $$ = i; }
-  | i:imul      { $$ = i; }
-  | i:neg       { $$ = i; }
-  | i:test      { $$ = i; }
+          i:xchg  { $$ = i; }
+        | i:xor   { $$ = i; }
+        | i:xorpd { $$ = i; }
+        | i:xorps { $$ = i; } ))
+  | i:or    { $$ = i; }
+  | i:leave { $$ = i; } 
+  | i:ret   { $$ = i; }
+  | i:push  { $$ = i; }
+  | i:pop   { $$ = i; }
+  | i:jmp   { $$ = i; }
+  | i:div   { $$ = i; }
+  | i:idiv  { $$ = i; }
+  | i:lea   { $$ = i; }
+  | i:imul  { $$ = i; }
+  | i:neg   { $$ = i; }
+  | i:test  { $$ = i; }
   # Floating point is less common, so check last.
-  | i:divss     { $$ = i; }
-  | i:divsd     { $$ = i; }
-  | i:pxor      { $$ = i; }
-  | i:ucomisd   { $$ = i; }
-  | i:ucomiss   { $$ = i; }
-  | i:nop       { $$ = i; }
+  | i:divss   { $$ = i; }
+  | i:divsd   { $$ = i; }
+  | i:pxor    { $$ = i; }
+  | i:ucomisd { $$ = i; }
+  | i:ucomiss { $$ = i; }
+  | i:nop     { $$ = i; }
 
 call = "call" 'q'? ws (
     '*' t:mem
