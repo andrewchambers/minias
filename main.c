@@ -503,7 +503,7 @@ assemblejmp(const Jmp* j)
         } else {
             distance = target->wco - cursection->hdr.sh_size;
         }
-        if ((distance - 1) >= -128 && (distance - 1) <= 127) {
+        if ((distance - 1) >= -128 && (distance - 5) <= 127) {
             jmpsize = 1;
         } else {
             jmpsize = 4;
