@@ -363,7 +363,7 @@ assemblemem(const Memarg* memarg, Rex rex, VarBytes prefix, VarBytes opcode,
 
         if (memarg->disp.l) {
             assemblereloc(
-                memarg->disp.l, memarg->disp.c - 4 + nexti, 4, R_X86_64_PC32);
+                memarg->disp.l, memarg->disp.c - 4 - nexti, 4, R_X86_64_PC32);
         } else {
             assembleconstant(memarg->disp.c, 4);
         }
