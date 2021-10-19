@@ -140,7 +140,7 @@ call = "call" 'q'? ws (
 )
 
 jmp = 'j' v:jmp-variant ws t:ident
-    { $$.jmp = (Jmp) {.kind = ASM_JMP, .variant=v.i64, .target=t.charptr}; }
+    { $$.jmp = (Jmp) {.kind = ASM_JMP, .cc=v.i64, .target=t.charptr}; }
 
 jmp-variant =
       "mp"  { $$.i64 = 0; }
@@ -550,7 +550,15 @@ xchg =  "xchg" (
   | 'l'? ws s:mem ws? ',' ws? d:r32 { $$ = MEMREG(-1, (Rex){0}, 0x87, s, d); }
   | 'q'? ws s:mem ws? ',' ws? d:r64 { $$ = MEMREG(-1, (Rex){.w=1}, 0x87, s, d); }
 )
-  
+
+%{
+  static uint8_t cc2setop[30] = {
+      0x94, 0x98, 0x9b, 0x9a, 0x9a, 0x90, 0x95, 0x99, 0x9b, 0x91,
+      0x9f, 0x9d, 0x9c, 0x9e, 0x95, 0x93, 0x97, 0x93, 0x92, 0x96,
+      0x9e, 0x9c, 0x9d, 0x9f, 0x94, 0x92, 0x96, 0x92, 0x93, 0x97,
+  };
+%}
+
 set = "set" cc:condition-code (
     'b'? ws a:r8  { $$ = OPREG(-1, (Rex){0}, 0x01000f00 | cc2setop[cc.i64], 0x00, a) }
   | 'b'? ws a:mem { $$ = OPMEM(-1, (Rex){0}, 0x01000f00 | cc2setop[cc.i64], 0x00, a) }

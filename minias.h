@@ -248,7 +248,7 @@ typedef struct Call {
 
 typedef struct Jmp {
   AsmKind kind;
-  uint32_t variant;
+  uint32_t cc; /* 0 means unconditional. */
   const char *target;
 } Jmp;
 

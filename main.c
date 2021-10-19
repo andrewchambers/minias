@@ -459,7 +459,7 @@ static void assemblejmp(const Jmp *j) {
   int64_t distance;
   Symbol *target;
 
-  static uint8_t variant2op[31] = {
+  static uint8_t cc2op[31] = {
       0xe9, 0x84, 0x88, 0x8b, 0x8a, 0x8a, 0x80, 0x85, 0x89, 0x8b, 0x81,
       0x8f, 0x8d, 0x8c, 0x8e, 0x85, 0x83, 0x87, 0x83, 0x82, 0x86, 0x8e,
       0x8c, 0x8d, 0x8f, 0x84, 0x82, 0x86, 0x82, 0x83, 0x87,
@@ -481,12 +481,12 @@ static void assemblejmp(const Jmp *j) {
   }
 
   if (jmpsize == 4) {
-    if (j->variant)
+    if (j->cc)
       sb(0x0f);
-    sb(variant2op[j->variant]);
+    sb(cc2op[j->cc]);
     assemblereloc(j->target, -4, 4, R_X86_64_PC32);
   } else {
-    sb(variant2op[j->variant] + (j->variant ? -16 : 2));
+    sb(cc2op[j->cc] + (j->cc ? -16 : 2));
     assemblereloc(j->target, -1, 1, R_X86_64_PC8);
   }
 }
