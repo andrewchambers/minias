@@ -24,7 +24,9 @@ parse.o: asm.peg.inc
 main.o parse.o util.o: minias.h
 
 fmt:
-	clang-format -i *.c *.h
+	clang-format \
+	  -style='{BasedOnStyle: WebKit, AlwaysBreakAfterReturnType: TopLevelDefinitions, ColumnLimit: 100}'\
+	  -i *.c *.h
 
 check:
 	sh test/test.sh
