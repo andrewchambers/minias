@@ -40,6 +40,7 @@ t "movq $-4132994306676758123, %rcx"
 t "mov \$17293822569102704639, %rax"
 t "callq *%rax"
 t "callq *%r10"
+t "callq *(%r10)"
 t "movb %r11b, (%rsi, %r12, 1)"
 
 for r in rax r10

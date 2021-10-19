@@ -488,9 +488,8 @@ assemblecall(const Call* call)
 
     if (call->indirect) {
         if (call->target.indirect->kind == ASM_MEMARG) {
-            rex = (Rex){ 0 };
-            abort(); // assemblemem(&call->target.indirect->memarg, rex, -1,
-                     // 0xff, 0x02);
+            rex = (Rex){0};
+            assemblemem(&call->target.indirect->memarg, rex, -1, 0xff, 0x02, 0);
         } else {
             rm = regbits(call->target.indirect->kind);
             rex = (Rex){ .b = !!(rm & (1 << 3)) };
