@@ -44,6 +44,7 @@ t "callq *%r10"
 t "callq *(%r10)"
 t "movb %r11b, (%rsi, %r12, 1)"
 t "mov %rdi, -0x60(%rbp)"
+t "imul \$0x28, %rbx, %rcx"
 
 for r in rax r10
 do

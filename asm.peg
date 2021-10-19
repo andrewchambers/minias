@@ -256,13 +256,13 @@ imul = "imul" (
   | 'l'? ws s:mem ws? ',' ws? d:r32 { $$ = MEMREG({.w=0},   -1, 0x01000faf, s, d); }
   | 'q'? ws s:mem ws? ',' ws? d:r64 { $$ = MEMREG({.w=1},   -1, 0x01000faf, s, d); }
   
-  | 'w'? ws i:imm16 ws? ',' ws? s:r16 ws? ',' ws? d:r16 { $$ = IMMREGREG2({.w=0}, 0x66, 0x69, i, s, d); }
-  | 'l'? ws i:imm32 ws? ',' ws? s:r32 ws? ',' ws? d:r32 { $$ = IMMREGREG2({.w=0},   -1, 0x69, i, s, d); }
-  | 'q'? ws i:imm32 ws? ',' ws? s:r64 ws? ',' ws? d:r64 { $$ = IMMREGREG2({.w=1},   -1, 0x69, i, s, d); }
+  | 'w'? ws i:imm16-8 ws? ',' ws? s:r16 ws? ',' ws? d:r16 { $$ = IMMREGREG2({.w=0}, 0x66, i.imm.nbytes == 1 ? 0x6b : 0x69, i, s, d); }
+  | 'l'? ws i:imm32-8 ws? ',' ws? s:r32 ws? ',' ws? d:r32 { $$ = IMMREGREG2({.w=0},   -1, i.imm.nbytes == 1 ? 0x6b : 0x69, i, s, d); }
+  | 'q'? ws i:imm32-8 ws? ',' ws? s:r64 ws? ',' ws? d:r64 { $$ = IMMREGREG2({.w=1},   -1, i.imm.nbytes == 1 ? 0x6b : 0x69, i, s, d); }
   
-  | 'w'? ws i:imm16 ws? ',' ws? s:mem ws? ',' ws? d:r16 { $$ = IMMMEMREG({.w=0}, 0x66, 0x69, i, s, d); }
-  | 'l'? ws i:imm32 ws? ',' ws? s:mem ws? ',' ws? d:r32 { $$ = IMMMEMREG({.w=0},   -1, 0x69, i, s, d); }
-  | 'q'? ws i:imm32 ws? ',' ws? s:mem ws? ',' ws? d:r64 { $$ = IMMMEMREG({.w=1},   -1, 0x69, i, s, d); }
+  | 'w'? ws i:imm16-8 ws? ',' ws? s:mem ws? ',' ws? d:r16 { $$ = IMMMEMREG({.w=0}, 0x66, i.imm.nbytes == 1 ? 0x6b : 0x69, i, s, d); }
+  | 'l'? ws i:imm32-8 ws? ',' ws? s:mem ws? ',' ws? d:r32 { $$ = IMMMEMREG({.w=0},   -1, i.imm.nbytes == 1 ? 0x6b : 0x69, i, s, d); }
+  | 'q'? ws i:imm32-8 ws? ',' ws? s:mem ws? ',' ws? d:r64 { $$ = IMMMEMREG({.w=1},   -1, i.imm.nbytes == 1 ? 0x6b : 0x69, i, s, d); }
   
   # Must come last due to peg ordering.
   | 'b'  ws a:mem { $$ = OPMEM({.w=0},   -1, 0xf6, 0x05, a); }
