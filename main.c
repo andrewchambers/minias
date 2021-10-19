@@ -125,8 +125,6 @@ getsection(const char* name)
 static void
 initsections(void)
 {
-    Elf64_Sym elfsym;
-
     shstrtab = newsection();
     secaddbyte(shstrtab, 0);
     shstrtab->hdr.sh_name = elfstr(shstrtab, ".shstrtab");
@@ -142,8 +140,6 @@ initsections(void)
     symtab->hdr.sh_type = SHT_SYMTAB;
     symtab->hdr.sh_link = strtab->idx;
     symtab->hdr.sh_entsize = sizeof(Elf64_Sym);
-    memset(&elfsym, 0, sizeof(elfsym));
-    secaddbytes(symtab, &elfsym, sizeof(Elf64_Sym));
 
     bss = newsection();
     bss->hdr.sh_name = elfstr(shstrtab, ".bss");
@@ -875,8 +871,12 @@ addtosymtab(Symbol* sym)
 static void
 fillsymtab(void)
 {
+    Elf64_Sym elfsym;
     Symbol* sym;
     size_t i;
+
+    memset(&elfsym, 0, sizeof(elfsym));
+    secaddbytes(symtab, &elfsym, sizeof(Elf64_Sym));
 
     // Local symbols
     for (i = 0; i < symbols->cap; i++) {
