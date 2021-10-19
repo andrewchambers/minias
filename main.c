@@ -306,29 +306,22 @@ static void assemblereloc(const char *l, int64_t c, int nbytes, int type) {
   assembleconstant(c, nbytes);
 }
 
-/* Rip relative addressing. */
-static void assembleriprel(const Memarg *memarg, Rex rex, VarBytes prefix,
-                           VarBytes opcode, uint8_t reg, int32_t adjust) {
-  uint8_t rm;
-
-  rm = 0x05;
-  assemblemodregrm(rex, prefix, opcode, 0x00, reg, rm);
-  if (memarg->disp.l) {
-    assemblereloc(memarg->disp.l, memarg->disp.c - 4 + adjust, 4,
-                  R_X86_64_PC32);
-  } else {
-    assembleconstant(memarg->disp.c, 4);
-  }
-}
-
 /* Assemble a r <-> mem operation.  */
 static void assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix,
-                        VarBytes opcode, uint8_t reg) {
+                        VarBytes opcode, uint8_t reg, int32_t nexti) {
 
   uint8_t mod, rm, scale, index, base;
 
+  /* Rip relative addressing. */
   if (memarg->base == ASM_RIP) {
-    assembleriprel(memarg, rex, prefix, opcode, reg, 0);
+    rm = 0x05;
+    assemblemodregrm(rex, prefix, opcode, 0x00, reg, rm);
+    if (memarg->disp.l) {
+      assemblereloc(memarg->disp.l, memarg->disp.c - 4 + nexti, 4,
+                    R_X86_64_PC32);
+    } else {
+      assembleconstant(memarg->disp.c, 4);
+    }
     return;
   }
 
@@ -490,6 +483,155 @@ static void assemblejmp(const Jmp *j) {
   }
 }
 
+static void assembleabsimm(const Imm *imm) {
+  if (imm->nbytes == 1)
+    assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_8);
+  else if (imm->nbytes == 2)
+    assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_16);
+  else if (imm->nbytes == 4)
+    assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
+  else if (imm->nbytes == 8)
+    assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_64);
+  else
+    unreachable();
+}
+
+static void assembleinstr(const Instr *instr) {
+  Rex rex;
+  const Memarg *memarg;
+  const Imm *imm;
+  uint8_t mod, reg, rm;
+
+  switch (instr->encoder) {
+  case ENCODER_OP:
+    assemblevbytes(instr->opcode);
+    break;
+  case ENCODER_OPREG:
+    rm = regbits(instr->arg1->kind);
+    rex = instr->rex;
+    rex.required = isrexreg(instr->arg1->kind);
+    rex.b = !!(rm & (1 << 3));
+    assemblevbytes(instr->prefix);
+    assemblerex(rex);
+    assemblevbytes(instr->opcode);
+    sb(modregrmbyte(0x03, instr->fixedreg, rm));
+    break;
+  case ENCODER_OPMEM:
+    memarg = &instr->arg1->memarg;
+    rex = instr->rex;
+    assemblemem(memarg, rex, instr->prefix, instr->opcode, instr->fixedreg, 0);
+    break;
+  case ENCODER_R:
+    reg = regbits(instr->arg1->kind);
+    rex = instr->rex;
+    rex.required = isrexreg(instr->arg1->kind);
+    rex.b = !!(reg & (1 << 3));
+    assemblevbytes(instr->prefix);
+    assemblerex(rex);
+    assemblevbytes(instr->opcode | (reg & 7));
+    break;
+  case ENCODER_RIMM:
+    imm = &instr->arg1->imm;
+    reg = regbits(instr->arg2->kind);
+    rex = instr->rex;
+    rex.required = isrexreg(instr->arg2->kind);
+    rex.b = !!(reg & (1 << 3));
+    assemblevbytes(instr->prefix);
+    assemblerex(rex);
+    assemblevbytes(instr->opcode | (reg & 7));
+    assembleabsimm(imm);
+    break;
+  case ENCODER_IMM:
+    imm = &instr->arg1->imm;
+    rex = instr->rex;
+    assemblevbytes(instr->prefix);
+    assemblerex(rex);
+    assemblevbytes(instr->opcode);
+    assembleabsimm(imm);
+    break;
+  case ENCODER_IMMREG:
+    imm = &instr->arg1->imm;
+    reg = instr->fixedreg;
+    rm = regbits(instr->arg2->kind);
+    rex = instr->rex;
+    rex.required = isrexreg(instr->arg2->kind);
+    rex.b = !!(rm & (1 << 3));
+    assemblevbytes(instr->prefix);
+    assemblerex(rex);
+    assemblevbytes(instr->opcode);
+    sb(modregrmbyte(0x03, reg, rm));
+    assembleabsimm(imm);
+    break;
+  case ENCODER_IMMMEM:
+    imm = &instr->arg1->imm;
+    memarg = &instr->arg2->memarg;
+    reg = instr->fixedreg;
+    rex = instr->rex;
+    assemblemem(memarg, rex, instr->prefix, instr->opcode, instr->fixedreg,
+                imm->nbytes);
+    assembleabsimm(imm);
+    break;
+  case ENCODER_REGMEM:
+  case ENCODER_MEMREG:
+    if (instr->encoder == ENCODER_MEMREG) {
+      memarg = &instr->arg1->memarg;
+      reg = regbits(instr->arg2->kind);
+    } else {
+      memarg = &instr->arg2->memarg;
+      reg = regbits(instr->arg1->kind);
+    }
+    rex = instr->rex;
+    rex.required = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
+    rex.r = !!(reg & (1 << 3));
+    assemblemem(memarg, rex, instr->prefix, instr->opcode, reg, 0);
+    break;
+  case ENCODER_REGREG:
+  case ENCODER_REGREG2:
+    if (instr->encoder == ENCODER_REGREG) {
+      reg = regbits(instr->arg1->kind);
+      rm = regbits(instr->arg2->kind);
+    } else {
+      reg = regbits(instr->arg2->kind);
+      rm = regbits(instr->arg1->kind);
+    }
+    rex = instr->rex;
+    rex.required = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
+    rex.r = !!(reg & (1 << 3));
+    rex.b = !!(rm & (1 << 3));
+    assemblevbytes(instr->prefix);
+    assemblerex(rex);
+    assemblevbytes(instr->opcode);
+    sb(modregrmbyte(0x03, reg, rm));
+    break;
+  case ENCODER_IMMREGREG2:
+    imm = &instr->arg1->imm;
+    reg = regbits(instr->arg3->kind);
+    rm = regbits(instr->arg2->kind);
+    rex = instr->rex;
+    rex.required = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
+    rex.r = !!(reg & (1 << 3));
+    rex.b = !!(rm & (1 << 3));
+    assemblevbytes(instr->prefix);
+    assemblerex(rex);
+    assemblevbytes(instr->opcode);
+    sb(modregrmbyte(0x03, reg, rm));
+    assembleabsimm(imm);
+    break;
+  case ENCODER_IMMMEMREG:
+    imm = &instr->arg1->imm;
+    memarg = &instr->arg2->memarg;
+    reg = regbits(instr->arg3->kind);
+    rex = instr->rex;
+    rex.required = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
+    rex.r = !!(reg & (1 << 3));
+    assemblemem(memarg, rex, instr->prefix, instr->opcode, reg, imm->nbytes);
+    assembleabsimm(imm);
+    break;
+  default:
+    unreachable();
+  }
+}
+
 static void assemble(void) {
   Symbol *sym;
   AsmLine *l;
@@ -597,199 +739,9 @@ static void assemble(void) {
         lfatal("%s already defined", sym->name);
       sym->defined = 1;
       break;
-    case ASM_INSTR: {
-      Rex rex;
-      const Instr *instr;
-      const Memarg *memarg;
-      const Imm *imm;
-      uint8_t mod, reg, rm;
-
-      instr = &v->instr;
-
-      switch (instr->encoder) {
-      case ENCODER_OP:
-        assemblevbytes(instr->opcode);
-        break;
-      case ENCODER_OPREG:
-        rm = regbits(instr->arg1->kind);
-        rex = instr->rex;
-        rex.required = isrexreg(instr->arg1->kind);
-        rex.b = !!(rm & (1 << 3));
-        assemblevbytes(instr->prefix);
-        assemblerex(rex);
-        assemblevbytes(instr->opcode);
-        sb(modregrmbyte(0x03, instr->fixedreg, rm));
-        break;
-      case ENCODER_OPMEM:
-        memarg = &instr->arg1->memarg;
-        rex = instr->rex;
-        assemblemem(memarg, rex, instr->prefix, instr->opcode, instr->fixedreg);
-        break;
-      case ENCODER_R:
-        reg = regbits(instr->arg1->kind);
-        rex = instr->rex;
-        rex.required = isrexreg(instr->arg1->kind);
-        rex.b = !!(reg & (1 << 3));
-        assemblevbytes(instr->prefix);
-        assemblerex(rex);
-        assemblevbytes(instr->opcode | (reg & 7));
-        break;
-      case ENCODER_RIMM:
-        imm = &instr->arg1->imm;
-        reg = regbits(instr->arg2->kind);
-        rex = instr->rex;
-        rex.required = isrexreg(instr->arg2->kind);
-        rex.b = !!(reg & (1 << 3));
-        assemblevbytes(instr->prefix);
-        assemblerex(rex);
-        assemblevbytes(instr->opcode | (reg & 7));
-        if (imm->nbytes == 1)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_8);
-        else if (imm->nbytes == 2)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_16);
-        else if (imm->nbytes == 4)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
-        else if (imm->nbytes == 8)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_64);
-        else
-          unreachable();
-        break;
-      case ENCODER_IMM:
-        imm = &instr->arg1->imm;
-        rex = instr->rex;
-        assemblevbytes(instr->prefix);
-        assemblerex(rex);
-        assemblevbytes(instr->opcode);
-        if (imm->nbytes == 1)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_8);
-        else if (imm->nbytes == 2)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_16);
-        else if (imm->nbytes == 4)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
-        else
-          unreachable();
-        break;
-      case ENCODER_IMMREG:
-        imm = &instr->arg1->imm;
-        reg = instr->fixedreg;
-        rm = regbits(instr->arg2->kind);
-        rex = instr->rex;
-        rex.required = isrexreg(instr->arg2->kind);
-        rex.b = !!(rm & (1 << 3));
-        assemblevbytes(instr->prefix);
-        assemblerex(rex);
-        assemblevbytes(instr->opcode);
-        sb(modregrmbyte(0x03, reg, rm));
-        if (imm->nbytes == 1)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_8);
-        else if (imm->nbytes == 2)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_16);
-        else if (imm->nbytes == 4)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
-        else
-          unreachable();
-        break;
-      case ENCODER_IMMMEM:
-        imm = &instr->arg1->imm;
-        memarg = &instr->arg2->memarg;
-        reg = instr->fixedreg;
-        rex = instr->rex;
-        if (memarg->base == ASM_RIP) {
-          assembleriprel(memarg, rex, instr->prefix, instr->opcode,
-                         instr->fixedreg, -imm->nbytes);
-        } else {
-          assemblemem(memarg, rex, instr->prefix, instr->opcode,
-                      instr->fixedreg);
-        }
-        if (imm->nbytes == 1)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_8);
-        else if (imm->nbytes == 2)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_16);
-        else if (imm->nbytes == 4)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
-        else
-          unreachable();
-        break;
-      case ENCODER_REGMEM:
-      case ENCODER_MEMREG:
-        if (instr->encoder == ENCODER_MEMREG) {
-          memarg = &instr->arg1->memarg;
-          reg = regbits(instr->arg2->kind);
-        } else {
-          memarg = &instr->arg2->memarg;
-          reg = regbits(instr->arg1->kind);
-        }
-        rex = instr->rex;
-        rex.required =
-            isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
-        rex.r = !!(reg & (1 << 3));
-        assemblemem(memarg, rex, instr->prefix, instr->opcode, reg);
-        break;
-      case ENCODER_REGREG:
-      case ENCODER_REGREG2:
-        if (instr->encoder == ENCODER_REGREG) {
-          reg = regbits(instr->arg1->kind);
-          rm = regbits(instr->arg2->kind);
-        } else {
-          reg = regbits(instr->arg2->kind);
-          rm = regbits(instr->arg1->kind);
-        }
-        rex = instr->rex;
-        rex.required =
-            isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
-        rex.r = !!(reg & (1 << 3));
-        rex.b = !!(rm & (1 << 3));
-        assemblevbytes(instr->prefix);
-        assemblerex(rex);
-        assemblevbytes(instr->opcode);
-        sb(modregrmbyte(0x03, reg, rm));
-        break;
-      case ENCODER_IMMREGREG2:
-        imm = &instr->arg1->imm;
-        reg = regbits(instr->arg3->kind);
-        rm = regbits(instr->arg2->kind);
-        rex = instr->rex;
-        rex.required =
-            isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
-        rex.r = !!(reg & (1 << 3));
-        rex.b = !!(rm & (1 << 3));
-        assemblevbytes(instr->prefix);
-        assemblerex(rex);
-        assemblevbytes(instr->opcode);
-        sb(modregrmbyte(0x03, reg, rm));
-        if (imm->nbytes == 1)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_8);
-        else if (imm->nbytes == 2)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_16);
-        else if (imm->nbytes == 4)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
-        else
-          unreachable();
-        break;
-      case ENCODER_IMMMEMREG:
-        imm = &instr->arg1->imm;
-        memarg = &instr->arg2->memarg;
-        reg = regbits(instr->arg3->kind);
-        rex = instr->rex;
-        rex.required =
-            isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
-        rex.r = !!(reg & (1 << 3));
-        assemblemem(memarg, rex, instr->prefix, instr->opcode, reg);
-        if (imm->nbytes == 1)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_8);
-        else if (imm->nbytes == 2)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_16);
-        else if (imm->nbytes == 4)
-          assemblereloc(imm->v.l, imm->v.c, imm->nbytes, R_X86_64_32);
-        else
-          unreachable();
-        break;
-      default:
-        unreachable();
-      }
-
+    case ASM_INSTR:
+      assembleinstr(&v->instr);
       break;
-    }
     case ASM_CALL:
       assemblecall(&v->call);
       break;

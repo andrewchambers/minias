@@ -32,8 +32,6 @@ t () {
 
 # Various regression tests first.
 t "movss  %xmm15,-0x128(%rbp)"
-t "movaps -0x38(%rbp),%xmm15"
-t "movsd  -0x38(%rbp),%xmm15"
 t "xchgq %r13, %rax"
 t "movl \$1000, %r8d"
 t "movb %sil, (%rdi)"
@@ -43,8 +41,6 @@ t "mov \$17293822569102704639, %rax"
 t "callq *%rax"
 t "callq *%r10"
 t "movb %r11b, (%rsi, %r12, 1)"
-
-
 
 for r in rax r10
 do
