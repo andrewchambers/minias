@@ -249,7 +249,8 @@ static uint8_t
 isrexreg(AsmKind k)
 {
     return k > ASM_REG_BEGIN && k < ASM_REG_END
-        && (regbits(k) & (1 << 3) || k == ASM_SPL || k == ASM_BPL || k == ASM_SIL || k == ASM_DIL);
+        && (regbits(k) & (1 << 3) || k == ASM_SPL || k == ASM_BPL
+               || k == ASM_SIL || k == ASM_DIL);
 }
 
 static uint8_t
@@ -346,8 +347,8 @@ assemblereloc(const char* l, int64_t c, int nbytes, int type)
 
 /* Assemble a r <-> mem operation.  */
 static void
-assemblemem(
-    const Memarg* memarg, Rex rex, VarBytes prefix, VarBytes opcode, uint8_t reg, int32_t nexti)
+assemblemem(const Memarg* memarg, Rex rex, VarBytes prefix, VarBytes opcode,
+    uint8_t reg, int32_t nexti)
 {
 
     uint8_t mod, rm, scale, index, base;
@@ -361,7 +362,8 @@ assemblemem(
         sb(modregrmbyte(0x00, reg, rm));
 
         if (memarg->disp.l) {
-            assemblereloc(memarg->disp.l, memarg->disp.c - 4 + nexti, 4, R_X86_64_PC32);
+            assemblereloc(
+                memarg->disp.l, memarg->disp.c - 4 + nexti, 4, R_X86_64_PC32);
         } else {
             assembleconstant(memarg->disp.c, 4);
         }
@@ -423,7 +425,8 @@ assemblemem(
     if (memarg->disp.c == 0 && memarg->disp.l == 0 && ((base & 7) != 5)) {
         mod = 0; /* +0 */
     } else {
-        if (memarg->disp.l == NULL && memarg->disp.c >= -128 && memarg->disp.c <= 127) {
+        if (memarg->disp.l == NULL && memarg->disp.c >= -128
+            && memarg->disp.c <= 127) {
             mod = 1; /* +disp8 */
         } else {
             mod = 2; /* +disp32 */
@@ -486,8 +489,8 @@ assemblecall(const Call* call)
     if (call->indirect) {
         if (call->target.indirect->kind == ASM_MEMARG) {
             rex = (Rex){ 0 };
-            abort(); // assemblemem(&call->target.indirect->memarg, rex, -1, 0xff,
-                     // 0x02);
+            abort(); // assemblemem(&call->target.indirect->memarg, rex, -1,
+                     // 0xff, 0x02);
         } else {
             rm = regbits(call->target.indirect->kind);
             rex = (Rex){ .b = !!(rm & (1 << 3)) };
@@ -497,7 +500,8 @@ assemblecall(const Call* call)
         }
     } else {
         sb(0xe8);
-        assemblereloc(call->target.direct.l, call->target.direct.c - 4, 4, R_X86_64_PC32);
+        assemblereloc(
+            call->target.direct.l, call->target.direct.c - 4, 4, R_X86_64_PC32);
     }
 }
 
@@ -519,7 +523,8 @@ assemblejmp(const Jmp* j)
 
     jmpsize = 4;
     target = getsym(j->target);
-    if (cursection == target->section && (target->defined || target->wco != -1)) {
+    if (cursection == target->section
+        && (target->defined || target->wco != -1)) {
         if (target->defined) {
             distance = target->offset - cursection->hdr.sh_size;
         } else {
@@ -583,7 +588,8 @@ assembleinstr(const Instr* instr)
     case ENCODER_OPMEM:
         memarg = &instr->arg1->memarg;
         rex = instr->rex;
-        assemblemem(memarg, rex, instr->prefix, instr->opcode, instr->fixedreg, 0);
+        assemblemem(
+            memarg, rex, instr->prefix, instr->opcode, instr->fixedreg, 0);
         break;
     case ENCODER_R:
         reg = regbits(instr->arg1->kind);
@@ -631,7 +637,8 @@ assembleinstr(const Instr* instr)
         memarg = &instr->arg2->memarg;
         reg = instr->fixedreg;
         rex = instr->rex;
-        assemblemem(memarg, rex, instr->prefix, instr->opcode, instr->fixedreg, imm->nbytes);
+        assemblemem(memarg, rex, instr->prefix, instr->opcode, instr->fixedreg,
+            imm->nbytes);
         assembleabsimm(imm);
         break;
     case ENCODER_REGMEM:
@@ -644,7 +651,8 @@ assembleinstr(const Instr* instr)
             reg = regbits(instr->arg1->kind);
         }
         rex = instr->rex;
-        rex.required = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
+        rex.required
+            = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
         rex.r = !!(reg & (1 << 3));
         assemblemem(memarg, rex, instr->prefix, instr->opcode, reg, 0);
         break;
@@ -658,7 +666,8 @@ assembleinstr(const Instr* instr)
             rm = regbits(instr->arg1->kind);
         }
         rex = instr->rex;
-        rex.required = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
+        rex.required
+            = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
         rex.r = !!(reg & (1 << 3));
         rex.b = !!(rm & (1 << 3));
         assemblevbytes(instr->prefix);
@@ -671,7 +680,8 @@ assembleinstr(const Instr* instr)
         reg = regbits(instr->arg3->kind);
         rm = regbits(instr->arg2->kind);
         rex = instr->rex;
-        rex.required = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
+        rex.required
+            = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
         rex.r = !!(reg & (1 << 3));
         rex.b = !!(rm & (1 << 3));
         assemblevbytes(instr->prefix);
@@ -685,9 +695,11 @@ assembleinstr(const Instr* instr)
         memarg = &instr->arg2->memarg;
         reg = regbits(instr->arg3->kind);
         rex = instr->rex;
-        rex.required = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
+        rex.required
+            = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
         rex.r = !!(reg & (1 << 3));
-        assemblemem(memarg, rex, instr->prefix, instr->opcode, reg, imm->nbytes);
+        assemblemem(
+            memarg, rex, instr->prefix, instr->opcode, reg, imm->nbytes);
         assembleabsimm(imm);
         break;
     default:
@@ -785,16 +797,19 @@ assemble(void)
             break;
         }
         case ASM_DIR_BYTE:
-            assemblereloc(v->dirbyte.value.l, v->dirbyte.value.c, 1, R_X86_64_32);
+            assemblereloc(
+                v->dirbyte.value.l, v->dirbyte.value.c, 1, R_X86_64_32);
             break;
         case ASM_DIR_SHORT:
-            assemblereloc(v->dirshort.value.l, v->dirshort.value.c, 2, R_X86_64_32);
+            assemblereloc(
+                v->dirshort.value.l, v->dirshort.value.c, 2, R_X86_64_32);
             break;
         case ASM_DIR_INT:
             assemblereloc(v->dirint.value.l, v->dirint.value.c, 4, R_X86_64_32);
             break;
         case ASM_DIR_QUAD:
-            assemblereloc(v->dirquad.value.l, v->dirquad.value.c, 8, R_X86_64_64);
+            assemblereloc(
+                v->dirquad.value.l, v->dirquad.value.c, 8, R_X86_64_64);
             break;
         case ASM_LABEL:
             sym = getsym(v->label.name);
@@ -842,7 +857,9 @@ relaxreset(void)
         if (!symbols->keys[i].str)
             continue;
         sym = symbols->vals[i];
-        *sym = (Symbol){ .name = sym->name, .section = sym->section, .wco = sym->offset };
+        *sym = (Symbol){
+            .name = sym->name, .section = sym->section, .wco = sym->offset
+        };
     }
 }
 
