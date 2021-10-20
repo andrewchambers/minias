@@ -346,7 +346,7 @@ assemblereloc(const char *l, int64_t c, int nbytes, int type)
 }
 
 /* Assemble a r <-> mem operation.
-  
+
   In order to understand this function, you should check the intel
   manual which has tables showing the appropriate values of the modregrm
   byte and sib byte for the different addressing modes.
