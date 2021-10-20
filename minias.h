@@ -17,23 +17,23 @@ typedef struct {
     int64_t wco;
     int64_t offset;
     size_t capacity;
-    uint8_t* data;
+    uint8_t *data;
 } Section;
 
 typedef struct {
-    const char* name;
+    const char *name;
     int32_t idx;
     int64_t offset;
     int64_t wco; /* worst case offset */
     int64_t size;
     int global;
     int defined;
-    Section* section;
+    Section *section;
 } Symbol;
 
 typedef struct {
-    Section* section;
-    Symbol* sym;
+    Section *section;
+    Symbol *sym;
     int type;
     int64_t offset;
     int64_t addend;
@@ -162,24 +162,24 @@ typedef union Parsev Parsev;
 
 typedef struct Label {
     AsmKind kind;
-    const char* name;
+    const char *name;
 } Label;
 
 typedef struct Globl {
     AsmKind kind;
-    const char* name;
+    const char *name;
 } Globl;
 
 typedef struct DirSection {
     AsmKind kind;
     int32_t type;
-    const char* name;
-    const char* flags;
+    const char *name;
+    const char *flags;
 } DirSection;
 
 typedef struct {
     int64_t c;
-    const char* l;
+    const char *l;
 } Value;
 
 typedef struct Byte {
@@ -231,7 +231,7 @@ typedef struct Memarg {
 typedef struct String {
     AsmKind kind;
     size_t len;
-    uint8_t* data;
+    uint8_t *data;
 } String;
 typedef String Ascii;
 typedef String Asciiz;
@@ -239,7 +239,7 @@ typedef String Asciiz;
 typedef struct Jmp {
     AsmKind kind;
     uint32_t cc; /* 0 means unconditional. */
-    const char* target;
+    const char *target;
 } Jmp;
 
 /* Rex opcode prefix. */
@@ -281,9 +281,9 @@ typedef struct Instr {
     uint32_t fixedreg;
     int32_t opcode;
     int32_t prefix;
-    const Parsev* arg1;
-    const Parsev* arg2;
-    const Parsev* arg3;
+    const Parsev *arg1;
+    const Parsev *arg2;
+    const Parsev *arg3;
 } Instr;
 
 union Parsev {
@@ -306,7 +306,7 @@ union Parsev {
     String string;
     // Temporary values.
     Value value;
-    const char* charptr;
+    const char *charptr;
     int64_t i64;
 };
 
@@ -315,40 +315,40 @@ union Parsev {
 typedef struct AsmLine AsmLine;
 struct AsmLine {
     int64_t lineno;
-    const Parsev* v;
-    AsmLine* next;
+    const Parsev *v;
+    AsmLine *next;
 };
 
-AsmLine* parseasm(void);
+AsmLine *parseasm(void);
 
 /* util.c */
 
-void vwarn(const char* fmt, va_list ap);
-void fatal(const char* fmt, ...);
+void vwarn(const char *fmt, va_list ap);
+void fatal(const char *fmt, ...);
 void unreachable(void);
 
-void* xmalloc(size_t);
-void* xrealloc(void*, size_t);
-void* xreallocarray(void*, size_t, size_t);
-char* xmemdup(const char*, size_t);
-char* xstrdup(const char* s);
-void* zalloc(size_t n);
+void *xmalloc(size_t);
+void *xrealloc(void *, size_t);
+void *xreallocarray(void *, size_t, size_t);
+char *xmemdup(const char *, size_t);
+char *xstrdup(const char *s);
+void *zalloc(size_t n);
 
 struct hashtable {
     size_t len, cap;
-    struct hashtablekey* keys;
-    void** vals;
+    struct hashtablekey *keys;
+    void **vals;
 };
 
 struct hashtablekey {
     uint64_t hash;
-    const char* str;
+    const char *str;
     size_t len;
 };
 
-void htabkey(struct hashtablekey*, const char*, size_t);
-struct hashtable* mkhtab(size_t);
-void delhtab(struct hashtable*, void(void*));
-void** htabput(struct hashtable*, struct hashtablekey*);
-void* htabget(struct hashtable*, struct hashtablekey*);
-uint64_t murmurhash64a(const void*, size_t);
+void htabkey(struct hashtablekey *, const char *, size_t);
+struct hashtable *mkhtab(size_t);
+void delhtab(struct hashtable *, void(void *));
+void **htabput(struct hashtable *, struct hashtablekey *);
+void *htabget(struct hashtable *, struct hashtablekey *);
+uint64_t murmurhash64a(const void *, size_t);

@@ -1,8 +1,8 @@
 #include "minias.h"
 
 /* Cache of Parsev* by value. */
-static const Parsev*
-internparsev(Parsev* p)
+static const Parsev *
+internparsev(Parsev *p)
 {
     /*
      A simple direct mapped cache that prevents our parser
@@ -16,26 +16,26 @@ internparsev(Parsev* p)
      variants.
   */
     size_t idx;
-    const Parsev* interned;
-    static const Parsev* cache[4096] = { 0 };
+    const Parsev *interned;
+    static const Parsev *cache[4096] = { 0 };
 
-    idx = murmurhash64a((char*)p, sizeof(Parsev)) % sizeof(cache)
+    idx = murmurhash64a((char *)p, sizeof(Parsev)) % sizeof(cache)
         / sizeof(cache[0]);
     interned = cache[idx];
     if (interned && memcmp(p, interned, sizeof(Parsev)) == 0)
         return interned;
-    interned = (const Parsev*)xmemdup((char*)p, sizeof(Parsev));
+    interned = (const Parsev *)xmemdup((char *)p, sizeof(Parsev));
     cache[idx] = interned;
     return interned;
 }
 
 /* Cache of char* by value. */
-const char*
-internstring(const char* s)
+const char *
+internstring(const char *s)
 {
     size_t idx, len;
-    const char* interned;
-    static const char* cache[4096] = { 0 };
+    const char *interned;
+    static const char *cache[4096] = { 0 };
 
     len = strlen(s);
     idx = murmurhash64a(s, len) % sizeof(cache) / sizeof(cache[0]);
@@ -48,12 +48,12 @@ internstring(const char* s)
 }
 
 static String
-decodestring(char* s)
+decodestring(char *s)
 {
-    char* end;
+    char *end;
     size_t len = 0;
     size_t cap = 0;
-    uint8_t* data = NULL;
+    uint8_t *data = NULL;
     uint8_t c = 0;
 
     /* The string is already validated by the parser so we omit some checks*/
@@ -92,7 +92,7 @@ decodestring(char* s)
 }
 
 static int
-needsmovabs(Imm* imm)
+needsmovabs(Imm *imm)
 {
     int64_t mask, maskedc;
 
@@ -275,7 +275,7 @@ needsmovabs(Imm* imm)
 #define YY_CTX_MEMBERS Parsev v;
 #include "asm.peg.inc"
 
-AsmLine*
+AsmLine *
 parseasm(void)
 {
     AsmLine *result, *l, *prevl;

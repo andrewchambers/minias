@@ -25,7 +25,10 @@ main.o parse.o util.o: minias.h
 
 fmt:
 	clang-format \
-	  -style='{BasedOnStyle: WebKit, AlwaysBreakAfterReturnType: TopLevelDefinitions, ColumnLimit: 80}'\
+	  -style="{BasedOnStyle: WebKit,\
+	           AlwaysBreakAfterReturnType: TopLevelDefinitions,\
+	           ColumnLimit: 80,\
+	           PointerAlignment: Right}"\
 	  -i *.c *.h
 
 check:

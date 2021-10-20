@@ -1,7 +1,7 @@
 #include "minias.h"
 
 void
-vwarn(const char* fmt, va_list ap)
+vwarn(const char *fmt, va_list ap)
 {
     vfprintf(stderr, fmt, ap);
     if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
@@ -13,7 +13,7 @@ vwarn(const char* fmt, va_list ap)
 }
 
 void
-fatal(const char* fmt, ...)
+fatal(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
@@ -28,10 +28,10 @@ unreachable(void)
     fatal("BUG: unexpected internal condition");
 }
 
-void*
+void *
 xmalloc(size_t n)
 {
-    void* p;
+    void *p;
 
     p = malloc(n);
     if (!p)
@@ -40,10 +40,10 @@ xmalloc(size_t n)
     return p;
 }
 
-void*
+void *
 zalloc(size_t n)
 {
-    void* p;
+    void *p;
 
     p = malloc(n);
     if (!p)
@@ -52,8 +52,8 @@ zalloc(size_t n)
     return p;
 }
 
-void*
-xrealloc(void* p, size_t n)
+void *
+xrealloc(void *p, size_t n)
 {
     p = realloc(p, n);
     if (!p)
@@ -62,8 +62,8 @@ xrealloc(void* p, size_t n)
     return p;
 }
 
-void*
-xreallocarray(void* p, size_t n, size_t m)
+void *
+xreallocarray(void *p, size_t n, size_t m)
 {
     p = reallocarray(p, n, m);
     if (!p)
@@ -72,10 +72,10 @@ xreallocarray(void* p, size_t n, size_t m)
     return p;
 }
 
-char*
-xmemdup(const char* s, size_t n)
+char *
+xmemdup(const char *s, size_t n)
 {
-    char* p;
+    char *p;
 
     p = xmalloc(n);
     memcpy(p, s, n);
@@ -83,24 +83,24 @@ xmemdup(const char* s, size_t n)
     return p;
 }
 
-char*
-xstrdup(const char* s)
+char *
+xstrdup(const char *s)
 {
     return xmemdup(s, strlen(s) + 1);
 }
 
 void
-htabkey(struct hashtablekey* k, const char* s, size_t n)
+htabkey(struct hashtablekey *k, const char *s, size_t n)
 {
     k->str = s;
     k->len = n;
     k->hash = murmurhash64a(s, n);
 }
 
-struct hashtable*
+struct hashtable *
 mkhtab(size_t cap)
 {
-    struct hashtable* h;
+    struct hashtable *h;
     size_t i;
 
     assert(!(cap & (cap - 1)));
@@ -116,7 +116,7 @@ mkhtab(size_t cap)
 }
 
 void
-delhtab(struct hashtable* h, void del(void*))
+delhtab(struct hashtable *h, void del(void *))
 {
     size_t i;
 
@@ -134,7 +134,7 @@ delhtab(struct hashtable* h, void del(void*))
 }
 
 static bool
-keyequal(struct hashtablekey* k1, struct hashtablekey* k2)
+keyequal(struct hashtablekey *k1, struct hashtablekey *k2)
 {
     if (k1->hash != k2->hash || k1->len != k2->len)
         return false;
@@ -142,7 +142,7 @@ keyequal(struct hashtablekey* k1, struct hashtablekey* k2)
 }
 
 static size_t
-keyindex(struct hashtable* h, struct hashtablekey* k)
+keyindex(struct hashtable *h, struct hashtablekey *k)
 {
     size_t i;
 
@@ -152,11 +152,11 @@ keyindex(struct hashtable* h, struct hashtablekey* k)
     return i;
 }
 
-void**
-htabput(struct hashtable* h, struct hashtablekey* k)
+void **
+htabput(struct hashtable *h, struct hashtablekey *k)
 {
-    struct hashtablekey* oldkeys;
-    void** oldvals;
+    struct hashtablekey *oldkeys;
+    void **oldvals;
     size_t i, j, oldcap;
 
     if (h->cap / 2 < h->len) {
@@ -188,8 +188,8 @@ htabput(struct hashtable* h, struct hashtablekey* k)
     return &h->vals[i];
 }
 
-void*
-htabget(struct hashtable* h, struct hashtablekey* k)
+void *
+htabget(struct hashtable *h, struct hashtablekey *k)
 {
     size_t i;
 
@@ -198,7 +198,7 @@ htabget(struct hashtable* h, struct hashtablekey* k)
 }
 
 uint64_t
-murmurhash64a(const void* ptr, size_t len)
+murmurhash64a(const void *ptr, size_t len)
 {
     const uint64_t seed = 0xdecafbaddecafbadull;
     const uint64_t m = 0xc6a4a7935bd1e995ull;

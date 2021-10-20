@@ -1,16 +1,16 @@
 #include "minias.h"
 
 /* Parsed assembly */
-static AsmLine* allasm = NULL;
+static AsmLine *allasm = NULL;
 
 /* Number of assembly relaxation passes. */
 static int nrelax = 1;
 
 /* Symbols before writing to symtab section. */
-static struct hashtable* symbols = NULL;
+static struct hashtable *symbols = NULL;
 
 /* Array of all relocations before adding to the rel section. */
-static Relocation* relocs = NULL;
+static Relocation *relocs = NULL;
 static size_t nrelocs = 0;
 static size_t reloccap = 0;
 
@@ -18,21 +18,21 @@ static size_t reloccap = 0;
 static Section sections[MAXSECTIONS];
 static size_t nsections = 1; // first is reserved.
 
-static Section* cursection = NULL;
-static Section* shstrtab = NULL;
-static Section* strtab = NULL;
-static Section* symtab = NULL;
-static Section* bss = NULL;
-static Section* text = NULL;
-static Section* data = NULL;
-static Section* textrel = NULL;
-static Section* datarel = NULL;
+static Section *cursection = NULL;
+static Section *shstrtab = NULL;
+static Section *strtab = NULL;
+static Section *symtab = NULL;
+static Section *bss = NULL;
+static Section *text = NULL;
+static Section *data = NULL;
+static Section *textrel = NULL;
+static Section *datarel = NULL;
 
-static char* infilename = "<stdin>";
+static char *infilename = "<stdin>";
 static size_t curlineno = 0;
 
 static void
-lfatal(const char* fmt, ...)
+lfatal(const char *fmt, ...)
 {
     va_list ap;
     fprintf(stderr, "%s:%ld: ", infilename, curlineno);
@@ -42,14 +42,14 @@ lfatal(const char* fmt, ...)
     exit(1);
 }
 
-static Symbol*
-getsym(const char* name)
+static Symbol *
+getsym(const char *name)
 {
     Symbol **ps, *s;
     struct hashtablekey htk;
 
     htabkey(&htk, name, strlen(name));
-    ps = (Symbol**)htabput(symbols, &htk);
+    ps = (Symbol **)htabput(symbols, &htk);
     if (!*ps) {
         *ps = xmalloc(sizeof(Symbol));
         **ps = (Symbol){
@@ -62,7 +62,7 @@ getsym(const char* name)
 }
 
 static void
-secaddbytes(Section* s, const void* bytes, size_t n)
+secaddbytes(Section *s, const void *bytes, size_t n)
 {
 
     if (s->hdr.sh_type == SHT_NOBITS) {
@@ -80,23 +80,23 @@ secaddbytes(Section* s, const void* bytes, size_t n)
 }
 
 static void
-secaddbyte(Section* s, uint8_t b)
+secaddbyte(Section *s, uint8_t b)
 {
     secaddbytes(s, &b, 1);
 }
 
 static Elf64_Word
-elfstr(Section* sec, const char* s)
+elfstr(Section *sec, const char *s)
 {
     Elf64_Word i = sec->hdr.sh_size;
     secaddbytes(sec, s, strlen(s) + 1);
     return i;
 }
 
-static Section*
+static Section *
 newsection()
 {
-    Section* s;
+    Section *s;
     if (nsections >= MAXSECTIONS)
         fatal("too many sections");
     s = &sections[nsections];
@@ -105,15 +105,15 @@ newsection()
     return s;
 }
 
-static Section*
-getsection(const char* name)
+static Section *
+getsection(const char *name)
 {
     size_t i;
-    char* secname;
-    Section* s;
+    char *secname;
+    Section *s;
 
     for (i = 0; i < nsections; i++) {
-        secname = (char*)shstrtab->data + sections[i].hdr.sh_name;
+        secname = (char *)shstrtab->data + sections[i].hdr.sh_name;
         if (strcmp(secname, name) == 0)
             return &sections[i];
     }
@@ -178,7 +178,7 @@ initsections(void)
     datarel->hdr.sh_entsize = sizeof(Elf64_Rela);
 }
 
-static Relocation*
+static Relocation *
 newreloc()
 {
     if (nrelocs == reloccap) {
@@ -197,7 +197,7 @@ sb(uint8_t b)
 }
 
 static void
-sbn(uint8_t* bytes, size_t n)
+sbn(uint8_t *bytes, size_t n)
 {
     secaddbytes(cursection, bytes, n);
 }
@@ -327,10 +327,10 @@ assemblerex(Rex rex)
 
 /* Assemble a symbolic value. */
 static void
-assemblereloc(const char* l, int64_t c, int nbytes, int type)
+assemblereloc(const char *l, int64_t c, int nbytes, int type)
 {
-    Relocation* reloc;
-    Symbol* sym;
+    Relocation *reloc;
+    Symbol *sym;
 
     if (l != NULL) {
         reloc = newreloc();
@@ -347,7 +347,7 @@ assemblereloc(const char* l, int64_t c, int nbytes, int type)
 
 /* Assemble a r <-> mem operation.  */
 static void
-assemblemem(const Memarg* memarg, Rex rex, VarBytes prefix, VarBytes opcode,
+assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix, VarBytes opcode,
     uint8_t reg, int32_t nexti)
 {
 
@@ -480,11 +480,11 @@ assemblemem(const Memarg* memarg, Rex rex, VarBytes prefix, VarBytes opcode,
 }
 
 static void
-assemblejmp(const Jmp* j)
+assemblejmp(const Jmp *j)
 {
     int jmpsize;
     int64_t distance;
-    Symbol* target;
+    Symbol *target;
 
     // clang-format off
     static uint8_t cc2op[31] = {
@@ -523,7 +523,7 @@ assemblejmp(const Jmp* j)
 }
 
 static void
-assembleabsimm(const Imm* imm)
+assembleabsimm(const Imm *imm)
 {
     int reltype;
 
@@ -542,11 +542,11 @@ assembleabsimm(const Imm* imm)
 }
 
 static void
-assembleinstr(const Instr* instr)
+assembleinstr(const Instr *instr)
 {
     Rex rex;
-    const Memarg* memarg;
-    const Imm* imm;
+    const Memarg *memarg;
+    const Imm *imm;
     uint8_t reg, rm;
 
     switch (instr->encoder) {
@@ -696,9 +696,9 @@ assembleinstr(const Instr* instr)
 static void
 assemble(void)
 {
-    Symbol* sym;
-    AsmLine* l;
-    const Parsev* v;
+    Symbol *sym;
+    AsmLine *l;
+    const Parsev *v;
 
     cursection = text;
     curlineno = 0;
@@ -716,8 +716,8 @@ assemble(void)
             sym->global = 1;
             break;
         case ASM_DIR_SECTION: {
-            const char* fp;
-            Section* s;
+            const char *fp;
+            Section *s;
 
             s = getsection(v->section.name);
             s->hdr.sh_type = v->section.type;
@@ -821,8 +821,8 @@ assemble(void)
 static void
 relaxreset(void)
 {
-    Symbol* sym;
-    Section* sec;
+    Symbol *sym;
+    Section *sec;
     size_t i;
 
     /* Reset relocations and section data but retain capacity. */
@@ -847,7 +847,7 @@ relaxreset(void)
 }
 
 static void
-addtosymtab(Symbol* sym)
+addtosymtab(Symbol *sym)
 {
     Elf64_Sym elfsym;
     int stype;
@@ -874,7 +874,7 @@ addtosymtab(Symbol* sym)
 static void
 fillsymtab(void)
 {
-    Symbol* sym;
+    Symbol *sym;
     size_t i;
 
     // Local symbols
@@ -904,10 +904,10 @@ fillsymtab(void)
 }
 
 static int
-resolvereloc(Relocation* reloc)
+resolvereloc(Relocation *reloc)
 {
-    Symbol* sym;
-    uint8_t* rdata;
+    Symbol *sym;
+    uint8_t *rdata;
     int64_t value;
 
     sym = reloc->sym;
@@ -939,10 +939,10 @@ resolvereloc(Relocation* reloc)
 }
 
 static void
-appendreloc(Relocation* reloc)
+appendreloc(Relocation *reloc)
 {
-    Symbol* sym;
-    Section* relsection;
+    Symbol *sym;
+    Section *relsection;
     Elf64_Rela elfrel;
 
     memset(&elfrel, 0, sizeof(elfrel));
@@ -975,7 +975,7 @@ appendreloc(Relocation* reloc)
 static void
 handlerelocs(void)
 {
-    Relocation* reloc;
+    Relocation *reloc;
     size_t i;
     for (i = 0; i < nrelocs; i++) {
         reloc = &relocs[i];
@@ -986,7 +986,7 @@ handlerelocs(void)
 }
 
 static void
-out(const void* buf, size_t n)
+out(const void *buf, size_t n)
 {
     fwrite(buf, 1, n, stdout);
     if (ferror(stdout))
@@ -1036,7 +1036,7 @@ outelf(void)
 }
 
 static void
-usage(char* argv0)
+usage(char *argv0)
 {
     fprintf(stderr, "minias - a mini x86-64 assembler.\n\n");
     fprintf(stderr, "usage: %s [-r iter] [-o out] [input]\n", argv0);
@@ -1047,7 +1047,7 @@ usage(char* argv0)
 }
 
 static void
-parseargs(int argc, char* argv[])
+parseargs(int argc, char *argv[])
 {
     char *a, *argv0, *outfname;
 
@@ -1087,7 +1087,7 @@ parseargs(int argc, char* argv[])
 }
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     symbols = mkhtab(256);
     parseargs(argc, argv);
