@@ -743,8 +743,8 @@ cvtss2sd = "cvtss2sd" (
 )
 
 cvtsd2ss = "cvtsd2ss" (
-    ws s:xmm ws? ',' ws? d:xmm { $$ = REGREG2({.w=0}, 0x010066f3, 0x5a, s, d); }
-  | ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG ({.w=0}, 0x010066f3, 0x5a, s, d); }
+    ws s:xmm ws? ',' ws? d:xmm { $$ = REGREG2({.w=0}, 0xf2, 0x01000f5a, s, d); }
+  | ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG ({.w=0}, 0xf2, 0x01000f5a, s, d); }
 )
 
 cvttss2si = "cvttss2si" (

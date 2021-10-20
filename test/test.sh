@@ -69,6 +69,10 @@ t "cvttss2si %xmm10, %rax"
 t "cvttss2si %xmm1, %eax"
 t "cvttss2si %xmm10, %eax"
 
+t "cvtsd2ss %xmm0, %xmm0"
+t "cvtsd2ss (%rax), %xmm1"
+t "cvtsd2ss (%rax), %xmm10"
+
 t "cvtsi2sd %rax, %xmm1"
 t "cvtsi2sd %rax, %xmm10"
 t "cvtsi2sd %r9, %xmm10"
