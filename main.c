@@ -424,8 +424,8 @@ assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix, VarBytes opcode,
     if (memarg->disp.c == 0 && memarg->disp.l == 0 && ((base & 7) != 5)) {
         mod = 0; /* +0 */
     } else {
-        if (memarg->disp.l == NULL && memarg->disp.c >= -128
-            && memarg->disp.c <= 127) {
+        if (memarg->disp.l == NULL && memarg->disp.c >= INT8_MIN
+            && memarg->disp.c <= INT8_MAX) {
             mod = 1; /* +disp8 */
         } else {
             mod = 2; /* +disp32 */
@@ -504,7 +504,8 @@ assemblejmp(const Jmp *j)
         } else {
             distance = target->wco - cursection->hdr.sh_size;
         }
-        if (distance - 2 >= INT8_MIN && distance - (j->cc ? 6 : 5) <= INT8_MAX) {
+        if (distance - 2 >= INT8_MIN
+            && distance - (j->cc ? 6 : 5) <= INT8_MAX) {
             jmpsize = 1;
         } else {
             jmpsize = 4;
@@ -923,14 +924,14 @@ resolvereloc(Relocation *reloc)
         rdata = &reloc->section->data[reloc->offset];
         value = sym->offset - reloc->offset + reloc->addend;
         if (value > INT8_MAX || value < INT8_MIN)
-          fatal("R_X86_64_PC8 relocation overflow");
+            fatal("R_X86_64_PC8 relocation overflow");
         rdata[0] = value;
         return 1;
     case R_X86_64_PC32:
         rdata = &reloc->section->data[reloc->offset];
         value = sym->offset - reloc->offset + reloc->addend;
         if (value > INT32_MAX || value < INT32_MIN)
-          fatal("R_X86_64_PC32 relocation overflow");
+            fatal("R_X86_64_PC32 relocation overflow");
         rdata[0] = ((uint32_t)value & 0xff);
         rdata[1] = ((uint32_t)value & 0xff00) >> 8;
         rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
