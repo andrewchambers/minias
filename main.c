@@ -294,13 +294,13 @@ assembleconstant(int64_t c, int nbytes)
     }
 }
 
-/* The VarBytes type encodes a variadic number of bytes.
+/* The VarBytes type encodes a variable number of bytes.
    The top byte is how many bytes we encode less 1.
 
    examples:
    <nothing> encodes as -1
    0c encodes as 0x0000000c
-   02 03  encodes as 0x01000203
+   02 03 encodes as 0x01000203
 */
 typedef int32_t VarBytes;
 
