@@ -160,15 +160,21 @@ conditioncodes="
   o p pe po s z
 "
 
-for fill in 0 1 129
+t "l:\n .fill 1, 1, 0x00 \njmp l"
+t "jmp l\n .fill 1, 1, 0x00 \nl:"
+for cc in $conditioncodes
+do
+  t "l:\n .fill 1, 1, 0x00 \nj${cc} l"
+  t "j${cc} l\n .fill 1, 1, 0x00 \nl:"
+done
+
+# Check boundary on jump relaxing.
+for fill in 0 $(seq 120 140)
 do
   t "l:\n .fill $fill, 1, 0x00 \njmp l"
   t "jmp l\n .fill $fill, 1, 0x00 \nl:"
-  for cc in $conditioncodes
-  do
-    t "l:\n .fill $fill, 1, 0x00 \nj${cc} l"
-    t "j${cc} l\n .fill $fill, 1, 0x00 \nl:"
-  done
+  t "l:\n .fill $fill, 1, 0x00 \njz l"
+  t "jz l\n .fill $fill, 1, 0x00 \nl:"
 done
 
 for cc in $conditioncodes

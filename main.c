@@ -1,4 +1,3 @@
-#include <assert.h>
 #include "minias.h"
 
 /* Parsed assembly */
@@ -923,12 +922,15 @@ resolvereloc(Relocation *reloc)
     case R_X86_64_PC8:
         rdata = &reloc->section->data[reloc->offset];
         value = sym->offset - reloc->offset + reloc->addend;
-        assert(value >= INT8_MIN && value <= INT8_MAX);
+        if (value > INT8_MAX || value < INT8_MIN)
+          fatal("R_X86_64_PC8 relocation overflow");
         rdata[0] = value;
         return 1;
     case R_X86_64_PC32:
         rdata = &reloc->section->data[reloc->offset];
         value = sym->offset - reloc->offset + reloc->addend;
+        if (value > INT32_MAX || value < INT32_MIN)
+          fatal("R_X86_64_PC32 relocation overflow");
         rdata[0] = ((uint32_t)value & 0xff);
         rdata[1] = ((uint32_t)value & 0xff00) >> 8;
         rdata[2] = ((uint32_t)value & 0xff0000) >> 16;
