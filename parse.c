@@ -55,15 +55,13 @@ decodestring(char *s)
     size_t cap = 0;
     uint8_t *data = NULL;
     uint8_t c = 0;
+    int i;
 
-    /* The string is already validated by the parser so we omit some checks*/
+    /* The string is already validated by the parser so we omit some checks */
     while (*s) {
         if (*s == '\\') {
             s++;
-            if (*s >= '0' && *s <= '7') {
-                c = strtoul(s, &end, 8);
-                s += 2;
-            } else if (*s == 'x') {
+            if (*s == 'x') {
                 s++;
                 c = strtoul(s, &end, 16);
                 s = end - 1;
@@ -76,7 +74,11 @@ decodestring(char *s)
             } else if (*s == '\\') {
                 c = '\\';
             } else {
-                unreachable();
+                for (i = 0; i < 3 && *s >= '0' && *s <= '7'; i++, s++)
+                  c = c * 8 + (*s - '0');
+                if (i == 0)
+                  unreachable();
+                s--;
             }
         } else {
             c = *s;
