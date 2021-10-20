@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "minias.h"
 
 /* Parsed assembly */
@@ -504,7 +505,7 @@ assemblejmp(const Jmp *j)
         } else {
             distance = target->wco - cursection->hdr.sh_size;
         }
-        if ((distance - 1) >= -128 && (distance - 5) <= 127) {
+        if (distance - 2 >= INT8_MIN && distance - (j->cc ? 6 : 5) <= INT8_MAX) {
             jmpsize = 1;
         } else {
             jmpsize = 4;
@@ -922,7 +923,8 @@ resolvereloc(Relocation *reloc)
     case R_X86_64_PC8:
         rdata = &reloc->section->data[reloc->offset];
         value = sym->offset - reloc->offset + reloc->addend;
-        rdata[0] = ((uint8_t)value & 0xff);
+        assert(value >= INT8_MIN && value <= INT8_MAX);
+        rdata[0] = value;
         return 1;
     case R_X86_64_PC32:
         rdata = &reloc->section->data[reloc->offset];
