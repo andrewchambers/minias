@@ -345,12 +345,16 @@ assemblereloc(const char *l, int64_t c, int nbytes, int type)
     assembleconstant(c, nbytes);
 }
 
-/* Assemble a r <-> mem operation.  */
+/* Assemble a r <-> mem operation.
+  
+  In order to understand this function, you should check the intel
+  manual which has tables showing the appropriate values of the modregrm
+  byte and sib byte for the different addressing modes.
+*/
 static void
 assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix, VarBytes opcode,
     uint8_t reg, int32_t nexti)
 {
-
     uint8_t mod, rm, scale, index, base;
 
     /* Rip relative addressing. */
