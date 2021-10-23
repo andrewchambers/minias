@@ -90,7 +90,7 @@ decodestring(char *s)
         }
         data[len++] = c;
     }
-    return (String){ .kind = ASM_STRING, .len = len, .data = data };
+    return (String) { .kind = ASM_STRING, .len = len, .data = data };
 }
 
 static int

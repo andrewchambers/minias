@@ -33,6 +33,8 @@ directive =
     { $$.dirint = (Int){.kind = ASM_DIR_INT,  .value = v.value }; }
   | "quad" ws v:value
     { $$.dirquad = (Quad){.kind = ASM_DIR_QUAD, .value = v.value }; }
+  | "set" ws s:ident ws? ',' ws? v:value
+    { $$.set = (Set){.kind = ASM_DIR_SET, .sym = s.charptr, .value = v.value }; }
   | fd:fill-directive
     { $$ = fd; }
   | sd:section-directive
