@@ -21,9 +21,14 @@ typedef struct {
 } Section;
 
 typedef struct {
+    int64_t c;
+    const char *l;
+} Value;
+
+typedef struct {
     const char *name;
     int32_t idx;
-    int64_t offset;
+    Value value;
     int64_t wco; /* worst case offset */
     int64_t size;
     int global;
@@ -52,6 +57,7 @@ typedef enum {
     ASM_DIR_SECTION,
     ASM_DIR_ASCII,
     ASM_DIR_ASCIIZ,
+    ASM_DIR_SET,
     ASM_DIR_DATA,
     ASM_DIR_TEXT,
     ASM_DIR_FILL,
@@ -170,17 +176,18 @@ typedef struct Globl {
     const char *name;
 } Globl;
 
+typedef struct Set {
+    AsmKind kind;
+    const char *sym;
+    Value value;
+} Set;
+
 typedef struct DirSection {
     AsmKind kind;
     int32_t type;
     const char *name;
     const char *flags;
 } DirSection;
-
-typedef struct {
-    int64_t c;
-    const char *l;
-} Value;
 
 typedef struct Byte {
     AsmKind kind;
@@ -298,6 +305,7 @@ union Parsev {
     Instr instr;
     Jmp jmp;
     Fill fill;
+    Set set;
     Byte dirbyte;
     Short dirshort;
     Int dirint;

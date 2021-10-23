@@ -361,7 +361,7 @@ t () {
   echo -n "."
 }
 
-for tc in $(echo test/execute/*)
+for tc in $(echo test/execute/*.s)
 do
   t "$tc"
 done

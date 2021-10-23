@@ -52,7 +52,7 @@ getsym(const char *name)
     ps = (Symbol **)htabput(symbols, &htk);
     if (!*ps) {
         *ps = xmalloc(sizeof(Symbol));
-        **ps = (Symbol){
+        **ps = (Symbol) {
             .name = name,
             .wco = -1,
         };
@@ -250,7 +250,7 @@ isrexreg(AsmKind k)
 {
     return k > ASM_REG_BEGIN && k < ASM_REG_END
         && (regbits(k) & (1 << 3) || k == ASM_SPL || k == ASM_BPL
-               || k == ASM_SIL || k == ASM_DIL);
+            || k == ASM_SIL || k == ASM_DIL);
 }
 
 static uint8_t
@@ -486,9 +486,9 @@ assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix, VarBytes opcode,
 static void
 assemblejmp(const Jmp *j)
 {
-    int jmpsize;
-    int64_t distance;
     Symbol *target;
+    int64_t distance;
+    int jmpsize;
 
     // clang-format off
     static uint8_t cc2op[31] = {
@@ -501,13 +501,9 @@ assemblejmp(const Jmp *j)
 
     jmpsize = 4;
     target = getsym(j->target);
-    if (cursection == target->section
-        && (target->defined || target->wco != -1)) {
-        if (target->defined) {
-            distance = target->offset - cursection->hdr.sh_size;
-        } else {
-            distance = target->wco - cursection->hdr.sh_size;
-        }
+
+    if (cursection == target->section && target->wco != -1) {
+        distance = target->wco - cursection->hdr.sh_size;
         if (distance - 2 >= INT8_MIN
             && distance - (j->cc ? 6 : 5) <= INT8_MAX) {
             jmpsize = 1;
@@ -540,8 +536,10 @@ assembleabsimm(const Imm *imm)
         reltype = R_X86_64_32;
     else if (imm->nbytes == 8)
         reltype = R_X86_64_64;
-    else
+    else {
         unreachable();
+        return;
+    }
 
     assemblereloc(imm->v.l, imm->v.c, imm->nbytes, reltype);
 }
@@ -802,13 +800,18 @@ assemble(void)
             assemblereloc(
                 v->dirquad.value.l, v->dirquad.value.c, 8, R_X86_64_64);
             break;
+        case ASM_DIR_SET:
+            sym = getsym(v->set.sym);
+            sym->value = v->set.value;
+            break;
         case ASM_LABEL:
             sym = getsym(v->label.name);
-            sym->section = cursection;
-            sym->offset = cursection->hdr.sh_size;
             if (sym->defined)
                 lfatal("%s already defined", sym->name);
             sym->defined = 1;
+            sym->section = cursection;
+            sym->value.c = cursection->hdr.sh_size;
+            sym->wco = sym->value.c;
             break;
         case ASM_INSTR:
             assembleinstr(&v->instr);
@@ -845,9 +848,56 @@ relaxreset(void)
         if (!symbols->keys[i].str)
             continue;
         sym = symbols->vals[i];
-        *sym = (Symbol){
-            .name = sym->name, .section = sym->section, .wco = sym->offset
+        *sym = (Symbol) {
+            .name = sym->name, .section = sym->section, .wco = sym->wco
         };
+    }
+}
+
+/* Try to resolve the address of a symbol, this will recursively look
+   for the symbol address if it is defined relative to another symbol. */
+static int
+resolvesymrecurse(Symbol *sym, int n)
+{
+    Symbol *indirect;
+
+    if (n > 64)
+        fatal("recursion limit hit when resolving symbol location");
+
+    if (sym->value.l) {
+        indirect = getsym(sym->value.l);
+        if (!resolvesymrecurse(indirect, n + 1))
+            return 0;
+        sym->section = indirect->section;
+        sym->value.l = NULL;
+        sym->value.c += indirect->value.c;
+        sym->wco = sym->value.c;
+        sym->defined = 1;
+        return 1;
+    }
+
+    if (!sym->defined)
+        return 0;
+
+    return 1;
+}
+
+static int
+resolvesym(Symbol *sym)
+{
+    return resolvesymrecurse(sym, 0);
+}
+
+/* Resolve all symbols to their final location if we can. */
+static void
+resolvesymbols(void)
+{
+    size_t i;
+
+    for (i = 0; i < symbols->cap; i++) {
+        if (!symbols->keys[i].str)
+            continue;
+        resolvesym(symbols->vals[i]);
     }
 }
 
@@ -868,7 +918,7 @@ addtosymtab(Symbol *sym)
     sym->idx = symtab->hdr.sh_size / symtab->hdr.sh_entsize;
 
     elfsym.st_name = elfstr(strtab, sym->name);
-    elfsym.st_value = sym->offset;
+    elfsym.st_value = sym->value.c;
     elfsym.st_size = sym->size;
     elfsym.st_info = ELF64_ST_INFO(sbind, stype);
     elfsym.st_shndx = sym->section ? sym->section->idx : SHN_UNDEF;
@@ -882,7 +932,7 @@ fillsymtab(void)
     Symbol *sym;
     size_t i;
 
-    // Local symbols
+    /* Local symbols come first. */
     for (i = 0; i < symbols->cap; i++) {
         if (!symbols->keys[i].str)
             continue;
@@ -892,11 +942,10 @@ fillsymtab(void)
         addtosymtab(sym);
     }
 
-    // Global symbols
-
-    // Set start of global symbols.
+    /* Set start of global symbols. */
     symtab->hdr.sh_info = symtab->hdr.sh_size / symtab->hdr.sh_entsize;
 
+    /* Global symbols. */
     for (i = 0; i < symbols->cap; i++) {
         if (!symbols->keys[i].str)
             continue;
@@ -912,8 +961,8 @@ static int
 resolvereloc(Relocation *reloc)
 {
     Symbol *sym;
-    uint8_t *rdata;
     int64_t value;
+    uint8_t *rdata;
 
     sym = reloc->sym;
 
@@ -926,14 +975,14 @@ resolvereloc(Relocation *reloc)
         return 0;
     case R_X86_64_PC8:
         rdata = &reloc->section->data[reloc->offset];
-        value = sym->offset - reloc->offset + reloc->addend;
+        value = sym->value.c - reloc->offset + reloc->addend;
         if (value > INT8_MAX || value < INT8_MIN)
             fatal("R_X86_64_PC8 relocation overflow");
         rdata[0] = value;
         return 1;
     case R_X86_64_PC32:
         rdata = &reloc->section->data[reloc->offset];
-        value = sym->offset - reloc->offset + reloc->addend;
+        value = sym->value.c - reloc->offset + reloc->addend;
         if (value > INT32_MAX || value < INT32_MIN)
             fatal("R_X86_64_PC32 relocation overflow");
         rdata[0] = ((uint32_t)value & 0xff);
@@ -1103,9 +1152,11 @@ main(int argc, char *argv[])
     allasm = parseasm();
     initsections();
     assemble();
+    resolvesymbols();
     while (nrelax-- > 0) {
         relaxreset();
         assemble();
+        resolvesymbols();
     }
     fillsymtab();
     handlerelocs();
