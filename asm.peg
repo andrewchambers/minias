@@ -35,6 +35,8 @@ directive =
     { $$.dirquad = (Quad){.kind = ASM_DIR_QUAD, .value = v.value }; }
   | "set" ws s:ident ws? ',' ws? v:value
     { $$.set = (Set){.kind = ASM_DIR_SET, .sym = s.charptr, .value = v.value }; }
+  | "weak" ws s:ident
+    { $$.weak = (Weak){.kind = ASM_DIR_WEAK, .sym = s.charptr}; }
   | fd:fill-directive
     { $$ = fd; }
   | sd:section-directive

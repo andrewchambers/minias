@@ -31,7 +31,8 @@ typedef struct {
     Value value;
     int64_t wco; /* worst case offset */
     int64_t size;
-    int global;
+    int bind; /* STB_GLOBAL, STB_LOCAL, STB_WEAK */
+    int type;
     int defined;
     Section *section;
 } Symbol;
@@ -54,6 +55,7 @@ typedef enum {
     ASM_MEMARG,
     // Directives.
     ASM_DIR_GLOBL,
+    ASM_DIR_WEAK,
     ASM_DIR_SECTION,
     ASM_DIR_ASCII,
     ASM_DIR_ASCIIZ,
@@ -182,6 +184,11 @@ typedef struct Set {
     Value value;
 } Set;
 
+typedef struct Weak {
+    AsmKind kind;
+    const char *sym;
+} Weak;
+
 typedef struct DirSection {
     AsmKind kind;
     int32_t type;
@@ -306,6 +313,7 @@ union Parsev {
     Jmp jmp;
     Fill fill;
     Set set;
+    Weak weak;
     Byte dirbyte;
     Short dirshort;
     Int dirint;

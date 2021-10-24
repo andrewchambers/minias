@@ -75,9 +75,9 @@ decodestring(char *s)
                 c = '\\';
             } else {
                 for (i = 0; i < 3 && *s >= '0' && *s <= '7'; i++, s++)
-                  c = c * 8 + (*s - '0');
+                    c = c * 8 + (*s - '0');
                 if (i == 0)
-                  unreachable();
+                    unreachable();
                 s--;
             }
         } else {

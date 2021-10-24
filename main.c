@@ -55,6 +55,8 @@ getsym(const char *name)
         **ps = (Symbol) {
             .name = name,
             .wco = -1,
+            .bind = STB_LOCAL,
+            .type = STT_NOTYPE,
         };
     }
     s = *ps;
@@ -716,7 +718,11 @@ assemble(void)
             break;
         case ASM_DIR_GLOBL:
             sym = getsym(v->globl.name);
-            sym->global = 1;
+            sym->bind = STB_GLOBAL;
+            break;
+        case ASM_DIR_WEAK:
+            sym = getsym(v->weak.sym);
+            sym->bind = STB_WEAK;
             break;
         case ASM_DIR_SECTION: {
             const char *fp;
@@ -857,16 +863,16 @@ relaxreset(void)
 /* Try to resolve the address of a symbol, this will recursively look
    for the symbol address if it is defined relative to another symbol. */
 static int
-resolvesymrecurse(Symbol *sym, int n)
+resolvesym2(Symbol *sym, int depth)
 {
     Symbol *indirect;
 
-    if (n > 64)
+    if (depth > 64)
         fatal("recursion limit hit when resolving symbol location");
 
     if (sym->value.l) {
         indirect = getsym(sym->value.l);
-        if (!resolvesymrecurse(indirect, n + 1))
+        if (!resolvesym2(indirect, depth + 1))
             return 0;
         sym->section = indirect->section;
         sym->value.l = NULL;
@@ -885,7 +891,7 @@ resolvesymrecurse(Symbol *sym, int n)
 static int
 resolvesym(Symbol *sym)
 {
-    return resolvesymrecurse(sym, 0);
+    return resolvesym2(sym, 0);
 }
 
 /* Resolve all symbols to their final location if we can. */
@@ -905,22 +911,13 @@ static void
 addtosymtab(Symbol *sym)
 {
     Elf64_Sym elfsym;
-    int stype;
-    int sbind;
-
-    stype = 0;
-    if (sym->defined) {
-        sbind = sym->global ? STB_GLOBAL : STB_LOCAL;
-    } else {
-        sbind = STB_GLOBAL;
-    }
 
     sym->idx = symtab->hdr.sh_size / symtab->hdr.sh_entsize;
 
     elfsym.st_name = elfstr(strtab, sym->name);
     elfsym.st_value = sym->value.c;
     elfsym.st_size = sym->size;
-    elfsym.st_info = ELF64_ST_INFO(sbind, stype);
+    elfsym.st_info = ELF64_ST_INFO(sym->bind, sym->type);
     elfsym.st_shndx = sym->section ? sym->section->idx : SHN_UNDEF;
     elfsym.st_other = 0;
     secaddbytes(symtab, &elfsym, sizeof(Elf64_Sym));
@@ -937,7 +934,7 @@ fillsymtab(void)
         if (!symbols->keys[i].str)
             continue;
         sym = symbols->vals[i];
-        if (!sym->defined || sym->global)
+        if (sym->bind != STB_LOCAL)
             continue;
         addtosymtab(sym);
     }
@@ -951,7 +948,7 @@ fillsymtab(void)
             continue;
 
         sym = symbols->vals[i];
-        if (sym->defined && !sym->global)
+        if (sym->bind == STB_LOCAL)
             continue;
         addtosymtab(sym);
     }
