@@ -810,6 +810,10 @@ assemble(void)
             sym = getsym(v->set.sym);
             sym->value = v->set.value;
             break;
+        case ASM_DIR_TYPE:
+            break;
+        case ASM_DIR_SIZE:
+            break;
         case ASM_LABEL:
             sym = getsym(v->label.name);
             if (sym->defined)

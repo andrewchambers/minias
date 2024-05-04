@@ -41,6 +41,10 @@ directive =
     { $$ = fd; }
   | sd:section-directive
     { $$ = sd; }
+  | type-directive
+    { $$.kind = ASM_DIR_TYPE; }
+  | size-directive
+    { $$.kind = ASM_DIR_SIZE; }
 
 fill-directive = 
   "fill" ws r:number ws? "," ws? s:number ws? "," ws? v:number
@@ -61,6 +65,9 @@ section-flags = '"' <[awx]*> '"' { $$.charptr = internstring(yytext); }
 section-type =
     "@nobits" { $$.i64 = SHT_NOBITS; }
   | "@progbits" { $$.i64 = SHT_PROGBITS; }
+
+type-directive = "type" ws ident "," ws "@function"
+size-directive = "size" ws ident "," ws ".-" ident
 
 label = 
   i:ident ':'

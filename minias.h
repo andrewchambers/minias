@@ -68,6 +68,8 @@ typedef enum {
     ASM_DIR_INT,
     ASM_DIR_QUAD,
     ASM_DIR_BALIGN,
+    ASM_DIR_TYPE,
+    ASM_DIR_SIZE,
     // Instructions.
     ASM_JMP,
     ASM_INSTR,
