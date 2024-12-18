@@ -918,6 +918,10 @@ addtosymtab(Symbol *sym)
 
     sym->idx = symtab->hdr.sh_size / symtab->hdr.sh_entsize;
 
+    if (!sym->section) {
+        sym->bind = STB_GLOBAL;
+    }
+
     elfsym.st_name = elfstr(strtab, sym->name);
     elfsym.st_value = sym->value.c;
     elfsym.st_size = sym->size;
