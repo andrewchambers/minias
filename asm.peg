@@ -142,6 +142,8 @@ instr =
   | i:ucomisd { $$ = i; }
   | i:ucomiss { $$ = i; }
   | i:nop     { $$ = i; }
+  | i:endbr32 { $$ = i; }
+  | i:endbr64 { $$ = i; }
 
 call = "call" 'q'? ws (
     '*' t:mem
@@ -200,6 +202,9 @@ cqto =  "cqto"  { $$ = OP(0x01004899); }
 leave = "leave" { $$ = OP(0xc9); }
 nop =   "nop"   { $$ = OP(0x90); }
 ret  =  "ret"   { $$ = OP(0xc3); }
+
+endbr64 = "endbr64" { $$ = OP(0xF30F1EFA); }
+endbr32 = "endbr32" { $$ = OP(0xF30F1EFB); }
 
 push = "push" (
     'q'? ws  s:r64 { $$ = R({.w=0}, -1, 0x50, s); }
