@@ -929,6 +929,15 @@ fillsymtab(void)
     Symbol *sym;
     size_t i;
 
+    /* Mark unknown symbols as global. */
+    for (i = 0; i < symbols->cap; i++) {
+        if (!symbols->keys[i].str)
+            continue;
+        sym = symbols->vals[i];
+        if (!sym->section)
+            sym->bind = STB_GLOBAL;
+    }
+
     /* Local symbols come first. */
     for (i = 0; i < symbols->cap; i++) {
         if (!symbols->keys[i].str)
