@@ -810,6 +810,10 @@ assemble(void)
             sym = getsym(v->set.sym);
             sym->value = v->set.value;
             break;
+        case ASM_DIR_TYPE:
+            break;
+        case ASM_DIR_SIZE:
+            break;
         case ASM_LABEL:
             sym = getsym(v->label.name);
             if (sym->defined)
@@ -913,6 +917,10 @@ addtosymtab(Symbol *sym)
     Elf64_Sym elfsym;
 
     sym->idx = symtab->hdr.sh_size / symtab->hdr.sh_entsize;
+
+    if (!sym->section) {
+        sym->bind = STB_GLOBAL;
+    }
 
     elfsym.st_name = elfstr(strtab, sym->name);
     elfsym.st_value = sym->value.c;
