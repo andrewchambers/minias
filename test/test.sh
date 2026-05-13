@@ -352,7 +352,7 @@ t () {
     echo "failed to assemble: $1"
     exit 1
   fi
-  clang "$tmpo" -o "$tmpb"
+  clang -no-pie "$tmpo" -o "$tmpb"
   if !"$tmpb" 1>&2 2>/dev/null
   then
     echo "$t failed"

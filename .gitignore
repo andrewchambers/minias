@@ -2,3 +2,6 @@
 minias
 *.o
 *.inc
+asm_parser.c
+asm_parser.h
+vendor/packcc/packcc

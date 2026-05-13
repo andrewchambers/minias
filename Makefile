@@ -4,6 +4,7 @@
 PREFIX=/usr/local
 BINDIR=$(PREFIX)/bin
 CFLAGS+=-D _GNU_SOURCE
+PACKCC=vendor/packcc/packcc
 
 -include config.mk
 
@@ -17,10 +18,15 @@ all: minias
 minias: $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $(OBJ)
 
-asm.peg.inc: asm.peg
-	leg -o $@ asm.peg
+$(PACKCC): vendor/packcc/packcc.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ vendor/packcc/packcc.c
 
-parse.o: asm.peg.inc
+asm_parser.c: asm.peg $(PACKCC)
+	$(PACKCC) -o asm_parser asm.peg
+
+asm_parser.h: asm_parser.c
+
+parse.o: asm_parser.c asm_parser.h
 main.o parse.o util.o: minias.h
 
 fmt:
@@ -35,7 +41,7 @@ check:
 	sh test/test.sh
 
 clean:
-	rm -f $(OBJ) minias asm.peg.inc
+	rm -f $(OBJ) minias asm_parser.c asm_parser.h $(PACKCC)
 
 install: minias
 	mkdir -p $(DESTDIR)$(BINDIR)

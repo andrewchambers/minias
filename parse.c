@@ -48,7 +48,7 @@ internstring(const char *s)
 }
 
 static String
-decodestring(char *s)
+decodestring(const char *s)
 {
     char *end;
     size_t len = 0;
@@ -272,24 +272,22 @@ needsmovabs(Imm *imm)
 #define REG(K)                                                                 \
     (Parsev) { .kind = ASM_##K }
 
-#define YYSTYPE Parsev
-#define YY_CTX_LOCAL
-#define YY_CTX_MEMBERS Parsev v;
-#include "asm.peg.inc"
+#include "asm_parser.c"
 
 AsmLine *
 parseasm(void)
 {
     AsmLine *result, *l, *prevl;
-    yycontext ctx;
+    asm_context_t *ctx;
+    Parsev v;
 
-    memset(&ctx, 0, sizeof(yycontext));
+    ctx = asm_create(NULL);
     result = NULL;
     prevl = NULL;
 
-    while (yyparse(&ctx)) {
+    while (asm_parse(ctx, &v)) {
         l = zalloc(sizeof(AsmLine));
-        l->v = internparsev(&ctx.v);
+        l->v = internparsev(&v);
         if (prevl)
             prevl->next = l;
         else
@@ -297,5 +295,6 @@ parseasm(void)
         prevl = l;
     }
 
+    asm_destroy(ctx);
     return result;
 }
