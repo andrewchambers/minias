@@ -68,8 +68,14 @@ directive <-
     { $$.dirquad = (Quad){.kind = ASM_DIR_QUAD, .value = v.value }; }
   / "set" ws s:ident ws? ',' ws? v:value
     { $$.set = (Set){.kind = ASM_DIR_SET, .sym = s.charptr, .value = v.value }; }
+  / "local" ws s:ident
+    { $$.weak = (Weak){.kind = ASM_DIR_LOCAL, .sym = s.charptr}; }
   / "weak" ws s:ident
     { $$.weak = (Weak){.kind = ASM_DIR_WEAK, .sym = s.charptr}; }
+  / "comm" ws s:ident ws? ',' ws? z:number ws? ',' ws? a:number
+    { $$.comm = (Comm){.kind = ASM_DIR_COMM, .sym = s.charptr, .size = z.i64, .align = a.i64}; }
+  / "comm" ws s:ident ws? ',' ws? z:number
+    { $$.comm = (Comm){.kind = ASM_DIR_COMM, .sym = s.charptr, .size = z.i64}; }
   / "file" ws number ws? ',' ws? string
     { $$.kind = ASM_BLANK; }
   / "file" ws string
@@ -198,6 +204,8 @@ instr <-
         / i:cvttpd2dq { $$ = i; }
         / i:cvttsd2si { $$ = i; }
         / i:cvttss2si { $$ = i; }
+        / i:cbtw      { $$ = i; }
+        / i:cwtd      { $$ = i; }
         / i:cltd      { $$ = i; }
         / i:cltq      { $$ = i; }
         / i:cwtl      { $$ = i; }
@@ -235,6 +243,7 @@ instr <-
   / i:orpd  { $$ = i; }
   / i:or    { $$ = i; }
   / i:bswap { $$ = i; }
+  / i:btc   { $$ = i; }
   / i:bts   { $$ = i; }
   / i:btr   { $$ = i; }
   / i:bt    { $$ = i; }
@@ -348,6 +357,7 @@ instr <-
   / i:divsd   { $$ = i; }
   / i:packuswb { $$ = i; }
   / i:paddb   { $$ = i; }
+  / i:paddw   { $$ = i; }
   / i:paddd   { $$ = i; }
   / i:paddq   { $$ = i; }
   / i:pand    { $$ = i; }
@@ -359,6 +369,7 @@ instr <-
   / i:pcmpgtw { $$ = i; }
   / i:pcmpgtd { $$ = i; }
   / i:pextrw  { $$ = i; }
+  / i:pinsrw  { $$ = i; }
   / i:pmullw  { $$ = i; }
   / i:pmuludq { $$ = i; }
   / i:por     { $$ = i; }
@@ -465,6 +476,8 @@ condition_code <-
     / "a"   { $$.i64 = 29; }
 
 
+cbtw <-  "cbtw"  { $$ = OP(0x01006698); }
+cwtd <-  "cwtd"  { $$ = OP(0x01006699); }
 cltd <-  "cltd"  { $$ = OP(0x99); }
 cltq <-  "cltq"  { $$ = OP(0x01004898); }
 cwtl <-  "cwtl"  { $$ = OP(0x98); }
@@ -742,6 +755,13 @@ btr <- "btr" (
   / 'w'  ws i:imm8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, 0x01000fba, 0x06, i, d); }
   / 'l'  ws i:imm8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x01000fba, 0x06, i, d); }
   / 'q'  ws i:imm8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, 0x01000fba, 0x06, i, d); }
+
+  / 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = REGREG({.w=0}, 0x66, 0x01000fb3, s, d); }
+  / 'l'? ws s:r32 ws? ',' ws? d:r32 { $$ = REGREG({.w=0},   -1, 0x01000fb3, s, d); }
+  / 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = REGREG({.w=1},   -1, 0x01000fb3, s, d); }
+  / 'w'  ws s:r16 ws? ',' ws? d:mem { $$ = REGMEM({.w=0}, 0x66, 0x01000fb3, s, d); }
+  / 'l'  ws s:r32 ws? ',' ws? d:mem { $$ = REGMEM({.w=0},   -1, 0x01000fb3, s, d); }
+  / 'q'  ws s:r64 ws? ',' ws? d:mem { $$ = REGMEM({.w=1},   -1, 0x01000fb3, s, d); }
 )
 
 bts <- "bts" (
@@ -758,6 +778,22 @@ bts <- "bts" (
   / 'w'  ws s:r16 ws? ',' ws? d:mem { $$ = REGMEM({.w=0}, 0x66, 0x01000fab, s, d); }
   / 'l'  ws s:r32 ws? ',' ws? d:mem { $$ = REGMEM({.w=0},   -1, 0x01000fab, s, d); }
   / 'q'  ws s:r64 ws? ',' ws? d:mem { $$ = REGMEM({.w=1},   -1, 0x01000fab, s, d); }
+)
+
+btc <- "btc" (
+    'w'? ws i:imm8 ws? ',' ws? d:r16 { $$ = IMMREG({.w=0}, 0x66, 0x01000fba, 0x07, i, d); }
+  / 'l'? ws i:imm8 ws? ',' ws? d:r32 { $$ = IMMREG({.w=0},   -1, 0x01000fba, 0x07, i, d); }
+  / 'q'? ws i:imm8 ws? ',' ws? d:r64 { $$ = IMMREG({.w=1},   -1, 0x01000fba, 0x07, i, d); }
+  / 'w'  ws i:imm8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0}, 0x66, 0x01000fba, 0x07, i, d); }
+  / 'l'  ws i:imm8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=0},   -1, 0x01000fba, 0x07, i, d); }
+  / 'q'  ws i:imm8 ws? ',' ws? d:mem { $$ = IMMMEM({.w=1},   -1, 0x01000fba, 0x07, i, d); }
+
+  / 'w'? ws s:r16 ws? ',' ws? d:r16 { $$ = REGREG({.w=0}, 0x66, 0x01000fbb, s, d); }
+  / 'l'? ws s:r32 ws? ',' ws? d:r32 { $$ = REGREG({.w=0},   -1, 0x01000fbb, s, d); }
+  / 'q'? ws s:r64 ws? ',' ws? d:r64 { $$ = REGREG({.w=1},   -1, 0x01000fbb, s, d); }
+  / 'w'  ws s:r16 ws? ',' ws? d:mem { $$ = REGMEM({.w=0}, 0x66, 0x01000fbb, s, d); }
+  / 'l'  ws s:r32 ws? ',' ws? d:mem { $$ = REGMEM({.w=0},   -1, 0x01000fbb, s, d); }
+  / 'q'  ws s:r64 ws? ',' ws? d:mem { $$ = REGMEM({.w=1},   -1, 0x01000fbb, s, d); }
 )
 
 bt <- "bt" (
@@ -2385,6 +2421,11 @@ pcmpgtd <- "pcmpgtd" (
 pextrw <- "pextrw" ws i:imm8 ws? ',' ws? s:xmm ws? ',' ws? d:r32
   { $$ = IMMREGREG2({.w=0}, 0x66, 0x01000fc5, i, s, d); }
 
+pinsrw <- "pinsrw" (
+    ws i:imm8 ws? ',' ws? s:r32 ws? ',' ws? d:xmm { $$ = IMMREGREG2({.w=0}, 0x66, 0x01000fc4, i, s, d); }
+  / ws i:imm8 ws? ',' ws? s:mem ws? ',' ws? d:xmm { $$ = IMMMEMREG({.w=0}, 0x66, 0x01000fc4, i, s, d); }
+)
+
 packuswb <- "packuswb" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = REGREG2({.w=0}, 0x66, 0x01000f67, s, d); }
   / ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG ({.w=0}, 0x66, 0x01000f67, s, d); }
@@ -2393,6 +2434,11 @@ packuswb <- "packuswb" (
 paddb <- "paddb" (
     ws s:xmm ws? ',' ws? d:xmm { $$ = REGREG2({.w=0}, 0x66, 0x01000ffc, s, d); }
   / ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG ({.w=0}, 0x66, 0x01000ffc, s, d); }
+)
+
+paddw <- "paddw" (
+    ws s:xmm ws? ',' ws? d:xmm { $$ = REGREG2({.w=0}, 0x66, 0x01000ffd, s, d); }
+  / ws s:mem ws? ',' ws? d:xmm { $$ = MEMREG ({.w=0}, 0x66, 0x01000ffd, s, d); }
 )
 
 paddd <- "paddd" (

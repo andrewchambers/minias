@@ -378,6 +378,63 @@ assembleconstant(int64_t c, int nbytes)
     }
 }
 
+static void
+alignsection(Section *s, uint64_t align)
+{
+    int64_t amnt, i, offset, rem;
+    uint64_t risk;
+
+    if (align == 0)
+        return;
+    if (align > INT64_MAX)
+        lfatal("unsupported alignment '%llu'", (unsigned long long)align);
+    if (s->hdr.sh_addralign < align)
+        s->hdr.sh_addralign = align;
+    risk = align - 1;
+    if (risk <= INT64_MAX && s->align_risk <= INT64_MAX - (int64_t)risk)
+        s->align_risk += (int64_t)risk;
+    else
+        s->align_risk = INT64_MAX;
+
+    amnt = 0;
+    offset = s->hdr.sh_size;
+    rem = offset % (int64_t)align;
+    if (rem)
+        amnt = (int64_t)align - rem;
+    for (i = 0; i < amnt; i++)
+        secaddbyte(s, s->hdr.sh_flags & SHF_EXECINSTR ? 0x90 : 0x00);
+}
+
+static void
+definebsscomm(Symbol *sym, int64_t size, uint64_t align)
+{
+    if (sym->defined)
+        lfatal("%s already defined", sym->name);
+    alignsection(bss, align);
+    sym->defined = 1;
+    sym->section = bss;
+    sym->value.c = bss->hdr.sh_size;
+    sym->wco = sym->value.c;
+    sym->wco_align_risk = bss->align_risk;
+    sym->size = size;
+    sym->type = STT_OBJECT;
+    while (size-- > 0)
+        secaddbyte(bss, 0);
+}
+
+static uint64_t
+commalign(int64_t size, int64_t align)
+{
+    uint64_t a;
+
+    if (align > 0)
+        return (uint64_t)align;
+    a = 1;
+    while (a < (uint64_t)size && a < 16)
+        a *= 2;
+    return a;
+}
+
 /* The VarBytes type encodes a variable number of bytes.
    The top byte is how many bytes we encode less 1.
 
@@ -934,10 +991,17 @@ assemble(void)
         case ASM_DIR_GLOBL:
             sym = getsym(v->globl.name);
             sym->bind = STB_GLOBAL;
+            sym->force_local = 0;
+            break;
+        case ASM_DIR_LOCAL:
+            sym = getsym(v->weak.sym);
+            sym->bind = STB_LOCAL;
+            sym->force_local = 1;
             break;
         case ASM_DIR_WEAK:
             sym = getsym(v->weak.sym);
             sym->bind = STB_WEAK;
+            sym->force_local = 0;
             break;
         case ASM_DIR_HIDDEN:
             sym = getsym(v->weak.sym);
@@ -1003,26 +1067,7 @@ assemble(void)
             sb(0x00);
             break;
         case ASM_DIR_BALIGN: {
-            int64_t offset, i, rem, amnt;
-            uint64_t risk;
-            amnt = 0;
-            if (v->balign.align == 0)
-                break;
-            if (cursection->hdr.sh_addralign < v->balign.align)
-                cursection->hdr.sh_addralign = v->balign.align;
-            risk = v->balign.align - 1;
-            if (risk <= INT64_MAX
-                && cursection->align_risk <= INT64_MAX - (int64_t)risk)
-                cursection->align_risk += (int64_t)risk;
-            else
-                cursection->align_risk = INT64_MAX;
-            offset = cursection->hdr.sh_size;
-            rem = offset % v->balign.align;
-            if (rem)
-                amnt = v->balign.align - rem;
-            for (i = 0; i < amnt; i++) {
-                sb(cursection->hdr.sh_flags & SHF_EXECINSTR ? 0x90 : 0x00);
-            }
+            alignsection(cursection, v->balign.align);
             break;
         }
         case ASM_DIR_FILL: {
@@ -1057,6 +1102,27 @@ assemble(void)
         case ASM_DIR_SET:
             sym = getsym(v->set.sym);
             sym->value = v->set.value;
+            break;
+        case ASM_DIR_COMM:
+            if (v->comm.size < 0)
+                lfatal("negative .comm size '%ld'", v->comm.size);
+            if (v->comm.align < 0)
+                lfatal("negative .comm alignment '%ld'", v->comm.align);
+            sym = getsym(v->comm.sym);
+            if (sym->force_local) {
+                definebsscomm(
+                    sym, v->comm.size, commalign(v->comm.size, v->comm.align));
+            } else {
+                if (sym->defined)
+                    lfatal("%s already defined", sym->name);
+                sym->defined = 1;
+                sym->common = 1;
+                sym->value.c = commalign(v->comm.size, v->comm.align);
+                sym->size = v->comm.size;
+                sym->type = STT_OBJECT;
+                if (sym->bind == STB_LOCAL)
+                    sym->bind = STB_GLOBAL;
+            }
             break;
         case ASM_DIR_TYPE:
             break;
@@ -1172,7 +1238,8 @@ addtosymtab(Symbol *sym)
 
     sym->idx = symtab->hdr.sh_size / symtab->hdr.sh_entsize;
 
-    if (!sym->section && sym->bind == STB_LOCAL) {
+    if (!sym->section && !sym->common && sym->bind == STB_LOCAL
+        && !sym->force_local) {
         sym->bind = STB_GLOBAL;
     }
 
@@ -1180,7 +1247,9 @@ addtosymtab(Symbol *sym)
     elfsym.st_value = sym->value.c;
     elfsym.st_size = sym->size;
     elfsym.st_info = ELF64_ST_INFO(sym->bind, sym->type);
-    elfsym.st_shndx = sym->section ? sym->section->idx : SHN_UNDEF;
+    elfsym.st_shndx = sym->common ? SHN_COMMON
+                                  : sym->section ? sym->section->idx
+                                                 : SHN_UNDEF;
     elfsym.st_other = ELF64_ST_VISIBILITY(sym->visibility);
     secaddbytes(symtab, &elfsym, sizeof(Elf64_Sym));
 }
@@ -1196,7 +1265,8 @@ fillsymtab(void)
         if (!symbols->keys[i].str)
             continue;
         sym = symbols->vals[i];
-        if (!sym->section && sym->bind == STB_LOCAL)
+        if (!sym->section && !sym->common && sym->bind == STB_LOCAL
+            && !sym->force_local)
             sym->bind = STB_GLOBAL;
     }
 

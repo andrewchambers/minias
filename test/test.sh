@@ -90,6 +90,32 @@ fi
 echo -n "."
 must_fail ".bss\n.byte 1"
 must_fail ".bss\n.quad foo"
+echo -e ".comm x,4,4" > "$tmps"
+if ! ./minias < "$tmps" > "$tmpo"
+then
+  echo "failed to assemble .comm directive"
+  exit 1
+fi
+if ! readelf -Ws "$tmpo" | grep -q "GLOBAL DEFAULT  COM x"
+then
+  echo "expected common symbol for .comm directive"
+  readelf -Ws "$tmpo"
+  exit 1
+fi
+echo -n "."
+echo -e ".local x\n.comm x,4,4" > "$tmps"
+if ! ./minias < "$tmps" > "$tmpo"
+then
+  echo "failed to assemble local .comm directive"
+  exit 1
+fi
+if ! readelf -Ws "$tmpo" | grep -q "OBJECT  LOCAL .* x"
+then
+  echo "expected local object symbol for local .comm directive"
+  readelf -Ws "$tmpo"
+  exit 1
+fi
+echo -n "."
 t "1: jmp 1b"
 t "1: jmp 1f\n1: nop"
 t "movb %ah, %bl"
@@ -218,6 +244,8 @@ do
 done
 
 t "ret"
+t "cbtw"
+t "cwtd"
 t "cltd"
 t "cqto"
 
@@ -484,7 +512,9 @@ t "psrldq \$3, %xmm1"
 t "bsf %eax, %ebx"
 t "bsr %eax, %ebx"
 t "btr \$3, %eax"
+t "btr %eax, %ebx"
 t "bts \$3, %eax"
+t "btc \$3, %eax"
 t "bt \$3, %eax"
 t "bswap %eax"
 t "not %rax"
@@ -555,7 +585,7 @@ xmm_smoke_ops="
   movupd movdqa movdqu mulpd comiss comisd
   por orpd orps pand pandn pcmpeqb pcmpeqw
   pcmpeqd pmuludq pmullw pcmpgtb pcmpgtw
-  pcmpgtd packuswb paddb paddd paddq psubq
+  pcmpgtd packuswb paddb paddw paddd paddq psubq
   psubd punpcklbw punpcklwd punpckldq
   punpckhbw punpckhdq punpckhwd punpckhqdq
   punpcklqdq unpcklpd unpckhpd unpcklps
@@ -579,3 +609,4 @@ t "movd %xmm0, %eax"
 t "movmskpd %xmm0, %eax"
 t "movmskps %xmm0, %eax"
 t "pextrw \$3, %xmm0, %eax"
+t "pinsrw \$0, 54(%rax), %xmm0"

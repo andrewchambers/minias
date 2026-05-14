@@ -47,6 +47,8 @@ typedef struct {
     int type;
     int visibility;
     int defined;
+    int force_local;
+    int common;
     Section *section;
 } Symbol;
 
@@ -70,9 +72,11 @@ typedef enum {
     ASM_MEMARG,
     // Directives.
     ASM_DIR_GLOBL,
+    ASM_DIR_LOCAL,
     ASM_DIR_WEAK,
     ASM_DIR_HIDDEN,
     ASM_DIR_PROTECTED,
+    ASM_DIR_COMM,
     ASM_DIR_SECTION,
     ASM_DIR_ASCII,
     ASM_DIR_ASCIIZ,
@@ -221,6 +225,13 @@ typedef struct Weak {
     const char *sym;
 } Weak;
 
+typedef struct Comm {
+    AsmKind kind;
+    const char *sym;
+    int64_t size;
+    int64_t align;
+} Comm;
+
 typedef struct DirSection {
     AsmKind kind;
     int32_t type;
@@ -352,6 +363,7 @@ union Parsev {
     Fill fill;
     Set set;
     Weak weak;
+    Comm comm;
     Byte dirbyte;
     Short dirshort;
     Int dirint;
