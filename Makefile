@@ -1,8 +1,9 @@
 .POSIX:
-.PHONY: all clean
+.PHONY: all clean install
 
 PREFIX=/usr/local
 BINDIR=$(PREFIX)/bin
+MANDIR=$(PREFIX)/share/man/man1
 CFLAGS+=-D _GNU_SOURCE
 MINIPEG=vendor/minipeg/minipeg
 
@@ -41,7 +42,9 @@ check: minias
 clean:
 	rm -f $(OBJ) minias asm_parser.c asm_parser.h $(MINIPEG)
 
-install: minias
+install: minias minias.1
 	mkdir -p $(DESTDIR)$(BINDIR)
+	mkdir -p $(DESTDIR)$(MANDIR)
 	cp minias $(DESTDIR)$(BINDIR)/
 	ln -s ./minias $(DESTDIR)$(BINDIR)/minias-x86-64
+	cp minias.1 $(DESTDIR)$(MANDIR)/

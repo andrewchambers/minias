@@ -1,0 +1,61 @@
+.TH MINIAS 1 "May 2026" "minias"
+.SH NAME
+minias \- small x86-64 assembler
+.SH SYNOPSIS
+.B minias
+.RB [ \-h ]
+.RB [ \-r
+.IR iter ]
+.RB [ \-o
+.IR output ]
+.RI [ input ]
+.SH DESCRIPTION
+.B minias
+assembles AT&T-syntax x86-64 assembly into an ELF64 relocatable object.
+It is intended to support a reasonable practical set of assembly,
+including compiler output from GCC, Clang, cproc/QBE, and chibicc,
+rather than to
+implement every feature of GNU
+.BR as (1).
+.PP
+If
+.I input
+is omitted or is
+.BR \- ,
+.B minias
+reads assembly from standard input.  If
+.B \-o
+is omitted, the object file is written to standard output.
+.SH OPTIONS
+.TP
+.B \-h
+Print usage information and exit.
+.TP
+.BI \-o " output"
+Write the generated object file to
+.IR output .
+.TP
+.BI \-r " iter"
+Run
+.I iter
+jump relaxation passes after the initial assembly pass.
+The default is 1.
+.SH INPUT SYNTAX
+.B minias
+accepts a practical subset of GNU-style AT&T x86-64 assembly, including
+labels, local numeric labels, common ELF directives, relocations, data
+directives, and instruction forms used by real programs.
+.SH LIMITATIONS
+.B minias
+only targets x86-64 ELF relocatable output.
+It does not aim to assemble other architectures or every extension
+accepted by GNU
+.BR as (1).
+.SH EXAMPLES
+.EX
+minias -o file.o file.s
+cc -S -O2 file.c -o - | minias -o file.o -
+.EE
+.SH SEE ALSO
+.BR as (1),
+.BR cc (1)
