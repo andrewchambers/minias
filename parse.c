@@ -386,7 +386,43 @@ stringopcode(int64_t segment, int32_t opcode)
 #define REG(K)                                                                 \
     (Parsev) { .kind = ASM_##K }
 
+#define YY_CTX_LOCAL 1
+#define YYSTYPE Parsev
+#define YY_PARSE(T) static T
+#define YYPARSE asm_parse_internal
+#define YYRELEASE asm_release
 #include "asm_parser.c"
+#undef __
+#undef YYRELEASE
+#undef YYPARSE
+#undef YY_PARSE
+#undef YYSTYPE
+#undef YY_CTX_LOCAL
+
+typedef yycontext asm_context_t;
+
+static asm_context_t *
+asm_create(void *aux)
+{
+    (void)aux;
+    return zalloc(sizeof(asm_context_t));
+}
+
+static int
+asm_parse(asm_context_t *ctx, Parsev *out)
+{
+    if (!asm_parse_internal(ctx))
+        return 0;
+    *out = ctx->__;
+    return 1;
+}
+
+static void
+asm_destroy(asm_context_t *ctx)
+{
+    asm_release(ctx);
+    free(ctx);
+}
 
 static void
 appendasmline(AsmLine **result, AsmLine **prevl, const Parsev *v,
