@@ -98,6 +98,8 @@ must_fail "movb %ah, %r8b"
 must_fail "movb %ah, (%r8)"
 reloc_must_contain "movl foo@GOTPCREL(%rip), %eax" "R_X86_64_GOTPCRELX"
 reloc_must_contain "movq foo@GOTPCREL(%rip), %rax" "R_X86_64_REX_GOTPCRELX"
+reloc_must_contain ".globl foo\nfoo:\nret\ncall foo" "foo"
+reloc_must_contain ".weak foo\nfoo:\nret\ncall foo" "foo"
 must_fail ".quad foo@GOTPCREL"
 t "testl -740(%rbp), %r11d"
 t "movss  %xmm15,-0x128(%rbp)"
@@ -437,6 +439,17 @@ do
   t "$op"
   t "rep $op"
 done
+for op in outsb outsw outsl insb insw insl
+do
+  t "$op"
+  t "rep $op"
+done
+t "outb %al, %dx"
+t "outw %ax, %dx"
+t "outl %eax, %dx"
+t "inb %dx, %al"
+t "inw %dx, %ax"
+t "inl %dx, %eax"
 t "movsb (%rsi), %es:(%rdi)"
 t "rep movsb %ds:(%rsi), (%rdi)"
 t "rep movsw (%rsi), %es:(%rdi)"

@@ -257,6 +257,8 @@ instr <-
   / i:idiv  { $$ = i; }
   / i:lea   { $$ = i; }
   / i:imul  { $$ = i; }
+  / i:ins   { $$ = i; }
+  / i:in    { $$ = i; }
   / i:inc   { $$ = i; }
   / i:dec   { $$ = i; }
   / i:neg   { $$ = i; }
@@ -389,6 +391,8 @@ instr <-
   / i:ucomisd { $$ = i; }
   / i:ucomiss { $$ = i; }
   / i:nop     { $$ = i; }
+  / i:outs    { $$ = i; }
+  / i:out     { $$ = i; }
   / i:endbr32 { $$ = i; }
   / i:endbr64 { $$ = i; }
 
@@ -526,6 +530,12 @@ rep <- "rep" (
         / invalid_string_operands { $$ = INVALID_STRING_OPERANDS; }
         / { $$ = OP(0x02f348ab); }
       )
+      / "outsb" { $$ = OPP(0xf3, 0x6e); }
+      / "outsw" { $$ = OPP(0xf3, 0x0100666f); }
+      / "outsl" { $$ = OPP(0xf3, 0x6f); }
+      / "insb"  { $$ = OPP(0xf3, 0x6c); }
+      / "insw"  { $$ = OPP(0xf3, 0x0100666d); }
+      / "insl"  { $$ = OPP(0xf3, 0x6d); }
     )
   / { $$ = OP(0xf3); }
 )
@@ -592,6 +602,30 @@ stos <- "stos" (
       / invalid_string_operands { $$ = INVALID_STRING_OPERANDS; }
       / { $$ = OP(0x010048ab); }
     )
+)
+
+out <- "out" (
+    'b' ws "%al"  ws? ',' ws? "%dx" { $$ = OP(0xee); }
+  / 'w' ws "%ax"  ws? ',' ws? "%dx" { $$ = OP(0x010066ef); }
+  / 'l' ws "%eax" ws? ',' ws? "%dx" { $$ = OP(0xef); }
+)
+
+in <- "in" (
+    'b' ws "%dx" ws? ',' ws? "%al"  { $$ = OP(0xec); }
+  / 'w' ws "%dx" ws? ',' ws? "%ax"  { $$ = OP(0x010066ed); }
+  / 'l' ws "%dx" ws? ',' ws? "%eax" { $$ = OP(0xed); }
+)
+
+outs <- "outs" (
+    'b' { $$ = OP(0x6e); }
+  / 'w' { $$ = OP(0x0100666f); }
+  / 'l' { $$ = OP(0x6f); }
+)
+
+ins <- "ins" (
+    'b' { $$ = OP(0x6c); }
+  / 'w' { $$ = OP(0x0100666d); }
+  / 'l' { $$ = OP(0x6d); }
 )
 
 stmxcsr <- "stmxcsr" ws d:mem

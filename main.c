@@ -692,7 +692,8 @@ assemblejmp(const Jmp *j)
     longsize = j->cc ? 6 : 5;
     target = getsym(j->target);
 
-    if (cursection == target->section && target->wco != -1) {
+    if (target->bind == STB_LOCAL && cursection == target->section
+        && target->wco != -1) {
         distance = target->wco - cursection->hdr.sh_size;
         risk = 0;
         if (distance >= 0
@@ -1233,7 +1234,7 @@ resolvereloc(Relocation *reloc)
 
     sym = reloc->sym;
 
-    if (sym->section != reloc->section)
+    if (sym->section != reloc->section || sym->bind != STB_LOCAL)
         return 0;
 
     switch (reloc->type) {
