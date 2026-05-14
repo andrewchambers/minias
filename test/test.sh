@@ -30,7 +30,75 @@ t () {
   echo -n "."
 }
 
+must_fail () {
+  echo -e "$1" > "$tmps"
+  if ./minias < "$tmps" > "$tmpo" 2>"$tmpb"
+  then
+    echo ""
+    echo "unexpectedly assembled: $1"
+    exit 1
+  fi
+  echo -n "."
+}
+
+must_fail_containing () {
+  echo -e "$1" > "$tmps"
+  if ./minias < "$tmps" > "$tmpo" 2>"$tmpb"
+  then
+    echo ""
+    echo "unexpectedly assembled: $1"
+    exit 1
+  fi
+  if ! grep -q "$2" "$tmpb"
+  then
+    echo ""
+    echo "expected error containing '$2' for: $1"
+    cat "$tmpb"
+    exit 1
+  fi
+  echo -n "."
+}
+
+reloc_must_contain () {
+  echo -e "$1" > "$tmps"
+  if ! ./minias < "$tmps" > "$tmpo"
+  then
+    echo "failed to assemble: $1"
+    exit 1
+  fi
+  if ! readelf -Wr "$tmpo" | grep -q "$2"
+  then
+    echo ""
+    echo "expected relocation $2 for: $1"
+    readelf -Wr "$tmpo"
+    exit 1
+  fi
+  echo -n "."
+}
+
 # Various regression tests first.
+printf "ret\n" | ./minias -o "$tmpo" -
+t "ud2"
+t "movl \$3735936685>>32, 4+-16(%rbp)"
+t "movsd \".Lfp3\"(%rip), %xmm1\n.Lfp3:\n.quad 0"
+echo -e ".bss\n.balign 1\nx:\n.fill 2,1,0" > "$tmps"
+if ! ./minias < "$tmps" > "$tmpo"
+then
+  echo "failed to assemble .bss directive"
+  exit 1
+fi
+echo -n "."
+must_fail ".bss\n.byte 1"
+must_fail ".bss\n.quad foo"
+t "1: jmp 1b"
+t "1: jmp 1f\n1: nop"
+t "movb %ah, %bl"
+t "movb %ah, (%rax)"
+must_fail "movb %ah, %r8b"
+must_fail "movb %ah, (%r8)"
+reloc_must_contain "movl foo@GOTPCREL(%rip), %eax" "R_X86_64_GOTPCRELX"
+reloc_must_contain "movq foo@GOTPCREL(%rip), %rax" "R_X86_64_REX_GOTPCRELX"
+must_fail ".quad foo@GOTPCREL"
 t "testl -740(%rbp), %r11d"
 t "movss  %xmm15,-0x128(%rbp)"
 t "xchgq %r13, %rax"
@@ -167,6 +235,14 @@ do
   t "l:\n .fill 1, 1, 0x00 \nj${cc} l"
   t "j${cc} l\n .fill 1, 1, 0x00 \nl:"
 done
+
+echo -e ".fill 14, 1, 0x90\njz l\n.fill 120, 1, 0x90\n.p2align 4\nl:\nnop" > "$tmps"
+if ! ./minias < "$tmps" > "$tmpo"
+then
+  echo "failed to relax forward jump across alignment"
+  exit 1
+fi
+echo -n "."
 
 # Check boundary on jump relaxing.
 for fill in 0 $(seq 120 140)
@@ -346,22 +422,147 @@ do
   done
 done
 
-t () {
-  if ! ./minias < "$1" > "$tmpo"
-  then
-    echo "failed to assemble: $1"
-    exit 1
-  fi
-  clang -no-pie "$tmpo" -o "$tmpb"
-  if !"$tmpb" 1>&2 2>/dev/null
-  then
-    echo "$t failed"
-    exit 1
-  fi
-  echo -n "."
-}
-
-for tc in $(echo test/execute/*.s)
+# Smoke tests for supported instruction mnemonics that are not covered by the
+# variant-heavy loops above.
+for op in cltq cwtl cld std syscall leave hlt pause wait endbr64 endbr32
 do
-  t "$tc"
+  t "$op"
 done
+
+t "rep"
+t "rep ret"
+t "rep bsf %eax, %ebx"
+for op in movsb movsw movsl movsq stosb stosw stosl stosq
+do
+  t "$op"
+  t "rep $op"
+done
+t "movsb (%rsi), %es:(%rdi)"
+t "rep movsb %ds:(%rsi), (%rdi)"
+t "rep movsw (%rsi), %es:(%rdi)"
+t "rep movsl (%rsi), %es:(%rdi)"
+t "rep movsq (%rsi), %es:(%rdi)"
+t "rep movsb %cs:(%rsi), %es:(%rdi)"
+t "rep movsb %ss:(%rsi), %es:(%rdi)"
+t "rep movsb %es:(%rsi), %es:(%rdi)"
+t "rep movsb %fs:(%rsi), %es:(%rdi)"
+t "rep movsq %gs:(%rsi), %es:(%rdi)"
+t "movsw %fs:(%rsi), %es:(%rdi)"
+t "movsq %gs:(%rsi), %es:(%rdi)"
+t "stosb %al, %es:(%rdi)"
+t "rep stosw %ax, %es:(%rdi)"
+t "rep stosl %eax, (%rdi)"
+t "rep stosq %rax, %es:(%rdi)"
+must_fail_containing "rep movsb (%rax), %es:(%rdi)" "invalid string instruction operands"
+must_fail_containing "rep movsb (%rsi), %fs:(%rdi)" "invalid string instruction operands"
+must_fail_containing "rep stosb (%rax), %es:(%rbx)" "invalid string instruction operands"
+must_fail_containing "rep stosq %eax, %es:(%rdi)" "invalid string instruction operands"
+
+t "stmxcsr (%rax)"
+t "ldmxcsr (%rax)"
+t "shufps \$3, %xmm0, %xmm1"
+t "shufpd \$3, %xmm0, %xmm1"
+t "cmpltsd %xmm0, %xmm1"
+t "pshufd \$3, %xmm0, %xmm1"
+t "pshuflw \$3, %xmm0, %xmm1"
+t "pshufhw \$3, %xmm0, %xmm1"
+t "psrldq \$3, %xmm1"
+
+t "bsf %eax, %ebx"
+t "bsr %eax, %ebx"
+t "btr \$3, %eax"
+t "bts \$3, %eax"
+t "bt \$3, %eax"
+t "bswap %eax"
+t "not %rax"
+t "inc %rax"
+t "dec %rax"
+t "xadd %eax, %ebx"
+t "cmpxchg %eax, %ebx"
+t "adcq %rax, %rbx"
+t "sbbq %rax, %rbx"
+t "rol \$3, %rax"
+t "ror \$3, %rax"
+t "shrd \$3, %eax, %ebx"
+t "shld \$3, %eax, %ebx"
+t "lock addl %eax, (%rax)"
+t "movabsq \$17293822569102704639, %rax"
+
+for cc in $conditioncodes
+do
+  t "cmov${cc} %eax, %ebx"
+done
+
+x87ops="
+  f2xm1 fabs faddp fpatan fprem fprem1
+  frndint fscale fsqrt fyl2x fyl2xp1
+  fld1 fldl2e fldlg2 fldln2 fldz
+  fdivp fdivrp fnclex fchs fmulp
+  fsubp fsubrp fxch
+"
+for op in $x87ops
+do
+  t "$op"
+done
+
+for op in fadd fdiv fdivr fmul fsub fsubr fld
+do
+  t "${op} %st(1)"
+done
+t "fstp %st(1)"
+
+for op in fcomi fcomip fcompi fucomi fucomip fucompi
+do
+  t "${op} %st(1), %st"
+done
+
+for cc in nbe nb ne nu be b e u
+do
+  t "fcmov${cc} %st(1), %st"
+done
+
+x87memops="
+  faddl fadds fldcw fldenv fldl flds fldt
+  fdivl fdivs fdivrl fildl fildq fildll
+  fimull fiaddl fidivl fidivrl fisubl fisubrl
+  fistl fistpll fistpl fistpq fisttpll
+  fnstcw fnstenv fstcw fsts fstl fstpl fstps
+  fstpt fmuls fmull fsubl fsubs fsubrs
+"
+for op in $x87memops
+do
+  t "${op} (%rax)"
+done
+t "fnstsw %ax"
+
+xmm_smoke_ops="
+  addpd andpd andps andnpd andnps subpd
+  sqrtsd sqrtss cvtdq2pd cvttpd2dq
+  maxsd maxss minsd minss movups movapd
+  movupd movdqa movdqu mulpd comiss comisd
+  por orpd orps pand pandn pcmpeqb pcmpeqw
+  pcmpeqd pmuludq pmullw pcmpgtb pcmpgtw
+  pcmpgtd packuswb paddb paddd paddq psubq
+  psubd punpcklbw punpcklwd punpckldq
+  punpckhbw punpckhdq punpckhwd punpckhqdq
+  punpcklqdq unpcklpd unpckhpd unpcklps
+  unpckhps psrlw psrld psrlq psrad
+  psllw pslld psllq
+"
+for op in $xmm_smoke_ops
+do
+  t "${op} %xmm0, %xmm1"
+done
+
+t "cvtsd2si %xmm0, %eax"
+t "cvtss2si %xmm0, %eax"
+t "movhps (%rax), %xmm1"
+t "movhpd (%rax), %xmm1"
+t "movlpd (%rax), %xmm1"
+t "movlps (%rax), %xmm1"
+t "movhlps %xmm0, %xmm1"
+t "movlhps %xmm0, %xmm1"
+t "movd %xmm0, %eax"
+t "movmskpd %xmm0, %eax"
+t "movmskps %xmm0, %eax"
+t "pextrw \$3, %xmm0, %eax"

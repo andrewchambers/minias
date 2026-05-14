@@ -14,7 +14,7 @@ static Relocation *relocs = NULL;
 static size_t nrelocs = 0;
 static size_t reloccap = 0;
 
-#define MAXSECTIONS 32
+#define MAXSECTIONS 512
 static Section sections[MAXSECTIONS];
 static size_t nsections = 1; // first is reserved.
 
@@ -57,6 +57,7 @@ getsym(const char *name)
             .wco = -1,
             .bind = STB_LOCAL,
             .type = STT_NOTYPE,
+            .visibility = STV_DEFAULT,
         };
     }
     s = *ps;
@@ -66,8 +67,13 @@ getsym(const char *name)
 static void
 secaddbytes(Section *s, const void *bytes, size_t n)
 {
+    size_t i;
 
     if (s->hdr.sh_type == SHT_NOBITS) {
+        for (i = 0; i < n; i++) {
+            if (((const uint8_t *)bytes)[i] != 0)
+                lfatal("SHT_NOBITS section cannot have non-zero initializers");
+        }
         s->hdr.sh_size += n;
         return;
     }
@@ -124,6 +130,37 @@ getsection(const char *name)
     return s;
 }
 
+static bool
+sectionnameis(const char *name, const char *base)
+{
+    size_t n;
+
+    n = strlen(base);
+    return strcmp(name, base) == 0
+        || (strncmp(name, base, n) == 0 && name[n] == '.');
+}
+
+static const char *
+defaultsectionflags(const char *name)
+{
+    if (sectionnameis(name, ".text") || strcmp(name, ".init") == 0
+        || strcmp(name, ".fini") == 0)
+        return "ax";
+    if (sectionnameis(name, ".data") || sectionnameis(name, ".bss"))
+        return "aw";
+    if (sectionnameis(name, ".rodata"))
+        return "a";
+    return "";
+}
+
+static int
+defaultsectiontype(const char *name, int type)
+{
+    if (type == SHT_PROGBITS && sectionnameis(name, ".bss"))
+        return SHT_NOBITS;
+    return type;
+}
+
 static void
 initsections(void)
 {
@@ -171,6 +208,8 @@ initsections(void)
     textrel->hdr.sh_info = text->idx;
     textrel->hdr.sh_link = symtab->idx;
     textrel->hdr.sh_entsize = sizeof(Elf64_Rela);
+    textrel->hdr.sh_addralign = 8;
+    text->relocsec = textrel;
 
     datarel = newsection();
     datarel->hdr.sh_name = elfstr(shstrtab, ".rela.data");
@@ -178,6 +217,8 @@ initsections(void)
     datarel->hdr.sh_info = data->idx;
     datarel->hdr.sh_link = symtab->idx;
     datarel->hdr.sh_entsize = sizeof(Elf64_Rela);
+    datarel->hdr.sh_addralign = 8;
+    data->relocsec = datarel;
 }
 
 static Relocation *
@@ -243,6 +284,18 @@ su64(uint64_t l)
 static uint8_t
 regbits(AsmKind k)
 {
+    switch (k) {
+    case ASM_AH:
+        return 4;
+    case ASM_CH:
+        return 5;
+    case ASM_DH:
+        return 6;
+    case ASM_BH:
+        return 7;
+    default:
+        break;
+    }
     return (k - (ASM_REG_BEGIN + 1)) % 16;
 }
 
@@ -253,6 +306,35 @@ isrexreg(AsmKind k)
     return k > ASM_REG_BEGIN && k < ASM_REG_END
         && (regbits(k) & (1 << 3) || k == ASM_SPL || k == ASM_BPL
             || k == ASM_SIL || k == ASM_DIL);
+}
+
+static bool
+ishibytereg(AsmKind k)
+{
+    return k == ASM_AH || k == ASM_CH || k == ASM_DH || k == ASM_BH;
+}
+
+static bool
+rexwillbeemitted(Rex rex)
+{
+    return rex.required || rex.w || rex.r || rex.x || rex.b;
+}
+
+static bool
+memrequiresrex(const Memarg *memarg)
+{
+    return isrexreg(memarg->base) || isrexreg(memarg->index);
+}
+
+static void
+checkhibyterex(Rex rex, AsmKind a, AsmKind b, const Memarg *memarg)
+{
+    if (!ishibytereg(a) && !ishibytereg(b))
+        return;
+    if (memarg && memrequiresrex(memarg))
+        rex.required = 1;
+    if (rexwillbeemitted(rex))
+        lfatal("can't encode high-byte register with REX prefix");
 }
 
 static uint8_t
@@ -323,8 +405,44 @@ assemblevbytes(VarBytes bytes)
 static void
 assemblerex(Rex rex)
 {
-    if (rex.required || rex.w || rex.r || rex.x || rex.b)
+    if (rexwillbeemitted(rex))
         sb(rexbyte(rex));
+}
+
+static void
+validatereloc(const char *l, int nbytes, int type)
+{
+    if (!l)
+        return;
+    if (cursection->hdr.sh_type == SHT_NOBITS)
+        lfatal("SHT_NOBITS section cannot have relocations");
+    switch (type) {
+    case R_X86_64_8:
+    case R_X86_64_PC8:
+        if (nbytes == 1)
+            return;
+        break;
+    case R_X86_64_16:
+        if (nbytes == 2)
+            return;
+        break;
+    case R_X86_64_PC32:
+    case R_X86_64_PLT32:
+    case R_X86_64_32:
+    case R_X86_64_GOTPCREL:
+    case R_X86_64_GOTPCRELX:
+    case R_X86_64_REX_GOTPCRELX:
+        if (nbytes == 4)
+            return;
+        break;
+    case R_X86_64_64:
+        if (nbytes == 8)
+            return;
+        break;
+    default:
+        unreachable();
+    }
+    lfatal("relocation size does not match field size");
 }
 
 /* Assemble a symbolic value. */
@@ -334,6 +452,7 @@ assemblereloc(const char *l, int64_t c, int nbytes, int type)
     Relocation *reloc;
     Symbol *sym;
 
+    validatereloc(l, nbytes, type);
     if (l != NULL) {
         reloc = newreloc();
         sym = getsym(l);
@@ -347,6 +466,48 @@ assemblereloc(const char *l, int64_t c, int nbytes, int type)
     assembleconstant(c, nbytes);
 }
 
+static int
+valuereloctype(const Value *value, int deftype)
+{
+    if (value->reloc == ASM_RELOC_GOTPCREL_AUTO)
+        return R_X86_64_GOTPCREL;
+    return value->reloc ? value->reloc : deftype;
+}
+
+static int
+valuepcrelreloctype(const Value *value, int deftype, Rex rex)
+{
+    if (value->reloc == ASM_RELOC_GOTPCREL_AUTO)
+        return rexwillbeemitted(rex) ? R_X86_64_REX_GOTPCRELX
+                                     : R_X86_64_GOTPCRELX;
+    return valuereloctype(value, deftype);
+}
+
+static void
+assemblevalue(const Value *value, int nbytes, int deftype)
+{
+    Symbol *sub;
+    int type;
+    int64_t addend;
+
+    addend = value->c;
+    type = valuereloctype(value, deftype);
+    if (value->sub) {
+        if (nbytes != 4)
+            lfatal("unsupported non-32-bit symbol subtraction");
+        sub = getsym(value->sub);
+        if (!sub->defined || !sub->section)
+            lfatal("unsupported subtraction from undefined symbol '%s'",
+                value->sub);
+        if (sub->section != cursection)
+            lfatal("unsupported cross-section subtraction from '%s'",
+                value->sub);
+        addend += cursection->hdr.sh_size - sub->value.c;
+        type = valuereloctype(value, R_X86_64_PC32);
+    }
+    assemblereloc(value->l, addend, nbytes, type);
+}
+
 /* Assemble a r <-> mem operation.
 
   In order to understand this function, you should check the intel
@@ -358,18 +519,22 @@ assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix, VarBytes opcode,
     uint8_t reg, int32_t nexti)
 {
     uint8_t mod, rm, scale, index, base;
+    int forcedisp32;
 
     /* Rip relative addressing. */
     if (memarg->base == ASM_RIP) {
         rm = 0x05;
         assemblevbytes(prefix);
+        if (memarg->segment)
+            sb(memarg->segment);
         assemblerex(rex);
         assemblevbytes(opcode);
         sb(modregrmbyte(0x00, reg, rm));
 
         if (memarg->disp.l) {
             assemblereloc(
-                memarg->disp.l, memarg->disp.c - 4 - nexti, 4, R_X86_64_PC32);
+                memarg->disp.l, memarg->disp.c - 4 - nexti, 4,
+                valuepcrelreloctype(&memarg->disp, R_X86_64_PC32, rex));
         } else {
             assembleconstant(memarg->disp.c, 4);
         }
@@ -377,64 +542,80 @@ assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix, VarBytes opcode,
     }
 
     /* Direct memory access */
-    if (memarg->base == ASM_NO_REG) {
+    if (memarg->base == ASM_NO_REG && memarg->index == ASM_NO_REG) {
         mod = 0;
         rm = 4;
 
         assemblevbytes(prefix);
+        if (memarg->segment)
+            sb(memarg->segment);
         assemblerex(rex);
         assemblevbytes(opcode);
         sb(modregrmbyte(mod, reg, rm));
 
         sb(sibbyte(0, 4, 5));
         if (memarg->disp.l) {
-            assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
+            assemblereloc(memarg->disp.l, memarg->disp.c, 4,
+                valuereloctype(&memarg->disp, R_X86_64_32));
         } else {
             assembleconstant(memarg->disp.c, 4);
         }
         return;
     }
 
-    rm = regbits(memarg->base);
-    rex.b = !!(rm & (1 << 3));
+    forcedisp32 = 0;
 
-    /* Case when we don't need sib */
-    if (memarg->index == ASM_NO_REG && memarg->scale == 0 && ((rm & 7) != 4)) {
-
-        if (memarg->disp.l != NULL || memarg->disp.c > INT8_MAX
-            || memarg->disp.c < INT8_MIN) {
-            mod = 2;
-        } else if (memarg->disp.c != 0 || (rm & 7) == 5) {
-            mod = 1;
-        } else {
-            mod = 0;
-        }
-
-        assemblevbytes(prefix);
-        assemblerex(rex);
-        assemblevbytes(opcode);
-        sb(modregrmbyte(mod, reg, rm));
-
-        if (mod == 1) {
-            assembleconstant(memarg->disp.c, 1);
-        } else if (mod == 2) {
-            assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
-        }
-        return;
-    }
-
-    /* Setup sib indexing. */
-    base = rm;
-    rm = 4;
-
-    if (memarg->disp.c == 0 && memarg->disp.l == 0 && ((base & 7) != 5)) {
-        mod = 0; /* +0 */
+    if (memarg->base == ASM_NO_REG) {
+        base = 5;
+        rm = 4;
+        mod = 0;
+        forcedisp32 = 1;
     } else {
-        if (memarg->disp.l == NULL && memarg->disp.c >= INT8_MIN
-            && memarg->disp.c <= INT8_MAX) {
-            mod = 1; /* +disp8 */
+        rm = regbits(memarg->base);
+        rex.b = !!(rm & (1 << 3));
+
+        /* Case when we don't need sib */
+        if (memarg->index == ASM_NO_REG && memarg->scale == 0
+            && ((rm & 7) != 4)) {
+
+            if (memarg->disp.l != NULL || memarg->disp.c > INT8_MAX
+                || memarg->disp.c < INT8_MIN) {
+                mod = 2;
+            } else if (memarg->disp.c != 0 || (rm & 7) == 5) {
+                mod = 1;
+            } else {
+                mod = 0;
+            }
+
+            assemblevbytes(prefix);
+            if (memarg->segment)
+                sb(memarg->segment);
+            assemblerex(rex);
+            assemblevbytes(opcode);
+            sb(modregrmbyte(mod, reg, rm));
+
+            if (mod == 1) {
+                assembleconstant(memarg->disp.c, 1);
+            } else if (mod == 2) {
+                assemblereloc(memarg->disp.l, memarg->disp.c, 4,
+                    valuereloctype(&memarg->disp, R_X86_64_32));
+            }
+            return;
+        }
+
+        /* Setup sib indexing. */
+        base = rm;
+        rm = 4;
+
+        if (memarg->disp.c == 0 && memarg->disp.l == 0 && ((base & 7) != 5)) {
+            mod = 0; /* +0 */
         } else {
-            mod = 2; /* +disp32 */
+            if (memarg->disp.l == NULL && memarg->disp.c >= INT8_MIN
+                && memarg->disp.c <= INT8_MAX) {
+                mod = 1; /* +disp8 */
+            } else {
+                mod = 2; /* +disp32 */
+            }
         }
     }
 
@@ -473,15 +654,21 @@ assemblemem(const Memarg *memarg, Rex rex, VarBytes prefix, VarBytes opcode,
     }
 
     assemblevbytes(prefix);
+    if (memarg->segment)
+        sb(memarg->segment);
     assemblerex(rex);
     assemblevbytes(opcode);
     sb(modregrmbyte(mod, reg, rm));
     sb(sibbyte(scale, index, base));
 
-    if (mod == 1) {
+    if (forcedisp32) {
+        assemblereloc(memarg->disp.l, memarg->disp.c, 4,
+            valuereloctype(&memarg->disp, R_X86_64_32));
+    } else if (mod == 1) {
         assembleconstant(memarg->disp.c, 1);
     } else if (mod == 2) {
-        assemblereloc(memarg->disp.l, memarg->disp.c, 4, R_X86_64_32);
+        assemblereloc(memarg->disp.l, memarg->disp.c, 4,
+            valuereloctype(&memarg->disp, R_X86_64_32));
     }
 }
 
@@ -489,8 +676,8 @@ static void
 assemblejmp(const Jmp *j)
 {
     Symbol *target;
-    int64_t distance;
-    int jmpsize;
+    int64_t distance, risk;
+    int jmpsize, longsize;
 
     // clang-format off
     static uint8_t cc2op[31] = {
@@ -502,12 +689,17 @@ assemblejmp(const Jmp *j)
     // clang-format on
 
     jmpsize = 4;
+    longsize = j->cc ? 6 : 5;
     target = getsym(j->target);
 
     if (cursection == target->section && target->wco != -1) {
         distance = target->wco - cursection->hdr.sh_size;
+        risk = 0;
+        if (distance >= 0
+            && target->wco_align_risk > cursection->align_risk)
+            risk = target->wco_align_risk - cursection->align_risk;
         if (distance - 2 >= INT8_MIN
-            && distance - (j->cc ? 6 : 5) <= INT8_MAX) {
+            && distance - longsize + risk <= INT8_MAX) {
             jmpsize = 1;
         } else {
             jmpsize = 4;
@@ -518,7 +710,8 @@ assemblejmp(const Jmp *j)
         if (j->cc)
             sb(0x0f);
         sb(cc2op[j->cc]);
-        assemblereloc(j->target, -4, 4, R_X86_64_PC32);
+        assemblereloc(
+            j->target, -4, 4, j->reloc ? j->reloc : R_X86_64_PC32);
     } else {
         sb(cc2op[j->cc] + (j->cc ? -16 : 2));
         assemblereloc(j->target, -1, 1, R_X86_64_PC8);
@@ -543,7 +736,7 @@ assembleabsimm(const Imm *imm)
         return;
     }
 
-    assemblereloc(imm->v.l, imm->v.c, imm->nbytes, reltype);
+    assemblevalue(&imm->v, imm->nbytes, reltype);
 }
 
 static void
@@ -556,6 +749,7 @@ assembleinstr(const Instr *instr)
 
     switch (instr->encoder) {
     case ENCODER_OP:
+        assemblevbytes(instr->prefix);
         assemblevbytes(instr->opcode);
         break;
     case ENCODER_OPREG:
@@ -563,6 +757,7 @@ assembleinstr(const Instr *instr)
         rex = instr->rex;
         rex.required = isrexreg(instr->arg1->kind);
         rex.b = !!(rm & (1 << 3));
+        checkhibyterex(rex, instr->arg1->kind, ASM_NO_REG, NULL);
         assemblevbytes(instr->prefix);
         assemblerex(rex);
         assemblevbytes(instr->opcode);
@@ -571,6 +766,7 @@ assembleinstr(const Instr *instr)
     case ENCODER_OPMEM:
         memarg = &instr->arg1->memarg;
         rex = instr->rex;
+        checkhibyterex(rex, ASM_NO_REG, ASM_NO_REG, memarg);
         assemblemem(
             memarg, rex, instr->prefix, instr->opcode, instr->fixedreg, 0);
         break;
@@ -579,6 +775,7 @@ assembleinstr(const Instr *instr)
         rex = instr->rex;
         rex.required = isrexreg(instr->arg1->kind);
         rex.b = !!(reg & (1 << 3));
+        checkhibyterex(rex, instr->arg1->kind, ASM_NO_REG, NULL);
         assemblevbytes(instr->prefix);
         assemblerex(rex);
         assemblevbytes(instr->opcode | (reg & 7));
@@ -589,6 +786,7 @@ assembleinstr(const Instr *instr)
         rex = instr->rex;
         rex.required = isrexreg(instr->arg2->kind);
         rex.b = !!(reg & (1 << 3));
+        checkhibyterex(rex, instr->arg2->kind, ASM_NO_REG, NULL);
         assemblevbytes(instr->prefix);
         assemblerex(rex);
         assemblevbytes(instr->opcode | (reg & 7));
@@ -608,7 +806,8 @@ assembleinstr(const Instr *instr)
         assemblevbytes(instr->prefix);
         assemblerex(rex);
         assemblevbytes(instr->opcode);
-        assemblereloc(memarg->disp.l, memarg->disp.c - 4, 4, R_X86_64_PC32);
+        assemblereloc(memarg->disp.l, memarg->disp.c - 4, 4,
+            valuereloctype(&memarg->disp, R_X86_64_PC32));
         break;
     case ENCODER_IMMREG:
         imm = &instr->arg1->imm;
@@ -617,6 +816,7 @@ assembleinstr(const Instr *instr)
         rex = instr->rex;
         rex.required = isrexreg(instr->arg2->kind);
         rex.b = !!(rm & (1 << 3));
+        checkhibyterex(rex, instr->arg2->kind, ASM_NO_REG, NULL);
         assemblevbytes(instr->prefix);
         assemblerex(rex);
         assemblevbytes(instr->opcode);
@@ -628,6 +828,7 @@ assembleinstr(const Instr *instr)
         memarg = &instr->arg2->memarg;
         reg = instr->fixedreg;
         rex = instr->rex;
+        checkhibyterex(rex, ASM_NO_REG, ASM_NO_REG, memarg);
         assemblemem(memarg, rex, instr->prefix, instr->opcode, instr->fixedreg,
             imm->nbytes);
         assembleabsimm(imm);
@@ -645,6 +846,10 @@ assembleinstr(const Instr *instr)
         rex.required
             = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
         rex.r = !!(reg & (1 << 3));
+        checkhibyterex(rex,
+            instr->encoder == ENCODER_MEMREG ? instr->arg2->kind
+                                             : instr->arg1->kind,
+            ASM_NO_REG, memarg);
         assemblemem(memarg, rex, instr->prefix, instr->opcode, reg, 0);
         break;
     case ENCODER_REGREG:
@@ -661,6 +866,7 @@ assembleinstr(const Instr *instr)
             = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
         rex.r = !!(reg & (1 << 3));
         rex.b = !!(rm & (1 << 3));
+        checkhibyterex(rex, instr->arg1->kind, instr->arg2->kind, NULL);
         assemblevbytes(instr->prefix);
         assemblerex(rex);
         assemblevbytes(instr->opcode);
@@ -675,6 +881,7 @@ assembleinstr(const Instr *instr)
             = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
         rex.r = !!(reg & (1 << 3));
         rex.b = !!(rm & (1 << 3));
+        checkhibyterex(rex, instr->arg2->kind, instr->arg3->kind, NULL);
         assemblevbytes(instr->prefix);
         assemblerex(rex);
         assemblevbytes(instr->opcode);
@@ -689,6 +896,7 @@ assembleinstr(const Instr *instr)
         rex.required
             = isrexreg(instr->arg1->kind) || isrexreg(instr->arg2->kind);
         rex.r = !!(reg & (1 << 3));
+        checkhibyterex(rex, instr->arg3->kind, ASM_NO_REG, memarg);
         assemblemem(
             memarg, rex, instr->prefix, instr->opcode, reg, imm->nbytes);
         assembleabsimm(imm);
@@ -708,13 +916,19 @@ assemble(void)
     cursection = text;
     curlineno = 0;
     for (l = allasm; l; l = l->next) {
-        curlineno++;
+        curlineno = l->lineno ? l->lineno : curlineno + 1;
         v = l->v;
         switch (v->kind) {
         case ASM_SYNTAX_ERROR:
             lfatal("syntax error");
             break;
+        case ASM_INVALID_STRING_OPERANDS:
+            lfatal("invalid string instruction operands");
+            break;
         case ASM_BLANK:
+            break;
+        case ASM_STMT_PAIR:
+            lfatal("internal parser error: unexpanded statement pair");
             break;
         case ASM_DIR_GLOBL:
             sym = getsym(v->globl.name);
@@ -724,13 +938,26 @@ assemble(void)
             sym = getsym(v->weak.sym);
             sym->bind = STB_WEAK;
             break;
+        case ASM_DIR_HIDDEN:
+            sym = getsym(v->weak.sym);
+            sym->visibility = STV_HIDDEN;
+            break;
+        case ASM_DIR_PROTECTED:
+            sym = getsym(v->weak.sym);
+            sym->visibility = STV_PROTECTED;
+            break;
         case ASM_DIR_SECTION: {
             const char *fp;
             Section *s;
 
             s = getsection(v->section.name);
-            s->hdr.sh_type = v->section.type;
-            fp = v->section.flags;
+            s->hdr.sh_type = v->section.flags
+                ? v->section.type
+                : defaultsectiontype(v->section.name, v->section.type);
+            if (v->section.entsize)
+                s->hdr.sh_entsize = v->section.entsize;
+            fp = v->section.flags ? v->section.flags
+                                  : defaultsectionflags(v->section.name);
             while (fp && *fp) {
                 switch (*(fp++)) {
                 case 'a':
@@ -742,8 +969,17 @@ assemble(void)
                 case 'x':
                     s->hdr.sh_flags |= SHF_EXECINSTR;
                     break;
+                case 'M':
+                    s->hdr.sh_flags |= SHF_MERGE;
+                    break;
+                case 'S':
+                    s->hdr.sh_flags |= SHF_STRINGS;
+                    break;
+                case 'T':
+                    s->hdr.sh_flags |= SHF_TLS;
+                    break;
                 default:
-                    unreachable();
+                    break;
                 }
             }
             cursection = s;
@@ -755,6 +991,9 @@ assemble(void)
         case ASM_DIR_TEXT:
             cursection = text;
             break;
+        case ASM_DIR_BSS:
+            cursection = bss;
+            break;
         case ASM_DIR_ASCII:
             sbn(v->ascii.data, v->ascii.len);
             break;
@@ -764,13 +1003,24 @@ assemble(void)
             break;
         case ASM_DIR_BALIGN: {
             int64_t offset, i, rem, amnt;
+            uint64_t risk;
             amnt = 0;
-            offset = cursection->hdr.sh_addralign + cursection->hdr.sh_size;
+            if (v->balign.align == 0)
+                break;
+            if (cursection->hdr.sh_addralign < v->balign.align)
+                cursection->hdr.sh_addralign = v->balign.align;
+            risk = v->balign.align - 1;
+            if (risk <= INT64_MAX
+                && cursection->align_risk <= INT64_MAX - (int64_t)risk)
+                cursection->align_risk += (int64_t)risk;
+            else
+                cursection->align_risk = INT64_MAX;
+            offset = cursection->hdr.sh_size;
             rem = offset % v->balign.align;
             if (rem)
                 amnt = v->balign.align - rem;
             for (i = 0; i < amnt; i++) {
-                sb(0x00);
+                sb(cursection->hdr.sh_flags & SHF_EXECINSTR ? 0x90 : 0x00);
             }
             break;
         }
@@ -792,19 +1042,16 @@ assemble(void)
             break;
         }
         case ASM_DIR_BYTE:
-            assemblereloc(
-                v->dirbyte.value.l, v->dirbyte.value.c, 1, R_X86_64_32);
+            assemblevalue(&v->dirbyte.value, 1, R_X86_64_8);
             break;
         case ASM_DIR_SHORT:
-            assemblereloc(
-                v->dirshort.value.l, v->dirshort.value.c, 2, R_X86_64_32);
+            assemblevalue(&v->dirshort.value, 2, R_X86_64_16);
             break;
         case ASM_DIR_INT:
-            assemblereloc(v->dirint.value.l, v->dirint.value.c, 4, R_X86_64_32);
+            assemblevalue(&v->dirint.value, 4, R_X86_64_32);
             break;
         case ASM_DIR_QUAD:
-            assemblereloc(
-                v->dirquad.value.l, v->dirquad.value.c, 8, R_X86_64_64);
+            assemblevalue(&v->dirquad.value, 8, R_X86_64_64);
             break;
         case ASM_DIR_SET:
             sym = getsym(v->set.sym);
@@ -822,6 +1069,7 @@ assemble(void)
             sym->section = cursection;
             sym->value.c = cursection->hdr.sh_size;
             sym->wco = sym->value.c;
+            sym->wco_align_risk = cursection->align_risk;
             break;
         case ASM_INSTR:
             assembleinstr(&v->instr);
@@ -851,6 +1099,7 @@ relaxreset(void)
         if (sec == shstrtab || sec == strtab || sec == symtab)
             continue;
         sec->hdr.sh_size = 0;
+        sec->align_risk = 0;
     }
 
     /* Reset symbols, saving the worst case offset for the second pass. */
@@ -859,7 +1108,10 @@ relaxreset(void)
             continue;
         sym = symbols->vals[i];
         *sym = (Symbol) {
-            .name = sym->name, .section = sym->section, .wco = sym->wco
+            .name = sym->name,
+            .section = sym->section,
+            .wco = sym->wco,
+            .wco_align_risk = sym->wco_align_risk,
         };
     }
 }
@@ -882,6 +1134,7 @@ resolvesym2(Symbol *sym, int depth)
         sym->value.l = NULL;
         sym->value.c += indirect->value.c;
         sym->wco = sym->value.c;
+        sym->wco_align_risk = indirect->wco_align_risk;
         sym->defined = 1;
         return 1;
     }
@@ -918,7 +1171,7 @@ addtosymtab(Symbol *sym)
 
     sym->idx = symtab->hdr.sh_size / symtab->hdr.sh_entsize;
 
-    if (!sym->section) {
+    if (!sym->section && sym->bind == STB_LOCAL) {
         sym->bind = STB_GLOBAL;
     }
 
@@ -927,7 +1180,7 @@ addtosymtab(Symbol *sym)
     elfsym.st_size = sym->size;
     elfsym.st_info = ELF64_ST_INFO(sym->bind, sym->type);
     elfsym.st_shndx = sym->section ? sym->section->idx : SHN_UNDEF;
-    elfsym.st_other = 0;
+    elfsym.st_other = ELF64_ST_VISIBILITY(sym->visibility);
     secaddbytes(symtab, &elfsym, sizeof(Elf64_Sym));
 }
 
@@ -942,7 +1195,7 @@ fillsymtab(void)
         if (!symbols->keys[i].str)
             continue;
         sym = symbols->vals[i];
-        if (!sym->section)
+        if (!sym->section && sym->bind == STB_LOCAL)
             sym->bind = STB_GLOBAL;
     }
 
@@ -984,8 +1237,13 @@ resolvereloc(Relocation *reloc)
         return 0;
 
     switch (reloc->type) {
+    case R_X86_64_8:
+    case R_X86_64_16:
     case R_X86_64_32:
     case R_X86_64_64:
+    case R_X86_64_GOTPCREL:
+    case R_X86_64_GOTPCRELX:
+    case R_X86_64_REX_GOTPCRELX:
         return 0;
     case R_X86_64_PC8:
         rdata = &reloc->section->data[reloc->offset];
@@ -995,6 +1253,7 @@ resolvereloc(Relocation *reloc)
         rdata[0] = value;
         return 1;
     case R_X86_64_PC32:
+    case R_X86_64_PLT32:
         rdata = &reloc->section->data[reloc->offset];
         value = sym->value.c - reloc->offset + reloc->addend;
         if (value > INT32_MAX || value < INT32_MIN)
@@ -1020,19 +1279,33 @@ appendreloc(Relocation *reloc)
     memset(&elfrel, 0, sizeof(elfrel));
 
     sym = reloc->sym;
-    if (reloc->section == text)
-        relsection = textrel;
-    else if (reloc->section == data)
-        relsection = datarel;
-    else {
-        fatal("unexpected relocation for symbol '%s'", sym->name);
-        return;
+    relsection = reloc->section->relocsec;
+    if (!relsection) {
+        const char *secname;
+        char *relname;
+
+        secname = (const char *)shstrtab->data + reloc->section->hdr.sh_name;
+        relname = xmalloc(strlen(secname) + strlen(".rela") + 1);
+        sprintf(relname, ".rela%s", secname);
+        relsection = getsection(relname);
+        relsection->hdr.sh_type = SHT_RELA;
+        relsection->hdr.sh_info = reloc->section->idx;
+        relsection->hdr.sh_link = symtab->idx;
+        relsection->hdr.sh_entsize = sizeof(Elf64_Rela);
+        relsection->hdr.sh_addralign = 8;
+        reloc->section->relocsec = relsection;
     }
 
     switch (reloc->type) {
+    case R_X86_64_8:
+    case R_X86_64_16:
     case R_X86_64_PC32:
+    case R_X86_64_PLT32:
     case R_X86_64_32:
     case R_X86_64_64:
+    case R_X86_64_GOTPCREL:
+    case R_X86_64_GOTPCRELX:
+    case R_X86_64_REX_GOTPCRELX:
         elfrel.r_info = ELF64_R_INFO(sym->idx, reloc->type);
         elfrel.r_offset = reloc->offset;
         elfrel.r_addend = reloc->addend;
@@ -1096,7 +1369,8 @@ outelf(void)
     for (i = 0; i < nsections; i++) {
         sections[i].hdr.sh_offset = offset;
         out(&sections[i].hdr, sizeof(Elf64_Shdr));
-        offset += sections[i].hdr.sh_size;
+        if (sections[i].hdr.sh_type != SHT_NOBITS)
+            offset += sections[i].hdr.sh_size;
     }
     for (i = 0; i < nsections; i++) {
         if (sections[i].hdr.sh_type == SHT_NOBITS)
@@ -1126,6 +1400,8 @@ parseargs(int argc, char *argv[])
     argv0 = argv[0];
 
     for (++argv; *argv; argv++) {
+        if (strcmp(argv[0], "-") == 0)
+            break;
         if (argv[0][0] != '-')
             break;
         a = &argv[0][1];
@@ -1152,9 +1428,11 @@ parseargs(int argc, char *argv[])
     if (argv[0]) {
         if (argv[1])
             usage(argv0);
-        infilename = argv[0];
-        if (!freopen(infilename, "r", stdin))
-            fatal("unable to open %s:", infilename);
+        if (strcmp(argv[0], "-") != 0) {
+            infilename = argv[0];
+            if (!freopen(infilename, "r", stdin))
+                fatal("unable to open %s:", infilename);
+        }
     }
 }
 

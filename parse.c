@@ -47,6 +47,76 @@ internstring(const char *s)
     return interned;
 }
 
+static int local_label_counters[10];
+
+static const char *
+local_label_define(const char *num)
+{
+    char buf[64];
+    int n, idx;
+
+    n = num[0] - '0';
+    if (n < 0 || n >= (int)(sizeof(local_label_counters) / sizeof(local_label_counters[0])))
+        unreachable();
+    idx = ++local_label_counters[n];
+    snprintf(buf, sizeof(buf), ".Llocal.%d.%d", n, idx);
+    return internstring(buf);
+}
+
+static const char *
+local_label_reference(const char *num, const char *dir)
+{
+    char buf[64];
+    int n, idx;
+
+    n = num[0] - '0';
+    if (n < 0 || n >= (int)(sizeof(local_label_counters) / sizeof(local_label_counters[0])))
+        unreachable();
+    idx = local_label_counters[n] + (*dir == 'f');
+    snprintf(buf, sizeof(buf), ".Llocal.%d.%d", n, idx);
+    return internstring(buf);
+}
+
+static int64_t
+parse_const_expr(const char *s)
+{
+    char *end;
+    int sign;
+    int64_t total;
+
+    total = 0;
+    sign = 1;
+    while (*s) {
+        while (isspace((unsigned char)*s))
+            s++;
+        if (*s == '+') {
+            sign = 1;
+            s++;
+            continue;
+        }
+        if (*s == '-') {
+            sign = -1;
+            s++;
+            continue;
+        }
+        errno = 0;
+        total += sign * (int64_t)strtoll(s, &end, 0);
+        if (s == end || errno)
+            fatal("invalid constant expression");
+        s = end;
+        sign = 1;
+    }
+    return total;
+}
+
+static const char *
+label_define(const char *name)
+{
+    if (name[0] >= '0' && name[0] <= '9' && name[1] == '\0')
+        return local_label_define(name);
+    return name;
+}
+
 static String
 decodestring(const char *s)
 {
@@ -65,12 +135,22 @@ decodestring(const char *s)
                 s++;
                 c = strtoul(s, &end, 16);
                 s = end - 1;
+            } else if (*s == 'a') {
+                c = '\a';
+            } else if (*s == 'b') {
+                c = '\b';
+            } else if (*s == 'f') {
+                c = '\f';
             } else if (*s == 'r') {
                 c = '\r';
             } else if (*s == 'n') {
                 c = '\n';
             } else if (*s == 't') {
                 c = '\t';
+            } else if (*s == 'v') {
+                c = '\v';
+            } else if (*s == '"') {
+                c = '"';
             } else if (*s == '\\') {
                 c = '\\';
             } else {
@@ -112,6 +192,40 @@ needsmovabs(Imm *imm)
         .instr = (Instr)                                                       \
         {                                                                      \
             .kind = ASM_INSTR, .encoder = ENCODER_OP, .prefix = -1,            \
+            .opcode = OPCODE,                                                  \
+        }                                                                      \
+    }
+
+#define INVALID_STRING_OPERANDS                                                \
+    (Parsev)                                                                   \
+    {                                                                          \
+        .kind = ASM_INVALID_STRING_OPERANDS,                                   \
+    }
+
+static int32_t
+stringopcode(int64_t segment, int32_t opcode)
+{
+    int n;
+    uint32_t mask;
+
+    if (segment < 0)
+        return opcode;
+
+    n = (int8_t)(uint8_t)((opcode & 0xff000000) >> 24);
+    if (n >= 2)
+        unreachable();
+
+    mask = (1U << ((n + 1) * 8)) - 1;
+    return ((n + 1) << 24) | ((uint8_t)segment << ((n + 1) * 8))
+        | (opcode & mask);
+}
+
+#define OPP(PREFIX, OPCODE)                                                    \
+    (Parsev)                                                                   \
+    {                                                                          \
+        .instr = (Instr)                                                       \
+        {                                                                      \
+            .kind = ASM_INSTR, .encoder = ENCODER_OP, .prefix = PREFIX,        \
             .opcode = OPCODE,                                                  \
         }                                                                      \
     }
@@ -274,25 +388,43 @@ needsmovabs(Imm *imm)
 
 #include "asm_parser.c"
 
+static void
+appendasmline(AsmLine **result, AsmLine **prevl, const Parsev *v,
+    int64_t lineno)
+{
+    AsmLine *l;
+
+    l = zalloc(sizeof(AsmLine));
+    l->lineno = lineno;
+    l->v = v;
+    if (*prevl)
+        (*prevl)->next = l;
+    else
+        *result = l;
+    *prevl = l;
+}
+
 AsmLine *
 parseasm(void)
 {
-    AsmLine *result, *l, *prevl;
+    AsmLine *result, *prevl;
     asm_context_t *ctx;
     Parsev v;
+    int64_t lineno;
 
     ctx = asm_create(NULL);
     result = NULL;
     prevl = NULL;
+    lineno = 0;
 
     while (asm_parse(ctx, &v)) {
-        l = zalloc(sizeof(AsmLine));
-        l->v = internparsev(&v);
-        if (prevl)
-            prevl->next = l;
-        else
-            result = l;
-        prevl = l;
+        lineno++;
+        if (v.kind == ASM_STMT_PAIR) {
+            appendasmline(&result, &prevl, v.pair.first, lineno);
+            appendasmline(&result, &prevl, v.pair.second, lineno);
+        } else {
+            appendasmline(&result, &prevl, internparsev(&v), lineno);
+        }
     }
 
     asm_destroy(ctx);

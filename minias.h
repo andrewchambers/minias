@@ -11,18 +11,29 @@
 #include <string.h>
 #include <unistd.h>
 
-typedef struct {
+typedef struct Section Section;
+
+enum {
+    ASM_RELOC_GOTPCREL_AUTO = -1,
+};
+
+struct Section {
     Elf64_Shdr hdr;
     int16_t idx;
     int64_t wco;
+    int64_t align_risk;
     int64_t offset;
     size_t capacity;
     uint8_t *data;
-} Section;
+    Section *relocsec;
+};
 
 typedef struct {
     int64_t c;
     const char *l;
+    const char *sub;
+    int32_t reloc;
+    int32_t pad;
 } Value;
 
 typedef struct {
@@ -30,9 +41,11 @@ typedef struct {
     int32_t idx;
     Value value;
     int64_t wco; /* worst case offset */
+    int64_t wco_align_risk;
     int64_t size;
     int bind; /* STB_GLOBAL, STB_LOCAL, STB_WEAK */
     int type;
+    int visibility;
     int defined;
     Section *section;
 } Symbol;
@@ -48,7 +61,9 @@ typedef struct {
 typedef enum {
     // Misc
     ASM_SYNTAX_ERROR,
+    ASM_INVALID_STRING_OPERANDS,
     ASM_BLANK,
+    ASM_STMT_PAIR,
     ASM_LABEL,
     ASM_IMM,
     ASM_STRING,
@@ -56,12 +71,15 @@ typedef enum {
     // Directives.
     ASM_DIR_GLOBL,
     ASM_DIR_WEAK,
+    ASM_DIR_HIDDEN,
+    ASM_DIR_PROTECTED,
     ASM_DIR_SECTION,
     ASM_DIR_ASCII,
     ASM_DIR_ASCIIZ,
     ASM_DIR_SET,
     ASM_DIR_DATA,
     ASM_DIR_TEXT,
+    ASM_DIR_BSS,
     ASM_DIR_FILL,
     ASM_DIR_BYTE,
     ASM_DIR_SHORT,
@@ -161,6 +179,11 @@ typedef enum {
     ASM_XMM14,
     ASM_XMM15,
 
+    ASM_AH,
+    ASM_CH,
+    ASM_DH,
+    ASM_BH,
+
     /* RIP is in a special class of its own. */
     ASM_RIP,
     ASM_NO_REG,
@@ -169,6 +192,13 @@ typedef enum {
 } AsmKind;
 
 typedef union Parsev Parsev;
+
+typedef struct StmtPair {
+    AsmKind kind;
+    uint32_t pad;
+    const Parsev *first;
+    const Parsev *second;
+} StmtPair;
 
 typedef struct Label {
     AsmKind kind;
@@ -196,6 +226,7 @@ typedef struct DirSection {
     int32_t type;
     const char *name;
     const char *flags;
+    int64_t entsize;
 } DirSection;
 
 typedef struct Byte {
@@ -242,6 +273,8 @@ typedef struct Memarg {
     AsmKind index;
     uint32_t scale;
     Value disp;
+    int32_t segment;
+    int32_t pad;
 } Memarg;
 
 typedef struct String {
@@ -256,6 +289,8 @@ typedef struct Jmp {
     AsmKind kind;
     uint32_t cc; /* 0 means unconditional. */
     const char *target;
+    int32_t reloc;
+    int32_t pad;
 } Jmp;
 
 /* Rex opcode prefix. */
@@ -304,6 +339,7 @@ typedef struct Instr {
 
 union Parsev {
     AsmKind kind;
+    StmtPair pair;
     Label label;
     Globl globl;
     DirSection section;
