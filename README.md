@@ -5,8 +5,7 @@ A mini assembler for x86-64, written for fun and learning.
 Minias can assemble large amounts of real world software after it has
 been compiled to assembly by compilers including GCC, Clang,
 [cproc](https://sr.ht/~mcf/cproc/)/[qbe](https://c9x.me/compile/), and
-[chibicc](https://github.com/rui314/chibicc). It can also assemble self
-hosted cproc, meaning it can indirectly assemble itself.
+[chibicc](https://github.com/rui314/chibicc). It can also assemble itself (After compilation with a C compiler).
 
 Project Goals:
 
@@ -77,10 +76,6 @@ Bonus features:
   to see if we can improve the parser generator upstream. That being said,
   performance is often better than gnu as and much better than the clang assembler.
 
-# Contact
-
-Ask questions on the [mailing list](https://lists.sr.ht/~ach/minias).
-Submit bugs to the [ticket system](https://todo.sr.ht/~ach/minias).
 
 # Resources
 
